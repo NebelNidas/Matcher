@@ -1,0 +1,85 @@
+plugins {
+	id 'java-library'
+	id 'application'
+	id 'maven-publish'
+	id 'com.github.johnrengelman.shadow' version '7.1.2'
+	id 'org.openjfx.javafxplugin' version '0.0.13'
+	id 'de.jjohannes.extra-java-module-info' version '0.12'
+}
+
+repositories {
+    mavenCentral()
+    maven {
+        name "Fabric"
+        url 'https://maven.fabricmc.net/'
+    }
+	maven {
+		name "Quilt"
+		url 'https://maven.quiltmc.org/repository/release/'
+	}
+}
+
+archivesBaseName = 'matcher'
+group = 'net.fabricmc'
+
+sourceSets {
+    main {
+        java.srcDirs = ['src']
+		resources.srcDirs = ['res']
+    }
+}
+
+javafx {
+	version = "11.0.2"
+	modules = [ 'javafx.controls', 'javafx.web' ]
+}
+
+java {
+	sourceCompatibility = JavaVersion.VERSION_11
+	targetCompatibility = JavaVersion.VERSION_11
+
+	if (!JavaVersion.current().isCompatibleWith(JavaVersion.VERSION_11)) {
+		toolchain {
+			languageVersion = JavaLanguageVersion.of(11)
+		}
+	}
+}
+
+tasks.withType(JavaCompile).configureEach {
+	it.options.encoding = "UTF-8"
+	it.options.release = 11
+}
+
+dependencies {
+    implementation "com.github.javaparser:javaparser-core:3.24.2"
+    implementation "net.fabricmc:mapping-io:0.3.0"
+	implementation "org.bitbucket.mstrobel:procyon-compilertools:0.5.33.6"
+	implementation "org.ow2.asm:asm:9.1"
+	implementation "org.ow2.asm:asm-commons:9.1"
+	implementation "org.ow2.asm:asm-tree:9.1"
+	implementation "org.ow2.asm:asm-util:9.1"
+	implementation "org.benf:cfr:0.151"
+	implementation "org.quiltmc:quiltflower:1.8.1"
+}
+
+extraJavaModuleInfo {
+	automaticModule("cfr-0.151.jar", "cfr")
+	automaticModule("procyon-compilertools-0.5.33.6.jar", "procyon.compilertools")
+	automaticModule("procyon-core-0.5.33.6.jar", "procyon.core")
+	automaticModule("quiltflower-1.8.1.jar", "intellij.fernflower")
+}
+
+application {
+	mainModule = 'matcher'
+	mainClass = 'matcher.Main'
+}
+
+build.dependsOn(shadowJar)
+
+publishing {
+	publications {
+		mavenJava(MavenPublication) {
+			from components.java
+		}
+	}
+}

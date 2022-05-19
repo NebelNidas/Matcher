@@ -16,6 +16,7 @@ import java.util.jar.Manifest;
 
 import org.jetbrains.java.decompiler.main.ClassesProcessor;
 import org.jetbrains.java.decompiler.main.DecompilerContext;
+import org.jetbrains.java.decompiler.main.IdentityRenamerFactory;
 import org.jetbrains.java.decompiler.main.ClassesProcessor.ClassNode;
 import org.jetbrains.java.decompiler.main.decompiler.PrintStreamLogger;
 import org.jetbrains.java.decompiler.main.extern.IBytecodeProvider;
@@ -23,6 +24,7 @@ import org.jetbrains.java.decompiler.main.extern.IFernflowerLogger;
 import org.jetbrains.java.decompiler.main.extern.IFernflowerPreferences;
 import org.jetbrains.java.decompiler.main.extern.IIdentifierRenamer;
 import org.jetbrains.java.decompiler.main.extern.IResultSaver;
+import org.jetbrains.java.decompiler.main.extern.IVariableNamingFactory;
 import org.jetbrains.java.decompiler.modules.renamer.ConverterHelper;
 import org.jetbrains.java.decompiler.modules.renamer.IdentifierConverter;
 import org.jetbrains.java.decompiler.modules.renamer.PoolInterceptor;
@@ -31,6 +33,7 @@ import org.jetbrains.java.decompiler.struct.IDecompiledData;
 import org.jetbrains.java.decompiler.struct.StructClass;
 import org.jetbrains.java.decompiler.struct.StructContext;
 import org.jetbrains.java.decompiler.struct.lazy.LazyLoader;
+import org.jetbrains.java.decompiler.util.DataInputFullStream;
 import org.jetbrains.java.decompiler.util.TextBuffer;
 
 import matcher.NameType;
@@ -38,7 +41,7 @@ import matcher.type.ClassEnv;
 import matcher.type.ClassFeatureExtractor;
 import matcher.type.ClassInstance;
 
-public class Fernflower implements Decompiler {
+public class Quiltflower implements Decompiler {
 	@Override
 	public String decompile(ClassInstance cls, ClassFeatureExtractor env, NameType nameType) {
 		// invoke ff with on-demand class lookup into matcher's state and string based output
@@ -67,7 +70,8 @@ public class Fernflower implements Decompiler {
 		data.converter = converter;
 
 		IFernflowerLogger logger = new PrintStreamLogger(System.out);
-		DecompilerContext context = new DecompilerContext(properties, logger, structContext, classProcessor, interceptor);
+		IVariableNamingFactory renamerFactory = new IdentityRenamerFactory();
+		DecompilerContext context = new DecompilerContext(properties, logger, structContext, classProcessor, interceptor, renamerFactory);
 		DecompilerContext.setCurrentContext(context);
 
 		try {
@@ -160,7 +164,9 @@ public class Fernflower implements Decompiler {
 			byte[] data = bcProvider.get(name); // BytecodeProvider has a name->byte[] cache to avoid redundant cls.serialize invocations
 			if (data == null) throw new IllegalStateException();
 
-			StructClass cl = new StructClass(data, isOwn, loader);
+			DataInputFullStream in = new DataInputFullStream(data);
+
+			StructClass cl = StructClass.create(in, isOwn, loader);
 			classes.put(cl.qualifiedName, cl);
 
 			ContextUnit unit = isOwn ? ownedUnit : unownedUnit;
@@ -171,7 +177,7 @@ public class Fernflower implements Decompiler {
 		}
 
 		@Override
-		public Map<String, StructClass> getClasses() {
+		public Map<String, StructClass> getOwnClasses() {
 			return emulatedClasses;
 		}
 
@@ -225,6 +231,8 @@ public class Fernflower implements Decompiler {
 		@Override
 		public void closeArchive(String path, String archiveName) { }
 		@Override
+		public void saveClassEntry(String path, String archiveName, String qualifiedName, String entryName, String content) { }
+		@Override
 		public void saveClassEntry(String path, String archiveName, String qualifiedName, String entryName, String content, int[] mapping) { }
 
 		@Override
@@ -235,6 +243,7 @@ public class Fernflower implements Decompiler {
 		}
 
 		Map<String, String> results = new HashMap<>();
+
 	}
 
 	private static class DecompiledData implements IDecompiledData {
