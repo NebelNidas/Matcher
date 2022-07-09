@@ -4,7 +4,7 @@ plugins {
 	id 'maven-publish'
 	id 'com.github.johnrengelman.shadow' version '7.1.2'
 	id 'org.openjfx.javafxplugin' version '0.0.13'
-	id 'de.jjohannes.extra-java-module-info' version '0.12'
+	id 'de.jjohannes.extra-java-module-info' version '0.15'
 }
 
 repositories {
@@ -53,19 +53,19 @@ tasks.withType(JavaCompile).configureEach {
 dependencies {
     implementation "com.github.javaparser:javaparser-core:3.24.2"
     implementation "net.fabricmc:mapping-io:0.3.0"
-	implementation "org.bitbucket.mstrobel:procyon-compilertools:0.5.33.6"
-	implementation "org.ow2.asm:asm:9.1"
-	implementation "org.ow2.asm:asm-commons:9.1"
-	implementation "org.ow2.asm:asm-tree:9.1"
-	implementation "org.ow2.asm:asm-util:9.1"
-	implementation "org.benf:cfr:0.151"
+	implementation "org.bitbucket.mstrobel:procyon-compilertools:0.6.0"
+	implementation "org.ow2.asm:asm:9.3"
+	implementation "org.ow2.asm:asm-commons:9.3"
+	implementation "org.ow2.asm:asm-tree:9.3"
+	implementation "org.ow2.asm:asm-util:9.3"
+	implementation "org.benf:cfr:0.152"
 	implementation "org.quiltmc:quiltflower:1.8.1"
 }
 
 extraJavaModuleInfo {
-	automaticModule("cfr-0.151.jar", "cfr")
-	automaticModule("procyon-compilertools-0.5.33.6.jar", "procyon.compilertools")
-	automaticModule("procyon-core-0.5.33.6.jar", "procyon.core")
+	automaticModule("cfr-0.152.jar", "cfr")
+	automaticModule("procyon-compilertools-0.6.0.jar", "procyon.compilertools")
+	automaticModule("procyon-core-0.6.0.jar", "procyon.core")
 	automaticModule("quiltflower-1.8.1.jar", "intellij.fernflower")
 }
 
