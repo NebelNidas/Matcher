@@ -63,10 +63,11 @@ dependencies {
 }
 
 extraJavaModuleInfo {
+	automaticModule("mapping-io-0.3.0.jar", "net.fabricmc.mappingio")
 	automaticModule("cfr-0.152.jar", "cfr")
 	automaticModule("procyon-compilertools-0.6.0.jar", "procyon.compilertools")
 	automaticModule("procyon-core-0.6.0.jar", "procyon.core")
-	automaticModule("quiltflower-1.8.1.jar", "intellij.fernflower")
+	automaticModule("quiltflower-1.8.1.jar", "org.quiltmc.quiltflower")
 }
 
 application {
