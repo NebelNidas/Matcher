@@ -68,6 +68,9 @@ dependencies {
 	implementation "org.openjfx:javafx-web:11.0.2:win"
 	implementation "org.openjfx:javafx-web:11.0.2:mac"
 	implementation "org.openjfx:javafx-web:11.0.2:linux"
+	runtimeOnly "org.openjfx:javafx-media:11.0.2:win"
+	runtimeOnly "org.openjfx:javafx-media:11.0.2:mac"
+	runtimeOnly "org.openjfx:javafx-media:11.0.2:linux"
 }
 
 extraJavaModuleInfo {
