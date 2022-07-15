@@ -3,7 +3,6 @@ plugins {
 	id 'application'
 	id 'maven-publish'
 	id 'com.github.johnrengelman.shadow' version '7.1.2'
-	id 'org.openjfx.javafxplugin' version '0.0.13'
 	id 'de.jjohannes.extra-java-module-info' version '0.15'
 }
 
@@ -27,11 +26,6 @@ sourceSets {
         java
 		resources
     }
-}
-
-javafx {
-	version = "11.0.2"
-	modules = [ 'javafx.controls', 'javafx.web' ]
 }
 
 java {
@@ -60,9 +54,20 @@ dependencies {
 	implementation "org.ow2.asm:asm-util:9.3"
 	implementation "org.benf:cfr:0.152"
 	implementation "org.quiltmc:quiltflower:1.8.1"
-	runtimeOnly "org.openjfx:javafx-graphics:11.0.2:win"
-	runtimeOnly "org.openjfx:javafx-graphics:11.0.2:mac"
-	runtimeOnly "org.openjfx:javafx-graphics:11.0.2:linux"
+
+	// JavaFX for all platforms (needed for cross-platform fat jar)
+	implementation "org.openjfx:javafx-base:11.0.2:win"
+	implementation "org.openjfx:javafx-base:11.0.2:mac"
+	implementation "org.openjfx:javafx-base:11.0.2:linux"
+	implementation "org.openjfx:javafx-graphics:11.0.2:win"
+	implementation "org.openjfx:javafx-graphics:11.0.2:mac"
+	implementation "org.openjfx:javafx-graphics:11.0.2:linux"
+	implementation "org.openjfx:javafx-controls:11.0.2:win"
+	implementation "org.openjfx:javafx-controls:11.0.2:mac"
+	implementation "org.openjfx:javafx-controls:11.0.2:linux"
+	implementation "org.openjfx:javafx-web:11.0.2:win"
+	implementation "org.openjfx:javafx-web:11.0.2:mac"
+	implementation "org.openjfx:javafx-web:11.0.2:linux"
 }
 
 extraJavaModuleInfo {
