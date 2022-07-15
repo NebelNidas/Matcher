@@ -24,8 +24,8 @@ group = 'net.fabricmc'
 
 sourceSets {
     main {
-        java.srcDirs = ['src']
-		resources.srcDirs = ['res']
+        java
+		resources
     }
 }
 
