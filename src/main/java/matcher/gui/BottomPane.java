@@ -66,19 +66,19 @@ public class BottomPane extends StackPane implements IGuiComponent {
 		right.setAlignment(Pos.CENTER_RIGHT);
 		right.setPickOnBounds(false);
 
-		unmatchClassButton.setText("unmatch classes");
+		unmatchClassButton.setText("unmatch class");
 		unmatchClassButton.setOnAction(event -> unmatchClass());
 		unmatchClassButton.setDisable(true);
 
 		right.getChildren().add(unmatchClassButton);
 
-		unmatchMemberButton.setText("unmatch members");
+		unmatchMemberButton.setText("unmatch member");
 		unmatchMemberButton.setOnAction(event -> unmatchMember());
 		unmatchMemberButton.setDisable(true);
 
 		right.getChildren().add(unmatchMemberButton);
 
-		unmatchVarButton.setText("unmatch vars");
+		unmatchVarButton.setText("unmatch var");
 		unmatchVarButton.setOnAction(event -> unmatchVar());
 		unmatchVarButton.setDisable(true);
 
