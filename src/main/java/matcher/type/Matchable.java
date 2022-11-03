@@ -8,6 +8,7 @@ public interface Matchable<T extends Matchable<T>> {
 	String getId();
 	String getName();
 	String getName(NameType type);
+	char getSide();
 
 	default String getDisplayName(NameType type, boolean full) {
 		return getName(type);
@@ -38,4 +39,6 @@ public interface Matchable<T extends Matchable<T>> {
 	boolean isFullyMatched(boolean recursive);
 	float getSimilarity();
 	boolean isNameObfuscated();
+	boolean isIgnored();
+	void setIgnored(boolean ignored);
 }

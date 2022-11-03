@@ -4,12 +4,20 @@ import matcher.NameType;
 import matcher.SimilarityChecker;
 import matcher.Util;
 import matcher.classifier.ClassifierUtil;
+import matcher.config.Config;
 
 public final class MethodVarInstance implements Matchable<MethodVarInstance> {
 	MethodVarInstance(MethodInstance method, boolean isArg, int index, int lvIndex, int asmIndex,
 			ClassInstance type, int startInsn, int endInsn, int startOpIdx,
-			String origName, boolean nameObfuscated) {
+			String origName, boolean nameObfuscated, int ignoredStatus) {
+		this(method, null, isArg, index, lvIndex, asmIndex, type, startInsn, endInsn, startOpIdx, origName, nameObfuscated, ignoredStatus);
+	}
+
+	MethodVarInstance(MethodInstance method, Character side, boolean isArg, int index, int lvIndex, int asmIndex,
+			ClassInstance type, int startInsn, int endInsn, int startOpIdx,
+			String origName, boolean nameObfuscated, int ignoredStatus) {
 		this.method = method;
+		this.side = side;
 		this.isArg = isArg;
 		this.index = index;
 		this.lvIndex = lvIndex;
@@ -20,6 +28,7 @@ public final class MethodVarInstance implements Matchable<MethodVarInstance> {
 		this.startOpIdx = startOpIdx;
 		this.origName = origName;
 		this.nameObfuscated = nameObfuscated;
+		this.ignoredStatus = ignoredStatus;
 	}
 
 	@Override
@@ -153,8 +162,26 @@ public final class MethodVarInstance implements Matchable<MethodVarInstance> {
 	}
 
 	@Override
+	public char getSide() {
+		return side;
+	}
+
+	@Override
 	public boolean isNameObfuscated() {
 		return nameObfuscated;
+	}
+
+	@Override
+	public boolean isIgnored() {
+		return ignoredStatus >= 1;
+	}
+
+	@Override
+	public void setIgnored(boolean ignored) {
+		if (ignoredStatus != 2) {
+			ignoredStatus = ignored ? 1 : 0;
+		}
+
 	}
 
 	@Override
@@ -182,6 +209,10 @@ public final class MethodVarInstance implements Matchable<MethodVarInstance> {
 
 	public void setMappedName(String mappedName) {
 		this.mappedName = mappedName;
+		if (side == 'a' && Config.getProjectConfig().isIgnoreUnmappedA()
+				|| side == 'b' && Config.getProjectConfig().isIgnoreUnmappedB()) {
+			setIgnored(mappedName == null);
+		}
 	}
 
 	@Override
@@ -269,6 +300,7 @@ public final class MethodVarInstance implements Matchable<MethodVarInstance> {
 	}
 
 	final MethodInstance method;
+	final Character side;
 	final boolean isArg;
 	final int index;
 	final int lvIndex;
@@ -279,6 +311,7 @@ public final class MethodVarInstance implements Matchable<MethodVarInstance> {
 	private final int startOpIdx;
 	final String origName;
 	final boolean nameObfuscated;
+	private int ignoredStatus;
 
 	private String tmpName;
 	private int uid = -1;

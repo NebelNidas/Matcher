@@ -9,14 +9,17 @@ import org.objectweb.asm.Opcodes;
 import matcher.NameType;
 import matcher.SimilarityChecker;
 import matcher.Util;
+import matcher.config.Config;
 
 public abstract class MemberInstance<T extends MemberInstance<T>> implements Matchable<T> {
 	@SuppressWarnings("unchecked")
-	protected MemberInstance(ClassInstance cls, String id, String origName, boolean nameObfuscated, int position, boolean isStatic) {
+	protected MemberInstance(ClassInstance cls, String id, char side, String origName, boolean nameObfuscated, boolean ignored, int position, boolean isStatic) {
 		this.cls = cls;
 		this.id = id;
+		this.side = side;
 		this.origName = origName;
 		this.nameObfuscatedLocal = nameObfuscated;
+		this.ignoredStatus = ignored;
 		this.position = position;
 		this.isStatic = isStatic;
 
@@ -32,6 +35,11 @@ public abstract class MemberInstance<T extends MemberInstance<T>> implements Mat
 	@Override
 	public final String getId() {
 		return id;
+	}
+
+	@Override
+	public final char getSide() {
+		return side;
 	}
 
 	@Override
@@ -103,6 +111,19 @@ public abstract class MemberInstance<T extends MemberInstance<T>> implements Mat
 	@Override
 	public boolean isNameObfuscated() {
 		return hierarchyData == null ? nameObfuscatedLocal : hierarchyData.nameObfuscated;
+	}
+
+	@Override
+	public boolean isIgnored() {
+		int igStat = hierarchyData == null ? ignoredStatus : hierarchyData.ignoredStatus;
+		return igStat >= 1;
+	}
+
+	@Override
+	public void setIgnored(boolean ignored) {
+		if (ignoredStatus != 2) {
+			this.ignoredStatus = ignored ? 1 : 0;
+		}
 	}
 
 	public int getPosition() {
@@ -270,6 +291,10 @@ public abstract class MemberInstance<T extends MemberInstance<T>> implements Mat
 
 	public void setMappedName(String mappedName) {
 		hierarchyData.mappedName = mappedName;
+		if (side == 'a' && Config.getProjectConfig().isIgnoreUnmappedA()
+				|| side == 'b' && Config.getProjectConfig().isIgnoreUnmappedB()) {
+			setIgnored(mappedName == null);
+		}
 	}
 
 	@Override
@@ -361,8 +386,10 @@ public abstract class MemberInstance<T extends MemberInstance<T>> implements Mat
 
 	final ClassInstance cls;
 	final String id;
+	final char side;
 	final String origName;
 	boolean nameObfuscatedLocal;
+	int ignoredStatus;
 	final int position;
 	final boolean isStatic;
 

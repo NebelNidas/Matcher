@@ -96,6 +96,9 @@ public class Matcher {
 			List<InputFile> cpFiles,
 			List<InputFile> cpFilesA, List<InputFile> cpFilesB,
 			String nonObfuscatedClassPatternA, String nonObfuscatedClassPatternB, String nonObfuscatedMemberPatternA, String nonObfuscatedMemberPatternB,
+			String ignoredClassesPatternA, String ignoredClassesPatternB, String ignoredMemberPatternA, String ignoredMemberPatternB,
+			boolean ignoreUnmappedA, boolean ignoreUnmappedB,
+			boolean analyzeIgnoredClasses, boolean analyzeIgnoredMembers,
 			DoubleConsumer progressReceiver) throws IOException {
 		List<Path> pathsA = resolvePaths(inputDirs, inputFilesA);
 		List<Path> pathsB = resolvePaths(inputDirs, inputFilesB);
@@ -104,7 +107,9 @@ public class Matcher {
 		List<Path> classPathB = resolvePaths(inputDirs, cpFilesB);
 
 		ProjectConfig config = new ProjectConfig(pathsA, pathsB, classPathA, classPathB, sharedClassPath, false,
-				nonObfuscatedClassPatternA, nonObfuscatedClassPatternB, nonObfuscatedMemberPatternA, nonObfuscatedMemberPatternB);
+				nonObfuscatedClassPatternA, nonObfuscatedClassPatternB, nonObfuscatedMemberPatternA, nonObfuscatedMemberPatternB,
+				ignoredClassesPatternA, ignoredClassesPatternB, ignoredMemberPatternA, ignoredMemberPatternB,
+				ignoreUnmappedA, ignoreUnmappedB, analyzeIgnoredClasses, analyzeIgnoredMembers);
 		if (!config.isValid()) throw new IOException("invalid config");
 		Config.setProjectConfig(config);
 		Config.saveAsLast();
@@ -486,14 +491,30 @@ public class Matcher {
 
 	public boolean autoMatchClasses(ClassifierLevel level, double absThreshold, double relThreshold, DoubleConsumer progressReceiver) {
 		boolean assumeBothOrNoneObfuscated = env.assumeBothOrNoneObfuscated;
-		Predicate<ClassInstance> filter = cls -> cls.isReal() && (!assumeBothOrNoneObfuscated || cls.isNameObfuscated()) && !cls.hasMatch() && cls.isMatchable();
+		Predicate<ClassInstance> filter = cls -> cls.isReal()
+				&& (!cls.isIgnored() || Config.getProjectConfig().isAnalyzeIgnoredClasses())
+				&& (!assumeBothOrNoneObfuscated || cls.isNameObfuscated())
+				&& !cls.hasMatch()
+				&& cls.isMatchable();
 
 		List<ClassInstance> classes = env.getClassesA().stream()
 				.filter(filter)
+				.filter(cls -> {
+					if (!Config.getProjectConfig().isIgnoreUnmappedA() || Config.getProjectConfig().isAnalyzeIgnoredClasses()) {
+						return true;
+					}
+					return cls.hasMappedName() || cls.hasMappedChildren();
+				})
 				.collect(Collectors.toList());
 
 		ClassInstance[] cmpClasses = env.getClassesB().stream()
 				.filter(filter)
+				.filter(cls -> {
+					if (!Config.getProjectConfig().isIgnoreUnmappedB() || Config.getProjectConfig().isAnalyzeIgnoredClasses()) {
+						return true;
+					}
+					return cls.hasMappedName() || cls.hasMappedChildren();
+				})
 				.collect(Collectors.toList()).toArray(new ClassInstance[0]);
 
 		double maxScore = ClassClassifier.getMaxScore(level);
@@ -554,9 +575,31 @@ public class Matcher {
 
 	public boolean autoMatchMethods(ClassifierLevel level, double absThreshold, double relThreshold, DoubleConsumer progressReceiver) {
 		AtomicInteger totalUnmatched = new AtomicInteger();
+		Predicate<MethodInstance> filter = mth -> !mth.isIgnored() || Config.getProjectConfig().isAnalyzeIgnoredMembers();
 		Map<MethodInstance, MethodInstance> matches = match(level, absThreshold, relThreshold,
-				cls -> cls.getMethods(), MethodClassifier::rank, MethodClassifier.getMaxScore(level),
-				progressReceiver, totalUnmatched);
+				cls -> List.of(cls.getMethods())
+						.stream()
+						.filter(filter)
+						.filter(mth -> {
+							if (!Config.getProjectConfig().isIgnoreUnmappedA() || Config.getProjectConfig().isAnalyzeIgnoredMembers()) {
+								return true;
+							}
+							return mth.hasMappedName() || mth.hasMappedChildren();
+						})
+						.collect(Collectors.toList())
+						.toArray(new MethodInstance[0]),
+				cls  -> List.of(cls.getMethods())
+						.stream()
+						.filter(filter)
+						.filter(mth -> {
+							if (!Config.getProjectConfig().isIgnoreUnmappedB() || Config.getProjectConfig().isAnalyzeIgnoredMembers()) {
+								return true;
+							}
+							return mth.hasMappedName() || mth.hasMappedChildren();
+						})
+						.collect(Collectors.toList())
+						.toArray(new MethodInstance[0]),
+				MethodClassifier::rank, MethodClassifier.getMaxScore(level), progressReceiver, totalUnmatched);
 
 		for (Map.Entry<MethodInstance, MethodInstance> entry : matches.entrySet()) {
 			match(entry.getKey(), entry.getValue());
@@ -574,10 +617,32 @@ public class Matcher {
 	public boolean autoMatchFields(ClassifierLevel level, double absThreshold, double relThreshold, DoubleConsumer progressReceiver) {
 		AtomicInteger totalUnmatched = new AtomicInteger();
 		double maxScore = FieldClassifier.getMaxScore(level);
+		Predicate<FieldInstance> filter = fld -> !fld.isIgnored() || Config.getProjectConfig().isAnalyzeIgnoredMembers();
 
 		Map<FieldInstance, FieldInstance> matches = match(level, absThreshold, relThreshold,
-				cls -> cls.getFields(), FieldClassifier::rank, maxScore,
-				progressReceiver, totalUnmatched);
+				cls -> List.of(cls.getFields())
+						.stream()
+						.filter(filter)
+						.filter(fld -> {
+							if (!Config.getProjectConfig().isIgnoreUnmappedA() || Config.getProjectConfig().isAnalyzeIgnoredMembers()) {
+								return true;
+							}
+							return fld.hasMappedName();
+						})
+						.collect(Collectors.toList())
+						.toArray(new FieldInstance[0]),
+				cls -> List.of(cls.getFields())
+						.stream()
+						.filter(filter)
+						.filter(fld -> {
+							if (!Config.getProjectConfig().isIgnoreUnmappedB() || Config.getProjectConfig().isAnalyzeIgnoredMembers()) {
+								return true;
+							}
+							return fld.hasMappedName();
+						})
+						.collect(Collectors.toList())
+						.toArray(new FieldInstance[0]),
+				FieldClassifier::rank, maxScore, progressReceiver, totalUnmatched);
 
 		for (Map.Entry<FieldInstance, FieldInstance> entry : matches.entrySet()) {
 			match(entry.getKey(), entry.getValue());
@@ -589,12 +654,12 @@ public class Matcher {
 	}
 
 	private <T extends MemberInstance<T>> Map<T, T> match(ClassifierLevel level, double absThreshold, double relThreshold,
-			Function<ClassInstance, T[]> memberGetter, IRanker<T> ranker, double maxScore,
+			Function<ClassInstance, T[]> memberGetterA, Function<ClassInstance, T[]> memberGetterB, IRanker<T> ranker, double maxScore,
 			DoubleConsumer progressReceiver, AtomicInteger totalUnmatched) {
 		List<ClassInstance> classes = env.getClassesA().stream()
-				.filter(cls -> cls.isReal() && cls.hasMatch() && memberGetter.apply(cls).length > 0)
+				.filter(cls -> cls.isReal() && cls.hasMatch() && memberGetterA.apply(cls).length > 0)
 				.filter(cls -> {
-					for (T member : memberGetter.apply(cls)) {
+					for (T member : memberGetterA.apply(cls)) {
 						if (!member.hasMatch() && member.isMatchable()) return true;
 					}
 
@@ -609,10 +674,10 @@ public class Matcher {
 		runInParallel(classes, cls -> {
 			int unmatched = 0;
 
-			for (T member : memberGetter.apply(cls)) {
+			for (T member : memberGetterA.apply(cls)) {
 				if (member.hasMatch() || !member.isMatchable()) continue;
 
-				List<RankResult<T>> ranking = ranker.rank(member, memberGetter.apply(cls.getMatch()), level, env, maxMismatch);
+				List<RankResult<T>> ranking = ranker.rank(member, memberGetterB.apply(cls.getMatch()), level, env, maxMismatch);
 
 				if (checkRank(ranking, absThreshold, relThreshold, maxScore)) {
 					T match = ranking.get(0).getSubject();
@@ -649,12 +714,20 @@ public class Matcher {
 
 	private boolean autoMatchMethodVars(boolean isArg, Function<MethodInstance, MethodVarInstance[]> supplier,
 			ClassifierLevel level, double absThreshold, double relThreshold, DoubleConsumer progressReceiver) {
-		List<MethodInstance> methods = env.getClassesA().stream()
+		Predicate<MethodVarInstance> predicateB = var -> {
+			if (!Config.getProjectConfig().isIgnoreUnmappedB() || Config.getProjectConfig().isAnalyzeIgnoredMembers()) {
+				return true;
+			}
+			return var.hasMappedName();
+		};
+		List<MethodInstance> methodsA = env.getClassesA().stream()
 				.filter(cls -> cls.isReal() && cls.hasMatch() && cls.getMethods().length > 0)
 				.flatMap(cls -> Stream.<MethodInstance>of(cls.getMethods()))
 				.filter(m -> m.hasMatch() && supplier.apply(m).length > 0)
 				.filter(m -> {
 					for (MethodVarInstance a : supplier.apply(m)) {
+						if (a.isIgnored() && !Config.getProjectConfig().isAnalyzeIgnoredMembers()) return false;
+						if (Config.getProjectConfig().isIgnoreUnmappedA() && !a.hasMappedName() && !Config.getProjectConfig().isAnalyzeIgnoredMembers()) return false;
 						if (!a.hasMatch() && a.isMatchable()) return true;
 					}
 
@@ -664,25 +737,26 @@ public class Matcher {
 		Map<MethodVarInstance, MethodVarInstance> matches;
 		AtomicInteger totalUnmatched = new AtomicInteger();
 
-		if (methods.isEmpty()) {
+		if (methodsA.isEmpty()) {
 			matches = Collections.emptyMap();
 		} else {
 			double maxScore = MethodVarClassifier.getMaxScore(level);
 			double maxMismatch = maxScore - getRawScore(absThreshold * (1 - relThreshold), maxScore);
 			matches = new ConcurrentHashMap<>(512);
 
-			runInParallel(methods, m -> {
+			runInParallel(methodsA, m -> {
 				int unmatched = 0;
 
-				for (MethodVarInstance var : supplier.apply(m)) {
-					if (var.hasMatch() || !var.isMatchable()) continue;
+				for (MethodVarInstance varA : supplier.apply(m)) {
+					if (varA.hasMatch() || !varA.isMatchable()) continue;
 
-					List<RankResult<MethodVarInstance>> ranking = MethodVarClassifier.rank(var, supplier.apply(m.getMatch()), level, env, maxMismatch);
+					MethodVarInstance[] varsB = List.of(supplier.apply(m.getMatch())).stream().filter(predicateB).collect(Collectors.toList()).toArray(new MethodVarInstance[0]);
+					List<RankResult<MethodVarInstance>> ranking = MethodVarClassifier.rank(varA, varsB, level, env, maxMismatch);
 
 					if (checkRank(ranking, absThreshold, relThreshold, maxScore)) {
 						MethodVarInstance match = ranking.get(0).getSubject();
 
-						matches.put(var, match);
+						matches.put(varA, match);
 					} else {
 						unmatched++;
 					}

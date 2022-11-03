@@ -21,11 +21,11 @@ public interface ClassEnv {
 
 	ClassInstance getLocalClsById(String id);
 
-	default ClassInstance getCreateClassInstance(String id) {
-		return getCreateClassInstance(id, true);
+	default ClassInstance getCreateClassInstance(String id, char side) {
+		return getCreateClassInstance(id, true, side);
 	}
 
-	ClassInstance getCreateClassInstance(String id, boolean createUnknown);
+	ClassInstance getCreateClassInstance(String id, boolean createUnknown, char side);
 
 	default ClassInstance getClsByName(String name, NameType nameType) {
 		return getClsById(ClassInstance.getId(name), nameType);

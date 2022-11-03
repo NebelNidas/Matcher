@@ -17,18 +17,18 @@ public final class FieldInstance extends MemberInstance<FieldInstance> {
 	 * Create a shared unknown field.
 	 */
 	FieldInstance(ClassInstance cls, String origName, String desc, boolean isStatic) {
-		this(cls, origName, desc, null, false, -1, isStatic);
+		this(cls, origName, desc, null, false, true, -1, isStatic);
 	}
 
 	/**
 	 * Create a known field.
 	 */
-	FieldInstance(ClassInstance cls, String origName, String desc, FieldNode asmNode, boolean nameObfuscated, int position) {
-		this(cls, origName, desc, asmNode, nameObfuscated, position, (asmNode.access & Opcodes.ACC_STATIC) != 0);
+	FieldInstance(ClassInstance cls, String origName, String desc, FieldNode asmNode, boolean nameObfuscated, boolean ignored, int position) {
+		this(cls, origName, desc, asmNode, nameObfuscated, ignored, position, (asmNode.access & Opcodes.ACC_STATIC) != 0);
 	}
 
-	private FieldInstance(ClassInstance cls, String origName, String desc, FieldNode asmNode, boolean nameObfuscated, int position, boolean isStatic) {
-		super(cls, getId(origName, desc), origName, nameObfuscated, position, isStatic);
+	private FieldInstance(ClassInstance cls, String origName, String desc, FieldNode asmNode, boolean nameObfuscated, boolean ignored, int position, boolean isStatic) {
+		super(cls, getId(origName, desc), origName, nameObfuscated, ignored, position, isStatic);
 
 		try {
 			this.type = cls.getEnv().getCreateClassInstance(desc);
@@ -76,6 +76,11 @@ public final class FieldInstance extends MemberInstance<FieldInstance> {
 	@Override
 	public boolean isReal() {
 		return asmNode != null;
+	}
+
+	@Override
+	public boolean isIgnored() {
+		return ignoredStatus;
 	}
 
 	public FieldNode getAsmNode() {

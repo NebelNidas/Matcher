@@ -30,6 +30,8 @@ import org.objectweb.asm.tree.TypeInsnNode;
 
 import matcher.NameType;
 import matcher.Util;
+import matcher.config.Config;
+import matcher.config.ProjectConfig;
 import matcher.type.Analysis.CommonClasses;
 
 public class ClassFeatureExtractor implements LocalClassEnv {
@@ -37,22 +39,30 @@ public class ClassFeatureExtractor implements LocalClassEnv {
 		this.env = env;
 	}
 
-	public void processInputs(Collection<Path> inputs, Pattern nonObfuscatedClasses) {
+	public void processInputs(Collection<Path> inputs, Pattern ignoredClasses, char side) {
+		ProjectConfig config = Config.getProjectConfig();
 		Set<Path> uniqueInputs = new LinkedHashSet<>(inputs);
-		Predicate<ClassNode> obfuscatedCheck = cn -> isNameObfuscated(cn, nonObfuscatedClasses);
+		Predicate<ClassNode> ignoredCheck = cn -> isNameIgnored(cn, ignoredClasses);
 
 		for (Path archive : uniqueInputs) {
 			inputFiles.add(new InputFile(archive));
 			URI origin = archive.toUri();
 
 			Util.iterateJar(archive, true, file -> {
-				ClassInstance cls = readClass(file, origin, obfuscatedCheck);
+				ClassInstance cls = readClass(file, origin, ignoredCheck);
 				String id = cls.getId();
 				String name = cls.getName();
 
 				if (env.getSharedClsById(id) != null) return;
 				if (env.getSharedClassLocation(name) != null) return;
 				if (classPathIndex.containsKey(name)) return;
+
+				// No mappings available yet
+				if (config.isIgnoreUnmappedA() && side == 'a') {
+					cls.setIgnored(true);
+				} else if (config.isIgnoreUnmappedB() && side == 'b') {
+					cls.setIgnored(true);
+				}
 
 				ClassInstance prev = classes.get(id);
 
@@ -90,10 +100,17 @@ public class ClassFeatureExtractor implements LocalClassEnv {
 		return pattern == null || !pattern.matcher(cn.name).matches();
 	}
 
-	private ClassInstance readClass(Path path, URI origin, Predicate<ClassNode> nameObfuscated) {
+	private static boolean isNameIgnored(ClassNode cn, Pattern pattern) {
+		if (pattern != null && pattern.matcher(cn.name).matches()) {
+			return true;
+		}
+		return false;
+	}
+
+	private ClassInstance readClass(Path path, URI origin, Predicate<ClassNode> nameIgnored) {
 		ClassNode cn = ClassEnvironment.readClass(path, false);
 
-		return new ClassInstance(ClassInstance.getId(cn.name), origin, this, cn, nameObfuscated.test(cn));
+		return new ClassInstance(ClassInstance.getId(cn.name), origin, this, cn, nameIgnored.test(cn));
 	}
 
 	private static void mergeClasses(ClassInstance from, ClassInstance to) {
@@ -102,7 +119,7 @@ public class ClassFeatureExtractor implements LocalClassEnv {
 		to.addAsmNode(from.getAsmNodes()[0], from.getOrigin());
 	}
 
-	public void process(Pattern nonObfuscatedMemberPattern) {
+	public void process(Pattern nonObfuscatedMemberPattern, Pattern ignoredMemberPattern) {
 		ClassInstance clo = getCreateClassInstance("Ljava/lang/Object;");
 		assert clo != null && clo.getAsmNodes() != null;
 
@@ -110,7 +127,7 @@ public class ClassFeatureExtractor implements LocalClassEnv {
 		List<ClassInstance> initialClasses = new ArrayList<>(classes.values());
 
 		for (ClassInstance cls : initialClasses) {
-			if (cls.isReal()) ClassEnvironment.processClassA(cls, nonObfuscatedMemberPattern);
+			if (cls.isReal()) ClassEnvironment.processClassA(cls, nonObfuscatedMemberPattern, ignoredMemberPattern);
 		}
 
 		initStep++;
@@ -364,7 +381,7 @@ public class ClassFeatureExtractor implements LocalClassEnv {
 
 				if (isHierarchyBarrier(method)) {
 					if (method.hierarchyData == null) {
-						method.hierarchyData = new MemberHierarchyData<>(Collections.singleton(method), method.nameObfuscatedLocal);
+						method.hierarchyData = new MemberHierarchyData<>(Collections.singleton(method), method.nameObfuscatedLocal, method.ignoredStatus);
 					}
 				} else if ((prev = methods.get(method.id)) != null) {
 					if (method.hierarchyData == null) {
@@ -380,7 +397,7 @@ public class ClassFeatureExtractor implements LocalClassEnv {
 					methods.put(method.id, method);
 
 					if (method.hierarchyData == null) {
-						method.hierarchyData = new MemberHierarchyData<>(Util.newIdentityHashSet(), method.nameObfuscatedLocal);
+						method.hierarchyData = new MemberHierarchyData<>(Util.newIdentityHashSet(), method.nameObfuscatedLocal, method.ignoredStatus);
 						method.hierarchyData.addMember(method);
 					}
 				}
@@ -423,7 +440,7 @@ public class ClassFeatureExtractor implements LocalClassEnv {
 		}
 
 		for (FieldInstance field : cls.getFields()) {
-			field.hierarchyData = new MemberHierarchyData<>(Collections.singleton(field), field.nameObfuscatedLocal);
+			field.hierarchyData = new MemberHierarchyData<>(Collections.singleton(field), field.nameObfuscatedLocal, field.ignoredStatus);
 
 			if (field.writeRefs.size() == 1) {
 				Analysis.checkInitializer(field, this);
@@ -683,7 +700,7 @@ public class ClassFeatureExtractor implements LocalClassEnv {
 		ClassInstance prev = classes.putIfAbsent(cls.getId(), cls);
 		assert prev == null;
 
-		if (initStep > 0) ClassEnvironment.processClassA(cls, null);
+		if (initStep > 0) ClassEnvironment.processClassA(cls, null, null);
 		if (initStep > 1) pendingInit.add(cls);
 
 		return cls;

@@ -23,18 +23,18 @@ public final class MethodInstance extends MemberInstance<MethodInstance> {
 	 * Create a shared unknown method.
 	 */
 	MethodInstance(ClassInstance cls, String origName, String desc, boolean isStatic) {
-		this(cls, origName, desc, null, false, -1, isStatic);
+		this(cls, origName, desc, null, false, true, -1, isStatic);
 	}
 
 	/**
 	 * Create a known method.
 	 */
-	MethodInstance(ClassInstance cls, String origName, String desc, MethodNode asmNode, boolean nameObfuscated, int position) {
-		this(cls, origName, desc, asmNode, nameObfuscated, position, (asmNode.access & Opcodes.ACC_STATIC) != 0);
+	MethodInstance(ClassInstance cls, String origName, String desc, MethodNode asmNode, boolean nameObfuscated, boolean ignored, int position) {
+		this(cls, origName, desc, asmNode, nameObfuscated, ignored, position, (asmNode.access & Opcodes.ACC_STATIC) != 0);
 	}
 
-	private MethodInstance(ClassInstance cls, String origName, String desc, MethodNode asmNode, boolean nameObfuscated, int position, boolean isStatic) {
-		super(cls, getId(origName, desc), origName, nameObfuscated, position, isStatic);
+	private MethodInstance(ClassInstance cls, String origName, String desc, MethodNode asmNode, boolean nameObfuscated, boolean ignored, int position, boolean isStatic) {
+		super(cls, getId(origName, desc), origName, nameObfuscated, ignored, position, isStatic);
 
 		try {
 			this.real = asmNode != null;
@@ -59,7 +59,7 @@ public final class MethodInstance extends MemberInstance<MethodInstance> {
 		return ret;
 	}
 
-	private static MethodVarInstance[] gatherArgs(MethodInstance method, String desc, MethodNode asmNode) {
+	private static MethodVarInstance[] gatherArgs(MethodInstance method, String desc, MethodNode asmNode, char side) {
 		Type[] argTypes = Type.getArgumentTypes(desc);
 		if (argTypes.length == 0) return emptyVars;
 
@@ -105,10 +105,11 @@ public final class MethodInstance extends MemberInstance<MethodInstance> {
 				}
 			}
 
-			MethodVarInstance arg = new MethodVarInstance(method, true, i, lvIdx, asmIndex,
+			MethodVarInstance arg = new MethodVarInstance(method, side, true, i, lvIdx, asmIndex,
 					type, startInsn, endInsn, 0,
 					name,
-					name == null || method.nameObfuscatedLocal || method.cls.nameObfuscated || !Util.isValidJavaIdentifier(name));
+					name == null || method.nameObfuscatedLocal || method.cls.nameObfuscated || !Util.isValidJavaIdentifier(name),
+					(method.isIgnored() || method.cls.isIgnored()) ? 1 : 0);
 			args[i] = arg;
 
 			method.classRefs.add(type);
@@ -169,10 +170,11 @@ public final class MethodInstance extends MemberInstance<MethodInstance> {
 				if (start.getOpcode() >= 0) startOpIdx++;
 			}
 
-			ret[i] = new MethodVarInstance(method, false, i, var.index, asmNode.localVariables.indexOf(var),
-					method.getEnv().getCreateClassInstance(var.desc), startInsn, endInsn, startOpIdx,
+			ret[i] = new MethodVarInstance(method, false, method.getSide(), i, var.index, asmNode.localVariables.indexOf(var),
+					method.getEnv().getCreateClassInstance(var.desc, method.getSide()), startInsn, endInsn, startOpIdx,
 					var.name,
-					var.name == null || method.nameObfuscatedLocal || method.cls.nameObfuscated || !Util.isValidJavaIdentifier(var.name));
+					var.name == null || method.nameObfuscatedLocal || method.cls.nameObfuscated || !Util.isValidJavaIdentifier(var.name),
+					method.isIgnored() || method.cls.isIgnored());
 		}
 
 		return ret;
@@ -339,6 +341,16 @@ public final class MethodInstance extends MemberInstance<MethodInstance> {
 		}
 
 		return true;
+	}
+
+	public boolean hasMappedChildren() {
+		for (MethodVarInstance arg : args) {
+			if (arg.hasMappedName()) return true;
+		}
+		for (MethodVarInstance var : vars) {
+			if (var.hasMappedName()) return true;
+		}
+		return false;
 	}
 
 	public ClassInstance getRetType() {

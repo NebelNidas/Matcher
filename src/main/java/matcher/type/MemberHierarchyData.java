@@ -3,9 +3,10 @@ package matcher.type;
 import java.util.Set;
 
 final class MemberHierarchyData<T> {
-	MemberHierarchyData(Set<T> members, boolean nameObfuscated) {
+	MemberHierarchyData(Set<T> members, boolean nameObfuscated, int ignoredStatus) {
 		this.members = members;
 		this.nameObfuscated = nameObfuscated;
+		this.ignoredStatus = ignoredStatus;
 	}
 
 	boolean hasMultipleMembers() {
@@ -22,6 +23,7 @@ final class MemberHierarchyData<T> {
 
 	private final Set<T> members;
 	boolean nameObfuscated;
+	int ignoredStatus;
 
 	String tmpName;
 	int uid = -1;

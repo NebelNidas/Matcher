@@ -18,6 +18,7 @@ import javafx.scene.control.TreeView;
 
 import matcher.NameType;
 import matcher.Util;
+import matcher.config.Config;
 import matcher.gui.Gui.SortKey;
 import matcher.type.ClassInstance;
 import matcher.type.FieldInstance;
@@ -231,11 +232,23 @@ public class MatchPaneSrc extends SplitPane implements IFwdGuiComponent, ISelect
 
 		if (cls != null) {
 			for (MethodInstance m : cls.getMethods()) {
-				if (m.isReal()) items.add(m);
+				if (!m.isReal()) {
+					continue;
+				}
+				if (Config.getProjectConfig().isIgnoreUnmappedA() && !m.hasMappedName() && !m.hasMappedChildren()) {
+					continue;
+				}
+				items.add(m);
 			}
 
 			for (FieldInstance m : cls.getFields()) {
-				if (m.isReal()) items.add(m);
+				if (m.isReal()) {
+					continue;
+				}
+				if (Config.getProjectConfig().isIgnoreUnmappedA() && !m.hasMappedName()) {
+					continue;
+				}
+				items.add(m);
 			}
 
 			items.sort(getMemberComparator());
@@ -251,10 +264,16 @@ public class MatchPaneSrc extends SplitPane implements IFwdGuiComponent, ISelect
 
 		if (method != null) {
 			for (MethodVarInstance m : method.getArgs()) {
+				if (Config.getProjectConfig().isIgnoreUnmappedA() && !m.hasMappedName()) {
+					continue;
+				}
 				items.add(m);
 			}
 
 			for (MethodVarInstance m : method.getVars()) {
+				if (Config.getProjectConfig().isIgnoreUnmappedA() && !m.hasMappedName()) {
+					continue;
+				}
 				items.add(m);
 			}
 
@@ -517,7 +536,7 @@ public class MatchPaneSrc extends SplitPane implements IFwdGuiComponent, ISelect
 
 	@Override
 	public void onMappingChange() {
-		updateLists(false, true);
+		updateLists(true, true);
 		refreshClassList();
 
 		memberList.refresh();

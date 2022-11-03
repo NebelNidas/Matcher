@@ -16,6 +16,7 @@ import java.util.List;
 import java.util.function.DoubleConsumer;
 
 import matcher.Matcher;
+import matcher.config.Config;
 import matcher.type.ClassEnvironment;
 import matcher.type.ClassInstance;
 import matcher.type.FieldInstance;
@@ -41,6 +42,14 @@ public class MatchesIo {
 			String nonObfuscatedClassPatternB = "";
 			String nonObfuscatedMemberPatternA = "";
 			String nonObfuscatedMemberPatternB = "";
+			String ignoredClassPatternA = "";
+			String ignoredClassPatternB = "";
+			String ignoredMemberPatternA = "";
+			String ignoredMemberPatternB = "";
+			boolean ignoreUnmappedA = false;
+			boolean ignoreUnmappedB = false;
+			boolean analyzeIgnoredClasses = true;
+			boolean analyzeIgnoredMembers = true;
 			ClassInstance currentClass = null;
 			MethodInstance currentMethod = null;
 			String line;
@@ -140,6 +149,22 @@ public class MatchesIo {
 								nonObfuscatedMemberPatternA = line.substring("\tnon-obf mem a\t".length());
 							} else if (line.startsWith("\tnon-obf mem b\t")) {
 								nonObfuscatedMemberPatternB = line.substring("\tnon-obf mem b\t".length());
+							} else if (line.startsWith("\tignored cls a\t")) {
+								ignoredClassPatternA = line.substring("\tignored cls a\t".length());
+							} else if (line.startsWith("\tignored cls b\t")) {
+								ignoredClassPatternB = line.substring("\tignored cls b\t".length());
+							} else if (line.startsWith("\tignored mem a\t")) {
+								ignoredMemberPatternA = line.substring("\tignored mem a\t".length());
+							} else if (line.startsWith("\tignored mem b\t")) {
+								ignoredMemberPatternB = line.substring("\tignored mem b\t".length());
+							} else if (line.startsWith("\tignore unmapped a\t")) {
+								ignoreUnmappedA = Boolean.parseBoolean(line.substring("\tignore unmapped a\t".length()));
+							} else if (line.startsWith("\tignore unmapped b\t")) {
+								ignoreUnmappedB = Boolean.parseBoolean(line.substring("\tignore unmapped b\t".length()));
+							} else if (line.startsWith("\tanalyze ignored classes\t")) {
+								analyzeIgnoredClasses = Boolean.parseBoolean(line.substring("\tanalyze ignored classes\t".length()));
+							} else if (line.startsWith("\tanalyze ignored members\t")) {
+								analyzeIgnoredMembers = Boolean.parseBoolean(line.substring("\tanalyze ignored members\t".length()));
 							} else {
 								throw new IOException("invalid header: "+line);
 							}
@@ -152,6 +177,8 @@ public class MatchesIo {
 						if (inputDirs != null) {
 							matcher.initFromMatches(inputDirs, inputFilesA, inputFilesB, cpFiles, cpFilesA, cpFilesB,
 									nonObfuscatedClassPatternA, nonObfuscatedClassPatternB, nonObfuscatedMemberPatternA, nonObfuscatedMemberPatternB,
+									ignoredClassPatternA, ignoredClassPatternB, ignoredMemberPatternA, ignoredMemberPatternB,
+									ignoreUnmappedA, ignoreUnmappedB, analyzeIgnoredClasses, analyzeIgnoredMembers,
 									progressReceiver);
 							inputDirs = null;
 						}
@@ -339,12 +366,18 @@ public class MatchesIo {
 
 		for (ClassInstance cls : env.getClassesA()) {
 			if (cls.isReal() && (cls.hasMatch() || !cls.isMatchable())) {
+				if (Config.getProjectConfig().isIgnoreUnmappedA() && !cls.hasMappedName() && !cls.hasMappedChildren()) {
+					continue;
+				}
 				classes.add(cls);
 			}
 		}
 
 		for (ClassInstance cls : env.getClassesB()) {
 			if (cls.isReal() && !cls.isMatchable()) {
+				if (Config.getProjectConfig().isIgnoreUnmappedB() && !cls.hasMappedName() && !cls.hasMappedChildren()) {
+					continue;
+				}
 				classes.add(cls);
 			}
 		}
@@ -400,6 +433,46 @@ public class MatchesIo {
 				writer.write('\n');
 			}
 
+			if (env.getIgnoredClassPatternA() != null) {
+				writer.write("\tignored cls a\t");
+				writer.write(env.getIgnoredClassPatternA().toString());
+				writer.write('\n');
+			}
+
+			if (env.getIgnoredClassPatternB() != null) {
+				writer.write("\tignored cls b\t");
+				writer.write(env.getIgnoredClassPatternB().toString());
+				writer.write('\n');
+			}
+
+			if (env.getIgnoredMemberPatternA() != null) {
+				writer.write("\tignored mem a\t");
+				writer.write(env.getIgnoredMemberPatternA().toString());
+				writer.write('\n');
+			}
+
+			if (env.getIgnoredMemberPatternB() != null) {
+				writer.write("\tignored mem b\t");
+				writer.write(env.getIgnoredMemberPatternB().toString());
+				writer.write('\n');
+			}
+
+			writer.write("\tignore unmapped a\t");
+			writer.write(Boolean.toString(Config.getProjectConfig().isIgnoreUnmappedA()));
+			writer.write('\n');
+
+			writer.write("\tignore unmapped b\t");
+			writer.write(Boolean.toString(Config.getProjectConfig().isIgnoreUnmappedB()));
+			writer.write('\n');
+
+			writer.write("\tanalyze ignored classes\t");
+			writer.write(Boolean.toString(Config.getProjectConfig().isAnalyzeIgnoredClasses()));
+			writer.write('\n');
+
+			writer.write("\tanalyze ignored members\t");
+			writer.write(Boolean.toString(Config.getProjectConfig().isAnalyzeIgnoredMembers()));
+			writer.write('\n');
+
 			LocalClassEnv envA = env.getEnvA();
 
 			for (ClassInstance cls : classes) {
@@ -426,7 +499,7 @@ public class MatchesIo {
 		}
 	}
 
-	private static void writeClass(ClassInstance cls, char side, Writer out) throws IOException {
+	private static void writeClass(ClassInstance cls, Writer out) throws IOException {
 		if (cls.hasMatch()) {
 			out.write("c\t");
 			out.write(cls.getId());
@@ -436,24 +509,36 @@ public class MatchesIo {
 
 			for (MethodInstance method : cls.getMethods()) {
 				if (method.hasMatch() || !method.isMatchable()) {
+					if (Config.getProjectConfig().isIgnoreUnmappedA() && !method.hasMappedName() && !method.hasMappedChildren()) {
+						continue;
+					}
 					writeMethod(method, 'a', out);
 				}
 			}
 
 			for (FieldInstance field : cls.getFields()) {
 				if (field.hasMatch() || !field.isMatchable()) {
+					if (Config.getProjectConfig().isIgnoreUnmappedA() && !field.hasMappedName()) {
+						continue;
+					}
 					writeMemberMain(field, 'a', out);
 				}
 			}
 
 			for (MethodInstance method : cls.getMatch().getMethods()) {
 				if (!method.isMatchable()) {
+					if (Config.getProjectConfig().isIgnoreUnmappedB() && !method.hasMappedName() && !method.hasMappedChildren()) {
+						continue;
+					}
 					writeMethod(method, 'b', out);
 				}
 			}
 
 			for (FieldInstance field : cls.getMatch().getFields()) {
 				if (!field.isMatchable()) {
+					if (Config.getProjectConfig().isIgnoreUnmappedB() && !field.hasMappedName()) {
+						continue;
+					}
 					writeMemberMain(field, 'b', out);
 				}
 			}
@@ -474,24 +559,36 @@ public class MatchesIo {
 		if (method.hasMatch()) {
 			for (MethodVarInstance arg : method.getArgs()) {
 				if (arg.hasMatch() || !arg.isMatchable()) {
+					if (Config.getProjectConfig().isIgnoreUnmappedA() && !arg.hasMappedName()) {
+						continue;
+					}
 					writeVar(arg, 'a', out);
 				}
 			}
 
 			for (MethodVarInstance var : method.getVars()) {
 				if (var.hasMatch() || !var.isMatchable()) {
+					if (Config.getProjectConfig().isIgnoreUnmappedA() && !var.hasMappedName()) {
+						continue;
+					}
 					writeVar(var, 'a', out);
 				}
 			}
 
 			for (MethodVarInstance arg : method.getMatch().getArgs()) {
 				if (!arg.isMatchable()) {
+					if (Config.getProjectConfig().isIgnoreUnmappedB() && !arg.hasMappedName()) {
+						continue;
+					}
 					writeVar(arg, 'b', out);
 				}
 			}
 
 			for (MethodVarInstance var : method.getMatch().getVars()) {
 				if (!var.isMatchable()) {
+					if (Config.getProjectConfig().isIgnoreUnmappedB() && !var.hasMappedName()) {
+						continue;
+					}
 					writeVar(var, 'b', out);
 				}
 			}

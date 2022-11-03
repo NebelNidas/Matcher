@@ -25,6 +25,7 @@ import net.fabricmc.mappingio.format.MappingFormat;
 
 import matcher.NameType;
 import matcher.Util;
+import matcher.config.Config;
 import matcher.type.ClassEnv;
 import matcher.type.ClassInstance;
 import matcher.type.FieldInstance;
@@ -208,7 +209,9 @@ public class Mappings {
 						switch (fieldTarget) {
 						case MAPPED:
 							if (!cls.hasMappedName() || replace) {
-								if (ClassInstance.hasOuterName(name)) {
+								if (name.equals(cls.getName(NameType.PLAIN))) {
+									name = null;
+								} else if (ClassInstance.hasOuterName(name)) {
 									name = ClassInstance.getInnerName(name);
 								}
 
@@ -270,6 +273,9 @@ public class Mappings {
 						switch (fieldTarget) {
 						case MAPPED:
 							if (!field.hasMappedName() || replace) {
+								if (name.equals(field.getName(NameType.PLAIN))) {
+									name = null;
+								}
 								for (FieldInstance f : field.getAllHierarchyMembers()) {
 									f.setMappedName(name);
 								}
@@ -314,6 +320,9 @@ public class Mappings {
 						switch (fieldTarget) {
 						case MAPPED:
 							if (!method.hasMappedName() || replace) {
+								if (name.equals(method.getName(NameType.PLAIN))) {
+									name = null;
+								}
 								for (MethodInstance m : method.getAllHierarchyMembers()) {
 									m.setMappedName(name);
 								}
@@ -357,7 +366,12 @@ public class Mappings {
 					case METHOD_ARG:
 						switch (fieldTarget) {
 						case MAPPED:
-							if (!arg.hasMappedName() || replace) arg.setMappedName(name);
+							if (!arg.hasMappedName() || replace) {
+								if (name.equals(arg.getName(NameType.PLAIN))) {
+									name = null;
+								}
+								arg.setMappedName(name);
+							}
 							break;
 						case AUX:
 						case AUX2:
@@ -374,7 +388,12 @@ public class Mappings {
 					case METHOD_VAR:
 						switch (fieldTarget) {
 						case MAPPED:
-							if (!var.hasMappedName() || replace) var.setMappedName(name);
+							if (!var.hasMappedName() || replace) {
+								if (name.equals(var.getName(NameType.PLAIN))) {
+									name = null;
+								}
+								var.setMappedName(name);
+							}
 							break;
 						case AUX:
 						case AUX2:
@@ -390,7 +409,7 @@ public class Mappings {
 						break;
 					}
 
-					dstNameCounts[cur.getKind().ordinal()]++;
+					if (name != null) dstNameCounts[cur.getKind().ordinal()]++;
 				}
 
 				@Override

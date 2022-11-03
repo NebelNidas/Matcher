@@ -1289,17 +1289,17 @@ class Analysis {
 
 	public static class CommonClasses {
 		CommonClasses(ClassEnv env) {
-			this.INT = env.getCreateClassInstance("I");
-			this.LONG = env.getCreateClassInstance("J");
-			this.BOOLEAN = env.getCreateClassInstance("Z");
-			this.BYTE = env.getCreateClassInstance("B");
-			this.CHAR = env.getCreateClassInstance("C");
-			this.SHORT = env.getCreateClassInstance("S");
-			this.FLOAT = env.getCreateClassInstance("F");
-			this.DOUBLE = env.getCreateClassInstance("D");
-			this.NULL = new ClassInstance("Lmatcher/special/null;", env);
-			this.TOP = this.VOID = env.getCreateClassInstance("V");
-			this.STRING = env.getCreateClassInstance("Ljava/lang/String;");
+			this.INT = env.getCreateClassInstance("I", 'c');
+			this.LONG = env.getCreateClassInstance("J", 'c');
+			this.BOOLEAN = env.getCreateClassInstance("Z", 'c');
+			this.BYTE = env.getCreateClassInstance("B", 'c');
+			this.CHAR = env.getCreateClassInstance("C", 'c');
+			this.SHORT = env.getCreateClassInstance("S", 'c');
+			this.FLOAT = env.getCreateClassInstance("F", 'c');
+			this.DOUBLE = env.getCreateClassInstance("D", 'c');
+			this.NULL = new ClassInstance("Lmatcher/special/null;", env, 'c');
+			this.TOP = this.VOID = env.getCreateClassInstance("V", 'c');
+			this.STRING = env.getCreateClassInstance("Ljava/lang/String;", 'c');
 		}
 
 		final ClassInstance INT;

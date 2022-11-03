@@ -19,11 +19,14 @@ import javafx.collections.ObservableList;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.control.Button;
+import javafx.scene.control.CheckBox;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListView;
 import javafx.scene.control.MultipleSelectionModel;
+import javafx.scene.control.ScrollPane;
 import javafx.scene.control.SelectionMode;
 import javafx.scene.control.TextField;
+import javafx.scene.control.TitledPane;
 import javafx.scene.layout.ColumnConstraints;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
@@ -31,6 +34,7 @@ import javafx.scene.layout.Priority;
 import javafx.scene.layout.RowConstraints;
 import javafx.scene.layout.VBox;
 import javafx.stage.FileChooser;
+import javafx.stage.Screen;
 import javafx.stage.FileChooser.ExtensionFilter;
 import javafx.stage.Window;
 
@@ -40,11 +44,12 @@ import matcher.gui.Gui.SelectedFile;
 import matcher.gui.GuiConstants;
 import matcher.gui.GuiUtil;
 
-public class NewProjectPane extends GridPane {
+public class NewProjectPane extends ScrollPane {
 	NewProjectPane(ProjectConfig config, Window window, Node okButton) {
 		this.window = window;
 		this.okButton = okButton;
 
+		gridPane = new GridPane();
 		pathsA = FXCollections.observableArrayList(config.getPathsA());
 		pathsB = FXCollections.observableArrayList(config.getPathsB());
 		classPathA = FXCollections.observableArrayList(config.getClassPathA());
@@ -55,17 +60,33 @@ public class NewProjectPane extends GridPane {
 		nonObfuscatedClassPatternB = new TextField(config.getNonObfuscatedClassPatternB());
 		nonObfuscatedMemberPatternA = new TextField(config.getNonObfuscatedMemberPatternA());
 		nonObfuscatedMemberPatternB = new TextField(config.getNonObfuscatedMemberPatternB());
+		ignoredClassPatternA = new TextField(config.getIgnoredClassPatternA());
+		ignoredClassPatternB = new TextField(config.getIgnoredClassPatternB());
+		ignoredMemberPatternA = new TextField(config.getIgnoredMemberPatternA());
+		ignoredMemberPatternB = new TextField(config.getIgnoredMemberPatternB());
+		ignoreUnmappedA = new CheckBox("Ignore unmapped elements on side A") {{
+			setSelected(config.isIgnoreUnmappedA());
+		}};
+		ignoreUnmappedB = new CheckBox("Ignore unmapped elements on side B") {{
+			setSelected(config.isIgnoreUnmappedB());
+		}};
+		dontAnalyzeIgnoredClasses = new CheckBox("Don't analyze ignored classes at all (leads to worse results!)") {{
+			setSelected(!config.isAnalyzeIgnoredClasses());
+		}};
+		dontAnalyzeIgnoredMembers = new CheckBox("Don't analyze ignored members at all (leads to worse results!)") {{
+			setSelected(!config.isAnalyzeIgnoredMembers());
+		}};
 
 		init();
 	}
 
 	private void init() {
-		setHgap(4 * GuiConstants.padding);
-		setVgap(4 * GuiConstants.padding);
+		gridPane.setHgap(4 * GuiConstants.padding);
+		gridPane.setVgap(4 * GuiConstants.padding);
 
 		ColumnConstraints colConstraint = new ColumnConstraints();
 		colConstraint.setPercentWidth(50);
-		getColumnConstraints().addAll(colConstraint, colConstraint);
+		gridPane.getColumnConstraints().addAll(colConstraint, colConstraint);
 
 		RowConstraints rowConstraintInput = new RowConstraints();
 		RowConstraints rowConstraintClassPath = new RowConstraints();
@@ -73,12 +94,12 @@ public class NewProjectPane extends GridPane {
 		RowConstraints rowConstraintButtons = new RowConstraints();
 		RowConstraints rowConstraintShared = new RowConstraints();
 		rowConstraintShared.setVgrow(Priority.SOMETIMES);
-		getRowConstraints().addAll(rowConstraintInput, rowConstraintClassPath, rowConstraintButtons, rowConstraintShared);
+		gridPane.getRowConstraints().addAll(rowConstraintInput, rowConstraintClassPath, rowConstraintButtons, rowConstraintShared);
 
-		add(createFilesSelectionPane("Inputs A", pathsA, window, false, false), 0, 0);
-		add(createFilesSelectionPane("Inputs B", pathsB, window, false, false), 1, 0);
-		add(createFilesSelectionPane("Class path A", classPathA, window, true, false), 0, 1);
-		add(createFilesSelectionPane("Class path B", classPathB, window, true, false), 1, 1);
+		gridPane.add(createFilesSelectionPane("Inputs A", pathsA, window, false, false), 0, 0);
+		gridPane.add(createFilesSelectionPane("Inputs B", pathsB, window, false, false), 1, 0);
+		gridPane.add(createFilesSelectionPane("Class path A", classPathA, window, true, false), 0, 1);
+		gridPane.add(createFilesSelectionPane("Class path B", classPathB, window, true, false), 1, 1);
 
 		HBox hbox = new HBox(GuiConstants.padding);
 		Button swapButton = new Button("swap A ⇄ B");
@@ -95,20 +116,32 @@ public class NewProjectPane extends GridPane {
 			classPathA.addAll(classPathB);
 			classPathB.setAll(paths);
 
-			String tmp = nonObfuscatedClassPatternA.getText();
+			String tmpS = nonObfuscatedClassPatternA.getText();
 			nonObfuscatedClassPatternA.setText(nonObfuscatedClassPatternB.getText());
-			nonObfuscatedClassPatternB.setText(tmp);
+			nonObfuscatedClassPatternB.setText(tmpS);
 
-			tmp = nonObfuscatedMemberPatternA.getText();
+			tmpS = nonObfuscatedMemberPatternA.getText();
 			nonObfuscatedMemberPatternA.setText(nonObfuscatedMemberPatternB.getText());
-			nonObfuscatedMemberPatternB.setText(tmp);
-		});
-		add(hbox, 0, 2, 2, 1);
+			nonObfuscatedMemberPatternB.setText(tmpS);
 
-		add(createFilesSelectionPane("Shared class path", sharedClassPath, window, true, true), 0, 3, 2, 1);
+			tmpS = ignoredClassPatternA.getText();
+			ignoredClassPatternA.setText(ignoredClassPatternB.getText());
+			ignoredClassPatternB.setText(tmpS);
+
+			tmpS = ignoredMemberPatternA.getText();
+			ignoredMemberPatternA.setText(ignoredMemberPatternB.getText());
+			ignoredMemberPatternB.setText(tmpS);
+
+			boolean tmpB = ignoreUnmappedA.isSelected();
+			ignoreUnmappedA.setSelected(ignoreUnmappedB.isSelected());
+			ignoreUnmappedB.setSelected(tmpB);
+		});
+		gridPane.add(hbox, 0, 2, 2, 1);
+
+		gridPane.add(createFilesSelectionPane("Shared class path", sharedClassPath, window, true, true), 0, 3, 2, 1);
 		// TODO: config.inputsBeforeClassPath
 
-		add(createMiscPane(), 0, 4, 2, 1);
+		gridPane.add(createMiscPane(), 0, 4, 2, 1);
 
 		ListChangeListener<Path> listChangeListener = change -> okButton.setDisable(!createConfig().isValid());
 		InvalidationListener invalidationListener = change -> okButton.setDisable(!createConfig().isValid());
@@ -122,7 +155,15 @@ public class NewProjectPane extends GridPane {
 		nonObfuscatedClassPatternB.textProperty().addListener(invalidationListener);
 		nonObfuscatedMemberPatternA.textProperty().addListener(invalidationListener);
 		nonObfuscatedMemberPatternB.textProperty().addListener(invalidationListener);
+		ignoredClassPatternA.textProperty().addListener(invalidationListener);
+		ignoredClassPatternB.textProperty().addListener(invalidationListener);
+		ignoredMemberPatternA.textProperty().addListener(invalidationListener);
+		ignoredMemberPatternB.textProperty().addListener(invalidationListener);
 		listChangeListener.onChanged(null);
+
+		setContent(gridPane);
+		setFitToWidth(true);
+		// setPrefHeight(Screen.getPrimary().getBounds().getHeight() * 0.8);
 	}
 
 	private Node createFilesSelectionPane(String name, ObservableList<Path> entries, Window window, boolean isClassPath, boolean isShared) {
@@ -292,16 +333,42 @@ public class NewProjectPane extends GridPane {
 	}
 
 	private Node createMiscPane() {
-		VBox ret = new VBox(GuiConstants.padding);
+		VBox ret = new VBox(2 * GuiConstants.padding);
 
-		ret.getChildren().add(new Label("Non-obfuscated class name pattern A (regex):"));
-		ret.getChildren().add(nonObfuscatedClassPatternA);
-		ret.getChildren().add(new Label("Non-obfuscated class name pattern B (regex):"));
-		ret.getChildren().add(nonObfuscatedClassPatternB);
-		ret.getChildren().add(new Label("Non-obfuscated member name pattern A (regex):"));
-		ret.getChildren().add(nonObfuscatedMemberPatternA);
-		ret.getChildren().add(new Label("Non-obfuscated member name pattern B (regex):"));
-		ret.getChildren().add(nonObfuscatedMemberPatternB);
+		TitledPane nonObfPatternPane = new TitledPane();
+		VBox nonObfPatternBox = new VBox(GuiConstants.padding);
+		nonObfPatternPane.setText("Non-obfuscated class and member patterns");
+		nonObfPatternBox.getChildren().add(new Label("Non-obfuscated class name pattern A (regex):"));
+		nonObfPatternBox.getChildren().add(nonObfuscatedClassPatternA);
+		nonObfPatternBox.getChildren().add(new Label("Non-obfuscated class name pattern B (regex):"));
+		nonObfPatternBox.getChildren().add(nonObfuscatedClassPatternB);
+		nonObfPatternBox.getChildren().add(new Label("Non-obfuscated member name pattern A (regex):"));
+		nonObfPatternBox.getChildren().add(nonObfuscatedMemberPatternA);
+		nonObfPatternBox.getChildren().add(new Label("Non-obfuscated member name pattern B (regex):"));
+		nonObfPatternBox.getChildren().add(nonObfuscatedMemberPatternB);
+		nonObfPatternPane.setContent(nonObfPatternBox);
+		nonObfPatternPane.setExpanded(false);
+		ret.getChildren().add(nonObfPatternPane);
+
+		TitledPane ignoredPatternPane = new TitledPane();
+		ignoredPatternPane.setText("Ignored class and member patterns");
+		VBox ignoredPatternBox = new VBox(GuiConstants.padding);
+		ignoredPatternBox.getChildren().add(new Label("Ignored class name pattern A (regex):"));
+		ignoredPatternBox.getChildren().add(ignoredClassPatternA);
+		ignoredPatternBox.getChildren().add(new Label("Ignored class name pattern B (regex):"));
+		ignoredPatternBox.getChildren().add(ignoredClassPatternB);
+		ignoredPatternBox.getChildren().add(new Label("Ignored member name pattern A (regex):"));
+		ignoredPatternBox.getChildren().add(ignoredMemberPatternA);
+		ignoredPatternBox.getChildren().add(new Label("Ignored member name pattern B (regex):"));
+		ignoredPatternBox.getChildren().add(ignoredMemberPatternB);
+		ignoredPatternBox.getChildren().add(ignoreUnmappedA);
+		ignoredPatternBox.getChildren().add(ignoreUnmappedB);
+		ignoredPatternBox.getChildren().add(dontAnalyzeIgnoredClasses);
+		ignoredPatternBox.getChildren().add(dontAnalyzeIgnoredMembers);
+
+		ignoredPatternPane.setContent(ignoredPatternBox);
+		ignoredPatternPane.setExpanded(false);
+		ret.getChildren().add(ignoredPatternPane);
 
 		return ret;
 	}
@@ -316,12 +383,21 @@ public class NewProjectPane extends GridPane {
 				nonObfuscatedClassPatternA.getText(),
 				nonObfuscatedClassPatternB.getText(),
 				nonObfuscatedMemberPatternA.getText(),
-				nonObfuscatedMemberPatternB.getText());
+				nonObfuscatedMemberPatternB.getText(),
+				ignoredClassPatternA.getText(),
+				ignoredClassPatternB.getText(),
+				ignoredMemberPatternA.getText(),
+				ignoredMemberPatternB.getText(),
+				ignoreUnmappedA.isSelected(),
+				ignoreUnmappedB.isSelected(),
+				!dontAnalyzeIgnoredClasses.isSelected(),
+				!dontAnalyzeIgnoredMembers.isSelected());
 	}
 
 	private final Window window;
 	private final Node okButton;
 
+	private final GridPane gridPane;
 	private final ObservableList<Path> pathsA;
 	private final ObservableList<Path> pathsB;
 	private final ObservableList<Path> classPathA;
@@ -332,4 +408,12 @@ public class NewProjectPane extends GridPane {
 	private final TextField nonObfuscatedClassPatternB;
 	private final TextField nonObfuscatedMemberPatternA;
 	private final TextField nonObfuscatedMemberPatternB;
+	private final TextField ignoredClassPatternA;
+	private final TextField ignoredClassPatternB;
+	private final TextField ignoredMemberPatternA;
+	private final TextField ignoredMemberPatternB;
+	private final CheckBox ignoreUnmappedA;
+	private final CheckBox ignoreUnmappedB;
+	private final CheckBox dontAnalyzeIgnoredClasses;
+	private final CheckBox dontAnalyzeIgnoredMembers;
 }

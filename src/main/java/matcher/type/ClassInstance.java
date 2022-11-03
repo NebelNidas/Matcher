@@ -25,14 +25,15 @@ import matcher.Util;
 import matcher.bcremap.AsmClassRemapper;
 import matcher.bcremap.AsmRemapper;
 import matcher.classifier.ClassifierUtil;
+import matcher.config.Config;
 import matcher.type.Signature.ClassSignature;
 
 public final class ClassInstance implements Matchable<ClassInstance> {
 	/**
 	 * Create a shared unknown class.
 	 */
-	ClassInstance(String id, ClassEnv env) {
-		this(id, null, env, null, false, false, null);
+	ClassInstance(String id, ClassEnv env, char side) {
+		this(id, null, env, side, null, false, true, false, null);
 
 		assert id.indexOf('[') == -1 : id;
 	}
@@ -40,8 +41,8 @@ public final class ClassInstance implements Matchable<ClassInstance> {
 	/**
 	 * Create a known class (class path).
 	 */
-	public ClassInstance(String id, URI origin, ClassEnv env, ClassNode asmNode) {
-		this(id, origin, env, asmNode, false, false, null);
+	public ClassInstance(String id, URI origin, ClassEnv env, char side, ClassNode asmNode) {
+		this(id, origin, env, side, asmNode, false, false, false, null);
 
 		assert id.indexOf('[') == -1 : id;
 	}
@@ -49,8 +50,8 @@ public final class ClassInstance implements Matchable<ClassInstance> {
 	/**
 	 * Create an array class.
 	 */
-	ClassInstance(String id, ClassInstance elementClass) {
-		this(id, null, elementClass.env, null, elementClass.nameObfuscated, false, elementClass);
+	ClassInstance(String id, ClassInstance elementClass, char side) {
+		this(id, null, elementClass.env, side, null, elementClass.nameObfuscated, elementClass.isIgnored(), false, elementClass);
 
 		assert id.startsWith("[") : id;
 		assert id.indexOf('[', getArrayDimensions()) == -1 : id;
@@ -62,23 +63,26 @@ public final class ClassInstance implements Matchable<ClassInstance> {
 	/**
 	 * Create a non-array class.
 	 */
-	ClassInstance(String id, URI origin, ClassEnv env, ClassNode asmNode, boolean nameObfuscated) {
-		this(id, origin, env, asmNode, nameObfuscated, true, null);
+	ClassInstance(String id, URI origin, ClassEnv env, char side, ClassNode asmNode, boolean ignoredDueToPatternMatch) {
+		this(id, origin, env, side, asmNode, ignoredDueToPatternMatch, true, null);
+		this.ignoredStatus = ignoredDueToPatternMatch ? 2 : 0;
 
 		assert id.startsWith("L") : id;
 		assert id.indexOf('[') == -1 : id;
 		assert asmNode != null;
 	}
 
-	private ClassInstance(String id, URI origin, ClassEnv env, ClassNode asmNode, boolean nameObfuscated, boolean input, ClassInstance elementClass) {
+	private ClassInstance(String id, URI origin, ClassEnv env, char side, ClassNode asmNode, boolean ignored, boolean input, ClassInstance elementClass) {
 		if (id.isEmpty()) throw new IllegalArgumentException("empty id");
 		if (env == null) throw new NullPointerException("null env");
+		assert side == 'a' || side == 'b' || side == 'c';
 
 		this.id = id;
 		this.origin = origin;
 		this.env = env;
+		this.side = side;
 		this.asmNodes = asmNode == null ? null : new ClassNode[] { asmNode };
-		this.nameObfuscated = nameObfuscated;
+		this.ignoredStatus = ignored ? 1 : 0;
 		this.input = input;
 		this.elementClass = elementClass;
 
@@ -277,6 +281,11 @@ public final class ClassInstance implements Matchable<ClassInstance> {
 		return env;
 	}
 
+	@Override
+	public char getSide() {
+		return side;
+	}
+
 	public ClassNode[] getAsmNodes() {
 		return asmNodes;
 	}
@@ -377,6 +386,18 @@ public final class ClassInstance implements Matchable<ClassInstance> {
 	@Override
 	public boolean isNameObfuscated() {
 		return nameObfuscated;
+	}
+
+	@Override
+	public boolean isIgnored() {
+		return ignoredStatus >= 1;
+	}
+
+	@Override
+	public void setIgnored(boolean ignored) {
+		if (ignoredStatus != 2) {
+			this.ignoredStatus = ignored ? 1 : 0;
+		}
 	}
 
 	public boolean isInput() {
@@ -903,6 +924,16 @@ public final class ClassInstance implements Matchable<ClassInstance> {
 				/*|| outerClass != null && outerClass.hasMappedName() TODO: for anonymous only?*/;
 	}
 
+	public boolean hasMappedChildren() {
+		for (MethodInstance mth : methods) {
+			if (mth.hasMappedName() || mth.hasMappedChildren()) return true;
+		}
+		for (FieldInstance fld : fields) {
+			if (fld.hasMappedName()) return true;
+		}
+		return false;
+	}
+
 	public boolean hasNoFullyMappedName() {
 		assert elementClass == null || outerClass == null; // array classes can't have an outer class
 
@@ -915,6 +946,10 @@ public final class ClassInstance implements Matchable<ClassInstance> {
 		assert mappedName == null || !hasOuterName(mappedName);
 
 		this.mappedName = mappedName;
+		if (side == 'a' && Config.getProjectConfig().isIgnoreUnmappedA()
+				|| side == 'b' && Config.getProjectConfig().isIgnoreUnmappedB()) {
+			setIgnored(mappedName == null);
+		}
 	}
 
 	@Override
@@ -1165,11 +1200,13 @@ public final class ClassInstance implements Matchable<ClassInstance> {
 	private static final FieldInstance[] noFields = new FieldInstance[0];
 
 	final String id;
+	final char side;
 	private final URI origin;
 	final ClassEnv env;
 	private ClassNode[] asmNodes;
 	private URI[] asmNodeOrigins;
 	final boolean nameObfuscated;
+	private int ignoredStatus; // 0 = not ignored; 1 = ignored; 2 = ignored due to pattern matching
 	private final boolean input;
 	final ClassInstance elementClass; // 0-dim class TODO: improve handling of array classes (references etc.)
 	private ClassSignature signature;
