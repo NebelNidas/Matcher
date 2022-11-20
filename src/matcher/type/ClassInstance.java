@@ -920,7 +920,7 @@ public final class ClassInstance implements ParentEntry, Matchable<ClassInstance
 	@Override
 	public boolean hasMappedChildren() {
 		for (MethodInstance mth : methods) {
-			if (mth.hasMappedName() || mth.hasMappedChildren()) return true;
+			if (mth.hasNonInheritedMappedName() || mth.hasMappedChildren()) return true;
 		}
 
 		for (FieldInstance fld : fields) {
