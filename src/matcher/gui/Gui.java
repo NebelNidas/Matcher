@@ -8,18 +8,12 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Set;
-import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.function.Consumer;
-import java.util.function.DoubleConsumer;
 import java.util.stream.Collectors;
 
 import javafx.application.Application;
 import javafx.application.Platform;
-import javafx.concurrent.Task;
-import javafx.geometry.Insets;
 import javafx.scene.Node;
 import javafx.scene.Scene;
 import javafx.scene.control.Alert;
@@ -32,13 +26,10 @@ import javafx.scene.layout.ColumnConstraints;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.RowConstraints;
-import javafx.scene.layout.VBox;
 import javafx.stage.DirectoryChooser;
 import javafx.stage.FileChooser;
 import javafx.stage.FileChooser.ExtensionFilter;
-import javafx.stage.Modality;
 import javafx.stage.Stage;
-import javafx.stage.StageStyle;
 import javafx.stage.Window;
 
 import net.fabricmc.mappingio.MappingReader;
@@ -54,6 +45,9 @@ import matcher.gui.menu.NewProjectPane;
 import matcher.mapping.MappingField;
 import matcher.mapping.Mappings;
 import matcher.srcprocess.BuiltinDecompiler;
+import matcher.task.Task;
+import matcher.task.TaskManager;
+import matcher.task.TaskManager.TaskManagerEvent;
 import matcher.type.ClassEnvironment;
 import matcher.type.MatchType;
 
@@ -64,6 +58,8 @@ public class Gui extends Application {
 
 		env = new ClassEnvironment();
 		matcher = new Matcher(env);
+
+		TaskManager.registerEventListener((task, event) -> onTaskManagerEvent(task, event));
 
 		GridPane border = new GridPane();
 
@@ -111,7 +107,7 @@ public class Gui extends Application {
 
 	@Override
 	public void stop() throws Exception {
-		threadPool.shutdown();
+		TaskManager.shutdown();
 	}
 
 	private void handleStartupArgs(List<String> args) {
@@ -259,46 +255,49 @@ public class Gui extends Application {
 
 		CompletableFuture<Boolean> ret = new CompletableFuture<>();
 
-		runProgressTask("Initializing files...",
-				progressReceiver -> {
-					matcher.init(newConfig, progressReceiver);
-					ret.complete(true);
-				},
-				() -> {
-					if (newConfig.getMappingsPathA() != null) {
-						Path mappingsPath = newConfig.getMappingsPathA();
+		Task task = new Task("Initializing files", progressReceiver -> {
+			matcher.init(newConfig, progressReceiver);
+			ret.complete(true);
+		});
 
-						try {
-							List<String> namespaces = MappingReader.getNamespaces(mappingsPath, null);
-							Mappings.load(mappingsPath, null,
-									namespaces.get(0), namespaces.get(1),
-									MappingField.PLAIN, MappingField.MAPPED,
-									env.getEnvA(), true);
-						} catch (IOException e) {
-							e.printStackTrace();
-						}
-					}
+		task.addOnError(exc -> {
+			exc.printStackTrace();
+			ret.completeExceptionally(exc);
+		});
 
-					if (newConfig.getMappingsPathB() != null) {
-						Path mappingsPath = newConfig.getMappingsPathB();
+		task.addOnSuccess(() -> {
+			if (newConfig.getMappingsPathA() != null) {
+				Path mappingsPath = newConfig.getMappingsPathA();
 
-						try {
-							List<String> namespaces = MappingReader.getNamespaces(mappingsPath, null);
-							Mappings.load(mappingsPath, null,
-									namespaces.get(0), namespaces.get(1),
-									MappingField.PLAIN, MappingField.MAPPED,
-									env.getEnvB(), true);
-						} catch (IOException e) {
-							e.printStackTrace();
-						}
-					}
+				try {
+					List<String> namespaces = MappingReader.getNamespaces(mappingsPath, null);
+					Mappings.load(mappingsPath, null,
+							namespaces.get(0), namespaces.get(1),
+							MappingField.PLAIN, MappingField.MAPPED,
+							env.getEnvA(), true);
+				} catch (IOException e) {
+					e.printStackTrace();
+				}
+			}
 
-					onProjectChange();
-				},
-				exc -> {
-					exc.printStackTrace();
-					ret.completeExceptionally(exc);
-				});
+			if (newConfig.getMappingsPathB() != null) {
+				Path mappingsPath = newConfig.getMappingsPathB();
+
+				try {
+					List<String> namespaces = MappingReader.getNamespaces(mappingsPath, null);
+					Mappings.load(mappingsPath, null,
+							namespaces.get(0), namespaces.get(1),
+							MappingField.PLAIN, MappingField.MAPPED,
+							env.getEnvB(), true);
+				} catch (IOException e) {
+					e.printStackTrace();
+				}
+			}
+
+			onProjectChange();
+		});
+
+		task.run();
 
 		return ret;
 	}
@@ -479,70 +478,23 @@ public class Gui extends Application {
 		}
 	}
 
-	public static <T> CompletableFuture<T> runAsyncTask(Callable<T> task) {
-		Task<T> jfxTask = new Task<T>() {
-			@Override
-			protected T call() throws Exception {
-				return task.call();
-			}
-		};
+	public void onTaskManagerEvent(Task task, TaskManagerEvent event) {
+		ProgressBar progressBar = bottomPane.getProgressBar();
+		Label taskLabel = bottomPane.getTaskLabel();
 
-		CompletableFuture<T> ret = new CompletableFuture<T>();
-
-		jfxTask.setOnSucceeded(event -> ret.complete(jfxTask.getValue()));
-		jfxTask.setOnFailed(event -> ret.completeExceptionally(jfxTask.getException()));
-		jfxTask.setOnCancelled(event -> ret.cancel(false));
-
-		threadPool.execute(jfxTask);
-
-		return ret;
-	}
-
-	public void runProgressTask(String labelText, Consumer<DoubleConsumer> task) {
-		runProgressTask(labelText, task, null, null);
-	}
-
-	public void runProgressTask(String labelText, Consumer<DoubleConsumer> task, Runnable onSuccess, Consumer<Throwable> onError) {
-		Stage stage = new Stage(StageStyle.UTILITY);
-		stage.initOwner(this.scene.getWindow());
-		VBox pane = new VBox(GuiConstants.padding);
-
-		stage.setScene(new Scene(pane));
-		stage.initModality(Modality.APPLICATION_MODAL);
-		stage.setOnCloseRequest(event -> event.consume());
-		stage.setResizable(false);
-		stage.setTitle("Operation progress");
-
-		pane.setPadding(new Insets(GuiConstants.padding));
-
-		pane.getChildren().add(new Label(labelText));
-
-		ProgressBar progress = new ProgressBar(0);
-		progress.setPrefWidth(400);
-		pane.getChildren().add(progress);
-
-		stage.show();
-
-		Task<Void> jfxTask = new Task<Void>() {
-			@Override
-			protected Void call() throws Exception {
-				task.accept(cProgress -> Platform.runLater(() -> progress.setProgress(cProgress)));
-
-				return null;
-			}
-		};
-
-		jfxTask.setOnSucceeded(event -> {
-			stage.hide();
-			if (onSuccess != null) onSuccess.run();
-		});
-
-		jfxTask.setOnFailed(event -> {
-			stage.hide();
-			if (onError != null) onError.accept(jfxTask.getException());
-		});
-
-		threadPool.execute(jfxTask);
+		switch (event) {
+			case TASK_STARTED:
+				taskLabel.setText(task.getText());
+				progressBar.setVisible(true);
+				task.addProgressListener((progress) -> progressBar.setProgress(progress));
+				bottomPane.blockMatchButtons(true);
+				break;
+			case TASK_ENDED:
+				taskLabel.setText("");
+				progressBar.setVisible(false);
+				bottomPane.blockMatchButtons(false);
+				break;
+		}
 	}
 
 	public void showAlert(AlertType type, String title, String headerText, String text) {
@@ -640,8 +592,6 @@ public class Gui extends Application {
 	}
 
 	public static final List<Consumer<Gui>> loadListeners = new ArrayList<>();
-
-	private static final ExecutorService threadPool = Executors.newCachedThreadPool();
 
 	private ClassEnvironment env;
 	private Matcher matcher;

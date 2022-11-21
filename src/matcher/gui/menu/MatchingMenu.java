@@ -59,7 +59,8 @@ public class MatchingMenu extends Menu {
 				"Auto matching...",
 				gui.getMatcher()::autoMatchAll,
 				() -> gui.onMatchChange(EnumSet.allOf(MatchType.class)),
-				Throwable::printStackTrace);
+				Throwable::printStackTrace,
+				true);
 	}
 
 	public void autoMatchClasses() {
@@ -67,7 +68,8 @@ public class MatchingMenu extends Menu {
 				"Auto matching classes...",
 				gui.getMatcher()::autoMatchClasses,
 				() -> gui.onMatchChange(EnumSet.allOf(MatchType.class)),
-				Throwable::printStackTrace);
+				Throwable::printStackTrace,
+				true);
 	}
 
 	public void autoMatchMethods() {
@@ -75,7 +77,8 @@ public class MatchingMenu extends Menu {
 				"Auto matching methods...",
 				gui.getMatcher()::autoMatchMethods,
 				() -> gui.onMatchChange(EnumSet.of(MatchType.Method)),
-				Throwable::printStackTrace);
+				Throwable::printStackTrace,
+				true);
 	}
 
 	public void autoMatchFields() {
@@ -83,7 +86,8 @@ public class MatchingMenu extends Menu {
 				"Auto matching fields...",
 				gui.getMatcher()::autoMatchFields,
 				() -> gui.onMatchChange(EnumSet.of(MatchType.Field)),
-				Throwable::printStackTrace);
+				Throwable::printStackTrace,
+				true);
 	}
 
 	public void autoMatchArgs() {
@@ -91,7 +95,8 @@ public class MatchingMenu extends Menu {
 				"Auto matching method args...",
 				gui.getMatcher()::autoMatchMethodArgs,
 				() -> gui.onMatchChange(EnumSet.of(MatchType.MethodVar)),
-				Throwable::printStackTrace);
+				Throwable::printStackTrace,
+				true);
 	}
 
 	public void autoMatchVars() {
@@ -99,7 +104,8 @@ public class MatchingMenu extends Menu {
 				"Auto matching method vars...",
 				gui.getMatcher()::autoMatchMethodVars,
 				() -> gui.onMatchChange(EnumSet.of(MatchType.MethodVar)),
-				Throwable::printStackTrace);
+				Throwable::printStackTrace,
+				true);
 	}
 
 	public void showMatchingStatus() {

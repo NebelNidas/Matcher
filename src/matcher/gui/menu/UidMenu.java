@@ -54,7 +54,8 @@ public class UidMenu extends Menu {
 				"Importing matches...",
 				this::importMatches,
 				() -> gui.onMatchChange(EnumSet.allOf(MatchType.class)),
-				Throwable::printStackTrace));
+				Throwable::printStackTrace,
+				true));
 
 		menuItem = new MenuItem("Submit matches");
 		getItems().add(menuItem);
@@ -62,7 +63,8 @@ public class UidMenu extends Menu {
 				"Submitting matches...",
 				this::submitMatches,
 				() -> { },
-				Throwable::printStackTrace));
+				Throwable::printStackTrace,
+				false));
 
 		getItems().add(new SeparatorMenuItem());
 

@@ -36,6 +36,7 @@ import matcher.gui.menu.LoadProjectPane.ProjectLoadSettings;
 import matcher.gui.menu.SaveMappingsPane.MappingsSaveSettings;
 import matcher.mapping.Mappings;
 import matcher.serdes.MatchesIo;
+import matcher.task.Task;
 import matcher.type.ClassEnvironment;
 import matcher.type.MatchType;
 
@@ -117,10 +118,11 @@ public class FileMenu extends Menu {
 		gui.getMatcher().reset();
 		gui.onProjectChange();
 
-		gui.runProgressTask("Initializing files...",
-				progressReceiver -> MatchesIo.read(res.path, newConfig.paths, newConfig.verifyFiles, gui.getMatcher(), progressReceiver),
-				() -> gui.onProjectChange(),
-				Throwable::printStackTrace);
+		Task task = new Task("Initializing files",
+				progressReceiver -> MatchesIo.read(res.path, newConfig.paths, newConfig.verifyFiles, gui.getMatcher(), progressReceiver));
+		task.addOnError(Throwable::printStackTrace);
+		task.addOnSuccess(() -> gui.onProjectChange());
+		task.run();
 	}
 
 	public ProjectLoadSettings requestProjectLoadSettings() {
