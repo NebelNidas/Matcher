@@ -4,12 +4,15 @@ import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.util.Set;
 
+import javafx.application.Platform;
+
 import matcher.NameType;
 import matcher.gui.Gui;
 import matcher.gui.ISelectionProvider;
 import matcher.srcprocess.HtmlUtil;
 import matcher.srcprocess.SrcDecorator;
 import matcher.srcprocess.SrcDecorator.SrcParseException;
+import matcher.task.Task;
 import matcher.type.ClassInstance;
 import matcher.type.FieldInstance;
 import matcher.type.MatchType;
@@ -72,35 +75,36 @@ public class SourcecodeTab extends WebViewTab {
 
 		NameType nameType = gui.getNameType().withUnmatchedTmp(unmatchedTmp);
 
-		//Gui.runAsyncTask(() -> gui.getEnv().decompile(cls, true))
-		Gui.runAsyncTask(() -> SrcDecorator.decorate(gui.getEnv().decompile(gui.getDecompiler().get(), cls, nameType), cls, nameType))
-				.whenComplete((res, exc) -> {
-					if (cDecompId == decompId) {
-						if (exc != null) {
-							exc.printStackTrace();
+		var decompileTask = new Task<String>("decompile",
+				(progress) -> SrcDecorator.decorate(gui.getEnv().decompile(gui.getDecompiler().get(), cls, nameType), cls, nameType));
 
-							StringWriter sw = new StringWriter();
-							exc.printStackTrace(new PrintWriter(sw));
+		decompileTask.addOnError((error) -> Platform.runLater(() -> {
+			error.printStackTrace();
 
-							if (exc instanceof SrcParseException) {
-								SrcParseException parseExc = (SrcParseException) exc;
-								displayText("parse error: "+parseExc.problems+"\ndecompiled source:\n"+parseExc.source);
-							} else {
-								displayText("decompile error: "+sw.toString());
-							}
-						} else {
-							double prevScroll = isRefresh ? getScrollTop() : 0;
+			if (cDecompId == decompId) {
+				StringWriter sw = new StringWriter();
+				error.printStackTrace(new PrintWriter(sw));
 
-							displayHtml(res);
+				if (error instanceof SrcParseException) {
+					SrcParseException parseExc = (SrcParseException) error;
+					displayText("parse error: "+parseExc.problems+"\ndecompiled source:\n"+parseExc.source);
+				} else {
+					displayText("decompile error: "+sw.toString());
+				}
+			}
+		}));
+		decompileTask.addOnSuccess((code) -> Platform.runLater(() -> {
+			if (cDecompId == decompId) {
+				double prevScroll = isRefresh ? getScrollTop() : 0;
 
-							if (isRefresh && prevScroll > 0) {
-								setScrollTop(prevScroll);
-							}
-						}
-					} else if (exc != null) {
-						exc.printStackTrace();
-					}
-				});
+				displayHtml(code);
+
+				if (isRefresh && prevScroll > 0) {
+					setScrollTop(prevScroll);
+				}
+			}
+		}));
+		decompileTask.run();
 	}
 
 	@Override

@@ -118,10 +118,12 @@ public class FileMenu extends Menu {
 		gui.getMatcher().reset();
 		gui.onProjectChange();
 
-		Task task = new Task("Initializing files",
-				progressReceiver -> MatchesIo.read(res.path, newConfig.paths, newConfig.verifyFiles, gui.getMatcher(), progressReceiver));
+		var task = new Task<Void>("initializing-files", progressReceiver -> {
+			MatchesIo.read(res.path, newConfig.paths, newConfig.verifyFiles, gui.getMatcher(), progressReceiver);
+			return null;
+		});
 		task.addOnError(Throwable::printStackTrace);
-		task.addOnSuccess(() -> gui.onProjectChange());
+		task.addOnSuccess((result) -> gui.onProjectChange());
 		task.run();
 	}
 

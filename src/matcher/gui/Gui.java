@@ -8,7 +8,6 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Set;
-import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
@@ -59,7 +58,7 @@ public class Gui extends Application {
 		env = new ClassEnvironment();
 		matcher = new Matcher(env);
 
-		TaskManager.registerEventListener((task, event) -> onTaskManagerEvent(task, event));
+		TaskManager.registerEventListener((task, event) -> Platform.runLater(() -> onTaskManagerEvent(task, event)));
 
 		GridPane border = new GridPane();
 
@@ -131,35 +130,35 @@ public class Gui extends Application {
 			// ProjectConfig args
 
 			case "--inputs-a":
-				while (!args.get(i+1).startsWith("--")) {
+				while (i+1 < args.size() && !args.get(i+1).startsWith("--")) {
 					inputsA.add(Path.of(args.get(++i)));
 					validProjectConfigArgPresent = true;
 				}
 
 				break;
 			case "--inputs-b":
-				while (!args.get(i+1).startsWith("--")) {
+				while (i+1 < args.size() && !args.get(i+1).startsWith("--")) {
 					inputsB.add(Path.of(args.get(++i)));
 					validProjectConfigArgPresent = true;
 				}
 
 				break;
 			case "--classpath-a":
-				while (!args.get(i+1).startsWith("--")) {
+				while (i+1 < args.size() && !args.get(i+1).startsWith("--")) {
 					classPathA.add(Path.of(args.get(++i)));
 					validProjectConfigArgPresent = true;
 				}
 
 				break;
 			case "--classpath-b":
-				while (!args.get(i+1).startsWith("--")) {
+				while (i+1 < args.size() && !args.get(i+1).startsWith("--")) {
 					classPathB.add(Path.of(args.get(++i)));
 					validProjectConfigArgPresent = true;
 				}
 
 				break;
 			case "--shared-classpath":
-				while (!args.get(i+1).startsWith("--")) {
+				while (i+1 < args.size() && !args.get(i+1).startsWith("--")) {
 					sharedClassPath.add(Path.of(args.get(++i)));
 					validProjectConfigArgPresent = true;
 				}
@@ -225,7 +224,7 @@ public class Gui extends Application {
 		newProject(config, inputsA.isEmpty() || inputsB.isEmpty());
 	}
 
-	public CompletableFuture<Boolean> newProject(ProjectConfig config, boolean showConfigDialog) {
+	public void newProject(ProjectConfig config, boolean showConfigDialog) {
 		ProjectConfig newConfig;
 
 		if (showConfigDialog) {
@@ -242,7 +241,7 @@ public class Gui extends Application {
 			dialog.setResultConverter(button -> button == ButtonType.OK ? content.createConfig() : null);
 
 			newConfig = dialog.showAndWait().orElse(null);
-			if (newConfig == null || !newConfig.isValid()) return CompletableFuture.completedFuture(false);
+			if (newConfig == null || !newConfig.isValid()) return;
 		} else {
 			newConfig = config;
 		}
@@ -253,19 +252,12 @@ public class Gui extends Application {
 		matcher.reset();
 		onProjectChange();
 
-		CompletableFuture<Boolean> ret = new CompletableFuture<>();
-
-		Task task = new Task("Initializing files", progressReceiver -> {
+		var task = new Task<Void>("initializing-files", progressReceiver -> {
 			matcher.init(newConfig, progressReceiver);
-			ret.complete(true);
+			return null;
 		});
-
-		task.addOnError(exc -> {
-			exc.printStackTrace();
-			ret.completeExceptionally(exc);
-		});
-
-		task.addOnSuccess(() -> {
+		task.addOnError(Throwable::printStackTrace);
+		task.addOnSuccess((result) -> Platform.runLater(() -> {
 			if (newConfig.getMappingsPathA() != null) {
 				Path mappingsPath = newConfig.getMappingsPathA();
 
@@ -295,11 +287,8 @@ public class Gui extends Application {
 			}
 
 			onProjectChange();
-		});
-
+		}));
 		task.run();
-
-		return ret;
 	}
 
 	public ClassEnvironment getEnv() {
@@ -478,23 +467,53 @@ public class Gui extends Application {
 		}
 	}
 
-	public void onTaskManagerEvent(Task task, TaskManagerEvent event) {
+	public void onTaskManagerEvent(Task<?> task, TaskManagerEvent event) {
+		switch (event) {
+		case TASK_STARTED:
+			activeTasks.add(task);
+			task.addProgressListener((progress) -> Platform.runLater(() -> onProgressChange(progress)));
+			break;
+		case TASK_ENDED:
+			activeTasks.remove(task);
+			break;
+		}
+
+		updateProgressPane();
+	}
+
+	private void updateProgressPane() {
 		ProgressBar progressBar = bottomPane.getProgressBar();
 		Label taskLabel = bottomPane.getTaskLabel();
 
-		switch (event) {
-			case TASK_STARTED:
-				taskLabel.setText(task.getText());
-				progressBar.setVisible(true);
-				task.addProgressListener((progress) -> progressBar.setProgress(progress));
-				bottomPane.blockMatchButtons(true);
-				break;
-			case TASK_ENDED:
-				taskLabel.setText("");
-				progressBar.setVisible(false);
-				bottomPane.blockMatchButtons(false);
-				break;
+		if (activeTasks.size() == 0) {
+			taskLabel.setText("");
+			progressBar.setVisible(false);
+			progressBar.setProgress(-1);
+			bottomPane.blockMatchButtons(false);
+		} else {
+			progressBar.setVisible(true);
+			bottomPane.blockMatchButtons(true);
+
+			if (activeTasks.size() == 1) {
+				taskLabel.setText(activeTasks.get(0).getId());
+				progressBar.setProgress(activeTasks.get(0).getProgress());
+				taskLabel.setText(taskLabel.getText() + progressBar.getProgress());
+			} else {
+				taskLabel.setText(activeTasks.size() + " tasks running");
+
+				if (progressBar.getProgress() > 0) {
+					progressBar.setProgress(progressBar.getProgress() * (activeTasks.size() - 1) / activeTasks.size());
+					taskLabel.setText(taskLabel.getText() + progressBar.getProgress());
+				}
+			}
 		}
+	}
+
+	private void onProgressChange(double progress) {
+		ProgressBar progressBar = bottomPane.getProgressBar();
+		bottomPane.getTaskLabel().setText(progressBar.getProgress() + " " + bottomPane.getTaskLabel().getText());
+
+		progressBar.setProgress(progressBar.getProgress() + progress / activeTasks.size());
 	}
 
 	public void showAlert(AlertType type, String title, String headerText, String text) {
@@ -603,6 +622,8 @@ public class Gui extends Application {
 	private MatchPaneSrc srcPane;
 	private MatchPaneDst dstPane;
 	private BottomPane bottomPane;
+
+	private List<Task<?>> activeTasks = new ArrayList<>(5);
 
 	private SortKey sortKey = SortKey.Name;
 	private boolean sortMatchesAlphabetically;

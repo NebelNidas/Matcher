@@ -5,11 +5,21 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.function.Consumer;
 import java.util.function.DoubleConsumer;
+import java.util.function.Function;
 
-public class Task implements Runnable {
-	public Task(String text, Consumer<DoubleConsumer> task) {
-		this.text = text;
-		this.task = task;
+public class Task<T> implements Runnable {
+	public Task(String id, Function<DoubleConsumer, T> action) {
+		this.id = id;
+
+		setAction(action);
+	}
+
+	protected void setAction(Function<DoubleConsumer, T> action) {
+		this.action = action;
+	}
+
+	public void addProgressListener(Consumer<Double> progressListener) {
+		progressListeners.add(progressListener);
 	}
 
 	public void addOnCancel(Runnable onCancel) {
@@ -20,73 +30,109 @@ public class Task implements Runnable {
 		this.onErrorListeners.add(onError);
 	}
 
-	public void addOnSuccess(Runnable onSuccess) {
+	public void addOnSuccess(Consumer<T> onSuccess) {
 		this.onSuccessListeners.add(onSuccess);
 	}
 
-	public void addProgressListener(Consumer<Double> progressListener) {
-		progressListeners.add(progressListener);
+	public void addOnFinish(Runnable onFinish) {
+		this.onFinishListeners.add(onFinish);
 	}
 
-	public void addChildTask(Task childTask) {
-		childTask.setParent(this);
-		childTasks.add(childTask);
+	public void addBlockedBy(String... blockingTaskIds) {
+		this.blockingTaskIds.addAll(Arrays.asList(blockingTaskIds));
 	}
 
-	private void setParent(Task parent) {
+	void setParent(TaskGroup<?> parent) {
 		this.parent = parent;
-	}
-
-	public void setBlockedBy(TaskType... blockingTypes) {
-		blockingTaskTypes.addAll(Arrays.asList(blockingTypes));
-	}
-
-	public void cancel() {
-		onCancelListeners.forEach(listener -> listener.run());;
-	}
-
-	private void onProgressChange(double progress) {
-		progressListeners.forEach(listener -> listener.accept(progress));
 	}
 
 	@Override
 	public void run() {
-		TaskManager.queue(this);
+		state = TaskState.QUEUED;
+
+		if (parent == null) {
+			TaskManager.queue(this);
+		} else {
+			runNow();
+		}
 	}
 
 	void runNow() {
-		task.accept((progress) -> onProgressChange(progress));
-		childTasks.forEach(task -> TaskManager.queue(task));
+		state = TaskState.RUNNING;
+
+		if (action != null) {
+			try {
+				result = action.apply((progress) -> onProgressChange(progress));
+			} catch (Exception e) {
+				onError(e);
+				return;
+			}
+		}
+
+		onSuccess();
 	}
 
-	public String getText() {
-		return text;
+	public void cancel() {
+		onCancel();
 	}
 
-	public List<Task> getChildTasks() {
-		return childTasks;
+	protected void onCancel() {
+		state = TaskState.CANCELING;
+		onCancelListeners.forEach(listener -> listener.run());
+		onFinish();
 	}
 
-	public Task getParent() {
+	protected void onProgressChange(double progress) {
+		this.progress = progress;
+		progressListeners.forEach(listener -> listener.accept(progress));
+	}
+
+	protected void onError(Throwable error) {
+		state = TaskState.ERRORED;
+		onErrorListeners.forEach(listener -> listener.accept(error));
+		onFinish();
+	}
+
+	protected void onSuccess() {
+		state = TaskState.SUCCEEDED;
+		onSuccessListeners.forEach(listener -> listener.accept(result));
+		onFinish();
+	}
+
+	protected void onFinish() {
+		onFinishListeners.forEach(listener -> listener.run());
+	}
+
+	public String getId() {
+		return id;
+	}
+
+	public TaskGroup<?> getParent() {
 		return parent;
 	}
 
-	public boolean isBlockedBy(TaskType taskType) {
-		return blockingTaskTypes.contains(taskType);
+	public double getProgress() {
+		return progress;
 	}
 
-	enum TaskType {
-		INIT_PROJECT,
-		MATCHING_BLOCKING
+	public TaskState getState() {
+		return state;
 	}
 
-	private final String text;
-	private final Consumer<DoubleConsumer> task;
-	private List<Runnable> onCancelListeners = new ArrayList<>(2);
-	private List<Runnable> onSuccessListeners = new ArrayList<>(2);
-	private List<Consumer<Throwable>> onErrorListeners = new ArrayList<>(2);
-	private List<Consumer<Double>> progressListeners = new ArrayList<>(2);
-	private List<TaskType> blockingTaskTypes = new ArrayList<>();
-	private List<Task> childTasks = new ArrayList<>(2);
-	private Task parent;
+	public boolean isBlockedBy(String taskId) {
+		return blockingTaskIds.contains(taskId);
+	}
+
+	protected final String id;
+	private Function<DoubleConsumer, T> action;
+	private T result;
+	protected TaskGroup<?> parent;
+	protected double progress = -1;
+	protected TaskState state = TaskState.CREATED;
+	protected List<Runnable> onCancelListeners = new ArrayList<>(2);
+	protected List<Consumer<T>> onSuccessListeners = new ArrayList<>(2);
+	protected List<Consumer<Throwable>> onErrorListeners = new ArrayList<>(2);
+	protected List<Runnable> onFinishListeners = new ArrayList<>(2);
+	protected List<Consumer<Double>> progressListeners = new ArrayList<>(2);
+	protected List<String> blockingTaskIds = new ArrayList<>(4);
 }
