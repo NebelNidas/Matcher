@@ -95,6 +95,7 @@ public class AutoMatchAllTask extends TaskGroup<Set<MatchType>> {
 		methodTask.addOnSuccess((result) -> matchedAnyMembers.set(matchedAnyMembers.get() | result));
 		methodTask.addOnFinish(() -> {
 			methodsDone.set(true);
+			System.out.println("Matching methods finished");
 
 			autoMatchMembers0(methodsDone.get(), fieldsDone.get(), level, parentTask);
 		});
@@ -105,10 +106,15 @@ public class AutoMatchAllTask extends TaskGroup<Set<MatchType>> {
 		fieldTask.addOnSuccess((result) -> matchedAnyMembers.set(matchedAnyMembers.get() | result));
 		fieldTask.addOnFinish(() -> {
 			fieldsDone.set(true);
+			System.out.println("Matching fields finished");
 
 			autoMatchMembers0(methodsDone.get(), fieldsDone.get(), level, parentTask);
 		});
 		parentTask.addSubTask(fieldTask, false);
+
+		for (Task<?> task : parentTask.getSubTasks()) {
+			task.run();
+		}
 	}
 
 	private void autoMatchMembers0(boolean methodsDone, boolean fieldsDone, ClassifierLevel level, TaskGroup<Boolean> parentTask) {
@@ -128,6 +134,7 @@ public class AutoMatchAllTask extends TaskGroup<Set<MatchType>> {
 		});
 		matchedAnyMembers.set(false);
 		parentTask.addSubTask(task, fieldsDone);
+		task.run();
 	}
 
 	private void autoMatchVars(TaskGroup<Boolean> parentTask) {
@@ -139,6 +146,7 @@ public class AutoMatchAllTask extends TaskGroup<Set<MatchType>> {
 		argTask.addOnSuccess((result) -> matchedAnyVars.set(matchedAnyVars.get() | result));
 		argTask.addOnFinish(() -> {
 			argsDone.set(true);
+			System.out.println("Matching args finished");
 
 			autoMatchVars0(argsDone.get(), varsDone.get(), parentTask);
 		});
@@ -149,10 +157,15 @@ public class AutoMatchAllTask extends TaskGroup<Set<MatchType>> {
 		varTask.addOnSuccess((result) -> matchedAnyVars.set(matchedAnyVars.get() | result));
 		varTask.addOnFinish(() -> {
 			varsDone.set(true);
+			System.out.println("Matching vars finished");
 
 			autoMatchVars0(argsDone.get(), varsDone.get(), parentTask);
 		});
 		parentTask.addSubTask(varTask, false);
+
+		for (Task<?> task : parentTask.getSubTasks()) {
+			task.run();
+		}
 	}
 
 	private void autoMatchVars0(boolean argsDone, boolean varsDone, TaskGroup<Boolean> parentTask) {
@@ -169,8 +182,8 @@ public class AutoMatchAllTask extends TaskGroup<Set<MatchType>> {
 
 	public static final String ID = "auto-match-all";
 	private final Matcher matcher;
-	AtomicBoolean matchedClassesBefore = new AtomicBoolean(true);
-	AtomicBoolean matchedAnyClasses = new AtomicBoolean(false);
-	AtomicBoolean matchedAnyMembers = new AtomicBoolean(false);
-	AtomicBoolean matchedAnyVars = new AtomicBoolean(false);
+	private final AtomicBoolean matchedClassesBefore = new AtomicBoolean(true);
+	private final AtomicBoolean matchedAnyClasses = new AtomicBoolean(false);
+	private final AtomicBoolean matchedAnyMembers = new AtomicBoolean(false);
+	private final AtomicBoolean matchedAnyVars = new AtomicBoolean(false);
 }

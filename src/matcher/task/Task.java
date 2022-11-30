@@ -18,6 +18,10 @@ public class Task<T> implements Runnable {
 		this.action = action;
 	}
 
+	/**
+	 * Every time this task's progress changes, the double consumer gets invoked.
+	 * Progress is a value between -∞ and 1, where negative values indicate an uncertain runtime.
+	 */
 	public void addProgressListener(Consumer<Double> progressListener) {
 		progressListeners.add(progressListener);
 	}
@@ -34,18 +38,33 @@ public class Task<T> implements Runnable {
 		this.onSuccessListeners.add(onSuccess);
 	}
 
+	/**
+	 * Gets called once this task is finished. This doesn't guarantee a specific state,
+	 * it can be cancelled, errored or finished successfully.
+	 */
 	public void addOnFinish(Runnable onFinish) {
 		this.onFinishListeners.add(onFinish);
 	}
 
+	/**
+	 * Add IDs of other tasks which must be executed before this task can be started.
+	 */
 	public void addBlockedBy(String... blockingTaskIds) {
 		this.blockingTaskIds.addAll(Arrays.asList(blockingTaskIds));
+	}
+
+	protected void andThen(Task<?> task) {
+
 	}
 
 	void setParent(TaskGroup<?> parent) {
 		this.parent = parent;
 	}
 
+	/**
+	 * Queues this task for execution.
+	 * If called on a TaskGroup's child, executes it directly.
+	 */
 	@Override
 	public void run() {
 		state = TaskState.QUEUED;

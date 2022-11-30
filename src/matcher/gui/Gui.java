@@ -21,6 +21,7 @@ import javafx.scene.control.ButtonType;
 import javafx.scene.control.Dialog;
 import javafx.scene.control.Label;
 import javafx.scene.control.ProgressBar;
+import javafx.scene.control.Tooltip;
 import javafx.scene.layout.ColumnConstraints;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.Priority;
@@ -491,27 +492,44 @@ public class Gui extends Application {
 			progressBar.setProgress(-1);
 			bottomPane.blockMatchButtons(false);
 		} else {
-			progressBar.setVisible(true);
 			bottomPane.blockMatchButtons(true);
+			progressBar.setVisible(true);
+			progressBar.setProgress(0);
+
+			for (Task<?> task : activeTasks) {
+				if (task.getProgress() < 0) {
+					progressBar.setProgress(-1);
+					break;
+				} else {
+					progressBar.setProgress(progressBar.getProgress() + (task.getProgress() / activeTasks.size()));
+				}
+			}
 
 			if (activeTasks.size() == 1) {
 				taskLabel.setText(activeTasks.get(0).getId());
-				progressBar.setProgress(activeTasks.get(0).getProgress());
-				taskLabel.setText(taskLabel.getText() + progressBar.getProgress());
+				// progressBar.setProgress(activeTasks.get(0).getProgress());
 			} else {
 				taskLabel.setText(activeTasks.size() + " tasks running");
+				StringBuilder tooltipText = new StringBuilder();
 
-				if (progressBar.getProgress() > 0) {
-					progressBar.setProgress(progressBar.getProgress() * (activeTasks.size() - 1) / activeTasks.size());
-					taskLabel.setText(taskLabel.getText() + progressBar.getProgress());
+				for (Task<?> task : activeTasks) {
+					tooltipText.append(task.getId() + "\n");
 				}
+
+				taskLabel.setTooltip(new Tooltip(tooltipText.toString()));
+
+				// if (progressBar.getProgress() > 0) {
+				// 	progressBar.setProgress(progressBar.getProgress() * (activeTasks.size() - 1) / activeTasks.size());
+				// }
 			}
+
+			progressBar.setTooltip(new Tooltip(""+progressBar.getProgress()));
 		}
 	}
 
 	private void onProgressChange(double progress) {
 		ProgressBar progressBar = bottomPane.getProgressBar();
-		bottomPane.getTaskLabel().setText(progressBar.getProgress() + " " + bottomPane.getTaskLabel().getText());
+		bottomPane.getTaskLabel().setText(bottomPane.getTaskLabel().getText());
 
 		progressBar.setProgress(progressBar.getProgress() + progress / activeTasks.size());
 	}
