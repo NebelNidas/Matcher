@@ -3,12 +3,19 @@ package matcher.gui.menu;
 import java.util.EnumSet;
 
 import javafx.scene.control.Alert.AlertType;
+import javafx.application.Platform;
 import javafx.scene.control.Menu;
 import javafx.scene.control.MenuItem;
 import javafx.scene.control.SeparatorMenuItem;
 
+import matcher.Matcher;
 import matcher.Matcher.MatchingStatus;
 import matcher.gui.Gui;
+import matcher.task.tasks.AutoMatchAllTask;
+import matcher.task.tasks.AutoMatchClassesTask;
+import matcher.task.tasks.AutoMatchFieldsTask;
+import matcher.task.tasks.AutoMatchMethodVarsTask;
+import matcher.task.tasks.AutoMatchMethodsTask;
 import matcher.type.MatchType;
 
 public class MatchingMenu extends Menu {
@@ -55,51 +62,65 @@ public class MatchingMenu extends Menu {
 	}
 
 	public void autoMatchAll() {
-		gui.runProgressTask(
-				"Auto matching...",
-				gui.getMatcher()::autoMatchAll,
-				() -> gui.onMatchChange(EnumSet.allOf(MatchType.class)),
-				Throwable::printStackTrace);
+		var task = new AutoMatchAllTask(gui.getMatcher());
+		task.addOnError(Throwable::printStackTrace);
+		task.addOnSuccess((result) -> Platform.runLater(() -> gui.onMatchChange(result)));
+		task.run();
 	}
 
 	public void autoMatchClasses() {
-		gui.runProgressTask(
-				"Auto matching classes...",
-				gui.getMatcher()::autoMatchClasses,
-				() -> gui.onMatchChange(EnumSet.allOf(MatchType.class)),
-				Throwable::printStackTrace);
+		var task = new AutoMatchClassesTask(gui.getMatcher(), Matcher.defaultAutoMatchLevel);
+		task.addOnError(Throwable::printStackTrace);
+		task.addOnSuccess((matchedAny) -> {
+			if (matchedAny) {
+				Platform.runLater(() -> gui.onMatchChange(EnumSet.allOf(MatchType.class)));
+			}
+		});
+		task.run();
 	}
 
 	public void autoMatchMethods() {
-		gui.runProgressTask(
-				"Auto matching methods...",
-				gui.getMatcher()::autoMatchMethods,
-				() -> gui.onMatchChange(EnumSet.of(MatchType.Method)),
-				Throwable::printStackTrace);
+		var task = new AutoMatchMethodsTask(gui.getMatcher(), Matcher.defaultAutoMatchLevel);
+		task.addOnError(Throwable::printStackTrace);
+		task.addOnSuccess((matchedAny) -> {
+			if (matchedAny) {
+				Platform.runLater(() -> gui.onMatchChange(EnumSet.of(MatchType.Method)));
+			}
+		});
+		task.run();
 	}
 
 	public void autoMatchFields() {
-		gui.runProgressTask(
-				"Auto matching fields...",
-				gui.getMatcher()::autoMatchFields,
-				() -> gui.onMatchChange(EnumSet.of(MatchType.Field)),
-				Throwable::printStackTrace);
+		var task = new AutoMatchFieldsTask(gui.getMatcher(), Matcher.defaultAutoMatchLevel);
+		task.addOnError(Throwable::printStackTrace);
+		task.addOnSuccess((matchedAny) -> {
+			if (matchedAny) {
+				Platform.runLater(() -> gui.onMatchChange(EnumSet.of(MatchType.Field)));
+			}
+		});
+		task.run();
 	}
 
 	public void autoMatchArgs() {
-		gui.runProgressTask(
-				"Auto matching method args...",
-				gui.getMatcher()::autoMatchMethodArgs,
-				() -> gui.onMatchChange(EnumSet.of(MatchType.MethodVar)),
-				Throwable::printStackTrace);
+		var task = new AutoMatchMethodVarsTask(gui.getMatcher(), Matcher.defaultAutoMatchLevel, true);
+		task.addOnError(Throwable::printStackTrace);
+		task.addOnSuccess((matchedAny) -> {
+			if (matchedAny) {
+				Platform.runLater(() -> gui.onMatchChange(EnumSet.of(MatchType.MethodVar)));
+			}
+		});
+		task.run();
 	}
 
 	public void autoMatchVars() {
-		gui.runProgressTask(
-				"Auto matching method vars...",
-				gui.getMatcher()::autoMatchMethodVars,
-				() -> gui.onMatchChange(EnumSet.of(MatchType.MethodVar)),
-				Throwable::printStackTrace);
+		var task = new AutoMatchMethodVarsTask(gui.getMatcher(), Matcher.defaultAutoMatchLevel, false);
+		task.addOnError(Throwable::printStackTrace);
+		task.addOnSuccess((matchedAny) -> {
+			if (matchedAny) {
+				Platform.runLater(() -> gui.onMatchChange(EnumSet.of(MatchType.MethodVar)));
+			}
+		});
+		task.run();
 	}
 
 	public void showMatchingStatus() {

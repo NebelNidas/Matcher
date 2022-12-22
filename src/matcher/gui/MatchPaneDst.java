@@ -7,23 +7,19 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.Set;
-import java.util.concurrent.Callable;
 
+import javafx.application.Platform;
 import javafx.scene.control.ListView;
 import javafx.scene.control.SplitPane;
 import javafx.scene.control.TextField;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
 
+import matcher.Matcher;
 import matcher.NameType;
-import matcher.classifier.ClassClassifier;
-import matcher.classifier.ClassifierLevel;
-import matcher.classifier.FieldClassifier;
-import matcher.classifier.MethodClassifier;
-import matcher.classifier.MethodVarClassifier;
 import matcher.classifier.RankResult;
+import matcher.task.tasks.RankMatchResultsTask;
 import matcher.type.ClassEnv;
-import matcher.type.ClassEnvironment;
 import matcher.type.ClassInstance;
 import matcher.type.FieldInstance;
 import matcher.type.MatchType;
@@ -674,41 +670,20 @@ public class MatchPaneDst extends SplitPane implements IFwdGuiComponent, ISelect
 			matchList.getItems().clear();
 			suppressChangeEvents = false;
 
-			ClassifierLevel matchLevel = gui.getMatcher().getAutoMatchLevel();
-			ClassEnvironment env = gui.getEnv();
-			double maxMismatch = Double.POSITIVE_INFINITY;
-
-			Callable<List<? extends RankResult<? extends Matchable<?>>>> ranker;
-
-			if (newSrcSelection == null) { // no class selected
+			if (newSrcSelection == null) {
 				return;
-			} else if (newSrcSelection instanceof ClassInstance) { // unmatched class or no member/method var selected
-				ClassInstance cls = (ClassInstance) newSrcSelection;
-				ranker = () -> ClassClassifier.rankParallel(cls, cmpClasses.toArray(new ClassInstance[0]), matchLevel, env, maxMismatch);
-			} else if (newSrcSelection instanceof MethodInstance) { // unmatched method or no method var selected
-				MethodInstance method = (MethodInstance) newSrcSelection;
-				ranker = () -> MethodClassifier.rank(method, method.getCls().getMatch().getMethods(), matchLevel, env, maxMismatch);
-			} else if (newSrcSelection instanceof FieldInstance) { // field
-				FieldInstance field = (FieldInstance) newSrcSelection;
-				ranker = () -> FieldClassifier.rank(field, field.getCls().getMatch().getFields(), matchLevel, env, maxMismatch);
-			} else if (newSrcSelection instanceof MethodVarInstance) { // method arg/var
-				MethodVarInstance var = (MethodVarInstance) newSrcSelection;
-				MethodInstance cmpMethod = var.getMethod().getMatch();
-				MethodVarInstance[] cmp = var.isArg() ? cmpMethod.getArgs() : cmpMethod.getVars();
-				ranker = () -> MethodVarClassifier.rank(var, cmp, matchLevel, env, maxMismatch);
-			} else {
-				throw new IllegalStateException();
 			}
 
+			// update matches list
 			final int cTaskId = ++taskId;
 
-			// update matches list
-			Gui.runAsyncTask(ranker).whenComplete((res, exc) -> {
-				if (exc != null) {
-					exc.printStackTrace();
-				} else if (taskId == cTaskId) {
+			var task = new RankMatchResultsTask(gui.getEnv(),
+					Matcher.defaultAutoMatchLevel, newSrcSelection, cmpClasses);
+			task.addOnError(Throwable::printStackTrace);
+			task.addOnSuccess((results) -> Platform.runLater(() -> {
+				if (taskId == cTaskId) {
 					assert rankResults.isEmpty();
-					rankResults.addAll(res);
+					rankResults.addAll(results);
 
 					updateResults(oldDstSelection);
 					oldDstSelection = null;
@@ -717,7 +692,8 @@ public class MatchPaneDst extends SplitPane implements IFwdGuiComponent, ISelect
 						onMatchChangeApply(matchChangeTypes);
 					}
 				}
-			});
+			}));
+			task.run();
 		}
 
 		private Matchable<?> getMatchableSrcSelection() {
