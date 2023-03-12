@@ -18,7 +18,7 @@ import javafx.scene.layout.VBox;
 import matcher.Matcher;
 import matcher.NameType;
 import matcher.classifier.RankResult;
-import matcher.task.tasks.RankMatchResultsTask;
+import matcher.jobs.builtin.RankMatchResultsJob;
 import matcher.type.ClassEnv;
 import matcher.type.ClassInstance;
 import matcher.type.FieldInstance;
@@ -675,13 +675,13 @@ public class MatchPaneDst extends SplitPane implements IFwdGuiComponent, ISelect
 			}
 
 			// update matches list
-			final int cTaskId = ++taskId;
+			final int cJobId = ++jobId;
 
-			var task = new RankMatchResultsTask(gui.getEnv(),
+			var job = new RankMatchResultsJob(gui.getEnv(),
 					Matcher.defaultAutoMatchLevel, newSrcSelection, cmpClasses);
-			task.addOnError(Throwable::printStackTrace);
-			task.addOnSuccess((results) -> Platform.runLater(() -> {
-				if (taskId == cTaskId) {
+			job.addOnError(Throwable::printStackTrace);
+			job.addOnSuccess((results) -> Platform.runLater(() -> {
+				if (jobId == cJobId) {
 					assert rankResults.isEmpty();
 					rankResults.addAll(results);
 
@@ -693,7 +693,7 @@ public class MatchPaneDst extends SplitPane implements IFwdGuiComponent, ISelect
 					}
 				}
 			}));
-			task.run();
+			job.run();
 		}
 
 		private Matchable<?> getMatchableSrcSelection() {
@@ -716,7 +716,7 @@ public class MatchPaneDst extends SplitPane implements IFwdGuiComponent, ISelect
 			return ret;
 		}
 
-		private int taskId;
+		private int jobId;
 		private Matchable<?> oldSrcSelection;
 		private Matchable<?> oldDstSelection;
 	}

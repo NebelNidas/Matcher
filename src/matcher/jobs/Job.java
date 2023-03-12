@@ -1,4 +1,4 @@
-package matcher.task;
+package matcher.jobs;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -7,10 +7,9 @@ import java.util.function.Consumer;
 import java.util.function.DoubleConsumer;
 import java.util.function.Function;
 
-public class Task<T> implements Runnable {
-	public Task(String id, Function<DoubleConsumer, T> action) {
+public class Job<T> implements Runnable {
+	public Job(String id, Function<DoubleConsumer, T> action) {
 		this.id = id;
-
 		setAction(action);
 	}
 
@@ -19,7 +18,7 @@ public class Task<T> implements Runnable {
 	}
 
 	/**
-	 * Every time this task's progress changes, the double consumer gets invoked.
+	 * Every time this job's progress changes, the double consumer gets invoked.
 	 * Progress is a value between -∞ and 1, where negative values indicate an uncertain runtime.
 	 */
 	public void addProgressListener(Consumer<Double> progressListener) {
@@ -39,7 +38,7 @@ public class Task<T> implements Runnable {
 	}
 
 	/**
-	 * Gets called once this task is finished. This doesn't guarantee a specific state,
+	 * Gets called once this job is finished. This doesn't guarantee a specific state,
 	 * it can be cancelled, errored or finished successfully.
 	 */
 	public void addOnFinish(Runnable onFinish) {
@@ -47,37 +46,37 @@ public class Task<T> implements Runnable {
 	}
 
 	/**
-	 * Add IDs of other tasks which must be executed before this task can be started.
+	 * Add IDs of other jobs which must be executed before this job can be started.
 	 */
-	public void addBlockedBy(String... blockingTaskIds) {
-		this.blockingTaskIds.addAll(Arrays.asList(blockingTaskIds));
+	public void addBlockedBy(String... blockingJobIds) {
+		this.blockingJobIds.addAll(Arrays.asList(blockingJobIds));
 	}
 
-	protected void andThen(Task<?> task) {
+	protected void andThen(Job<?> job) {
 
 	}
 
-	void setParent(TaskGroup<?> parent) {
+	void setParent(JobGroup<?> parent) {
 		this.parent = parent;
 	}
 
 	/**
-	 * Queues this task for execution.
-	 * If called on a TaskGroup's child, executes it directly.
+	 * Queues this job for execution.
+	 * If called on a JobGroup's child, executes it directly.
 	 */
 	@Override
 	public void run() {
-		state = TaskState.QUEUED;
+		state = JobState.QUEUED;
 
 		if (parent == null) {
-			TaskManager.queue(this);
+			JobManager.queue(this);
 		} else {
 			runNow();
 		}
 	}
 
 	void runNow() {
-		state = TaskState.RUNNING;
+		state = JobState.RUNNING;
 
 		if (action != null) {
 			try {
@@ -96,7 +95,7 @@ public class Task<T> implements Runnable {
 	}
 
 	protected void onCancel() {
-		state = TaskState.CANCELING;
+		state = JobState.CANCELING;
 		onCancelListeners.forEach(listener -> listener.run());
 		onFinish();
 	}
@@ -107,13 +106,13 @@ public class Task<T> implements Runnable {
 	}
 
 	protected void onError(Throwable error) {
-		state = TaskState.ERRORED;
+		state = JobState.ERRORED;
 		onErrorListeners.forEach(listener -> listener.accept(error));
 		onFinish();
 	}
 
 	protected void onSuccess() {
-		state = TaskState.SUCCEEDED;
+		state = JobState.SUCCEEDED;
 		onSuccessListeners.forEach(listener -> listener.accept(result));
 		onFinish();
 	}
@@ -126,7 +125,7 @@ public class Task<T> implements Runnable {
 		return id;
 	}
 
-	public TaskGroup<?> getParent() {
+	public JobGroup<?> getParent() {
 		return parent;
 	}
 
@@ -134,24 +133,24 @@ public class Task<T> implements Runnable {
 		return progress;
 	}
 
-	public TaskState getState() {
+	public JobState getState() {
 		return state;
 	}
 
-	public boolean isBlockedBy(String taskId) {
-		return blockingTaskIds.contains(taskId);
+	public boolean isBlockedBy(String jobId) {
+		return blockingJobIds.contains(jobId);
 	}
 
 	protected final String id;
 	private Function<DoubleConsumer, T> action;
 	private T result;
-	protected TaskGroup<?> parent;
+	protected JobGroup<?> parent;
 	protected double progress = -1;
-	protected TaskState state = TaskState.CREATED;
+	protected JobState state = JobState.CREATED;
 	protected List<Runnable> onCancelListeners = new ArrayList<>(2);
 	protected List<Consumer<T>> onSuccessListeners = new ArrayList<>(2);
 	protected List<Consumer<Throwable>> onErrorListeners = new ArrayList<>(2);
 	protected List<Runnable> onFinishListeners = new ArrayList<>(2);
 	protected List<Consumer<Double>> progressListeners = new ArrayList<>(2);
-	protected List<String> blockingTaskIds = new ArrayList<>(4);
+	protected List<String> blockingJobIds = new ArrayList<>(4);
 }

@@ -1,4 +1,4 @@
-package matcher.task.tasks;
+package matcher.jobs.builtin;
 
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -7,11 +7,11 @@ import java.util.function.DoubleConsumer;
 import matcher.Matcher;
 import matcher.classifier.ClassifierLevel;
 import matcher.classifier.MethodClassifier;
-import matcher.task.Task;
+import matcher.jobs.Job;
 import matcher.type.MethodInstance;
 
-public class AutoMatchMethodsTask extends Task<Boolean> {
-	public AutoMatchMethodsTask(Matcher matcher, ClassifierLevel level) {
+public class AutoMatchMethodsJob extends Job<Boolean> {
+	public AutoMatchMethodsJob(Matcher matcher, ClassifierLevel level) {
 		super(ID, null);
 
 		this.matcher = matcher;

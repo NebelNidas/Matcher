@@ -42,12 +42,12 @@ import matcher.config.Theme;
 import matcher.gui.IGuiComponent.ViewChangeCause;
 import matcher.gui.menu.MainMenuBar;
 import matcher.gui.menu.NewProjectPane;
+import matcher.jobs.Job;
+import matcher.jobs.JobManager;
+import matcher.jobs.JobManager.JobManagerEvent;
 import matcher.mapping.MappingField;
 import matcher.mapping.Mappings;
 import matcher.srcprocess.BuiltinDecompiler;
-import matcher.task.Task;
-import matcher.task.TaskManager;
-import matcher.task.TaskManager.TaskManagerEvent;
 import matcher.type.ClassEnvironment;
 import matcher.type.MatchType;
 
@@ -59,7 +59,7 @@ public class Gui extends Application {
 		env = new ClassEnvironment();
 		matcher = new Matcher(env);
 
-		TaskManager.registerEventListener((task, event) -> Platform.runLater(() -> onTaskManagerEvent(task, event)));
+		JobManager.registerEventListener((job, event) -> Platform.runLater(() -> onJobManagerEvent(job, event)));
 
 		GridPane border = new GridPane();
 
@@ -107,7 +107,7 @@ public class Gui extends Application {
 
 	@Override
 	public void stop() throws Exception {
-		TaskManager.shutdown();
+		JobManager.shutdown();
 	}
 
 	private void handleStartupArgs(List<String> args) {
@@ -253,12 +253,12 @@ public class Gui extends Application {
 		matcher.reset();
 		onProjectChange();
 
-		var task = new Task<Void>("initializing-files", progressReceiver -> {
+		var job = new Job<Void>("initializing-files", progressReceiver -> {
 			matcher.init(newConfig, progressReceiver);
 			return null;
 		});
-		task.addOnError(Throwable::printStackTrace);
-		task.addOnSuccess((result) -> Platform.runLater(() -> {
+		job.addOnError(Throwable::printStackTrace);
+		job.addOnSuccess((result) -> Platform.runLater(() -> {
 			if (newConfig.getMappingsPathA() != null) {
 				Path mappingsPath = newConfig.getMappingsPathA();
 
@@ -289,7 +289,7 @@ public class Gui extends Application {
 
 			onProjectChange();
 		}));
-		task.run();
+		job.run();
 	}
 
 	public ClassEnvironment getEnv() {
@@ -468,14 +468,14 @@ public class Gui extends Application {
 		}
 	}
 
-	public void onTaskManagerEvent(Task<?> task, TaskManagerEvent event) {
+	public void onJobManagerEvent(Job<?> job, JobManagerEvent event) {
 		switch (event) {
-		case TASK_STARTED:
-			activeTasks.add(task);
-			task.addProgressListener((progress) -> Platform.runLater(() -> onProgressChange(progress)));
+		case JOB_STARTED:
+			activeJobs.add(job);
+			job.addProgressListener((progress) -> Platform.runLater(() -> onProgressChange(progress)));
 			break;
-		case TASK_ENDED:
-			activeTasks.remove(task);
+		case JOB_ENDED:
+			activeJobs.remove(job);
 			break;
 		}
 
@@ -484,10 +484,10 @@ public class Gui extends Application {
 
 	private void updateProgressPane() {
 		ProgressBar progressBar = bottomPane.getProgressBar();
-		Label taskLabel = bottomPane.getTaskLabel();
+		Label jobLabel = bottomPane.getJobLabel();
 
-		if (activeTasks.size() == 0) {
-			taskLabel.setText("");
+		if (activeJobs.size() == 0) {
+			jobLabel.setText("");
 			progressBar.setVisible(false);
 			progressBar.setProgress(-1);
 			bottomPane.blockMatchButtons(false);
@@ -496,30 +496,30 @@ public class Gui extends Application {
 			progressBar.setVisible(true);
 			progressBar.setProgress(0);
 
-			for (Task<?> task : activeTasks) {
-				if (task.getProgress() < 0) {
+			for (Job<?> job : activeJobs) {
+				if (job.getProgress() < 0) {
 					progressBar.setProgress(-1);
 					break;
 				} else {
-					progressBar.setProgress(progressBar.getProgress() + (task.getProgress() / activeTasks.size()));
+					progressBar.setProgress(progressBar.getProgress() + (job.getProgress() / activeJobs.size()));
 				}
 			}
 
-			if (activeTasks.size() == 1) {
-				taskLabel.setText(activeTasks.get(0).getId());
-				// progressBar.setProgress(activeTasks.get(0).getProgress());
+			if (activeJobs.size() == 1) {
+				jobLabel.setText(activeJobs.get(0).getId());
+				// progressBar.setProgress(activeJobs.get(0).getProgress());
 			} else {
-				taskLabel.setText(activeTasks.size() + " tasks running");
+				jobLabel.setText(activeJobs.size() + " tasks running");
 				StringBuilder tooltipText = new StringBuilder();
 
-				for (Task<?> task : activeTasks) {
-					tooltipText.append(task.getId() + "\n");
+				for (Job<?> job : activeJobs) {
+					tooltipText.append(job.getId() + "\n");
 				}
 
-				taskLabel.setTooltip(new Tooltip(tooltipText.toString()));
+				jobLabel.setTooltip(new Tooltip(tooltipText.toString()));
 
 				// if (progressBar.getProgress() > 0) {
-				// 	progressBar.setProgress(progressBar.getProgress() * (activeTasks.size() - 1) / activeTasks.size());
+				// 	progressBar.setProgress(progressBar.getProgress() * (activeJobs.size() - 1) / activeJobs.size());
 				// }
 			}
 
@@ -529,9 +529,13 @@ public class Gui extends Application {
 
 	private void onProgressChange(double progress) {
 		ProgressBar progressBar = bottomPane.getProgressBar();
-		bottomPane.getTaskLabel().setText(bottomPane.getTaskLabel().getText());
+		// bottomPane.getJobLabel().setText(bottomPane.getJobLabel().getText());
 
-		progressBar.setProgress(progressBar.getProgress() + progress / activeTasks.size());
+		// progressBar.setProgress(progressBar.getProgress() + progress / activeJobs.size());
+		bottomPane.getJobLabel().setText(String.format("%s (%.0f%%)",
+				activeJobs.get(0).getId(), progress * 100));
+
+		progressBar.setProgress(progress / activeJobs.size());
 	}
 
 	public void showAlert(AlertType type, String title, String headerText, String text) {
@@ -641,7 +645,7 @@ public class Gui extends Application {
 	private MatchPaneDst dstPane;
 	private BottomPane bottomPane;
 
-	private List<Task<?>> activeTasks = new ArrayList<>(5);
+	private List<Job<?>> activeJobs = new ArrayList<>(5);
 
 	private SortKey sortKey = SortKey.Name;
 	private boolean sortMatchesAlphabetically;

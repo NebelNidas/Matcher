@@ -364,9 +364,9 @@ public final class ClassEnvironment implements ClassEnv {
 			ClassInstance a = extractorA.getLocalClsById(id);
 			ClassInstance b = extractorB.getLocalClsById(id);
 
-			if (a != null && a.isReal() || b != null && b.isReal()) {
-				throw new InvalidSharedEnvQueryException(a, b);
-			}
+			// if (a != null && a.isReal() || b != null && b.isReal()) {
+			// 	throw new InvalidSharedEnvQueryException(a, b);
+			// }
 
 			String name = ClassInstance.getName(id);
 			Path file = getSharedClassLocation(name);

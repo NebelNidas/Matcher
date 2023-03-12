@@ -6,6 +6,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import org.controlsfx.control.PopOver;
+
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.control.Button;
@@ -55,8 +57,17 @@ public class BottomPane extends StackPane implements IGuiComponent {
 		progressBar.setVisible(false);
 		progressBar.setPrefWidth(200);
 
+		JobProgressView jobProgressView = new JobProgressView();
+
+		PopOver jobPopOver = new PopOver(jobProgressView);
+		jobPopOver.setAnimated(false);
+
+		progressBar.setOnMouseClicked((e) -> {
+			jobPopOver.show(progressBar);
+		});
+
 		left.getChildren().add(progressBar);
-		left.getChildren().add(taskLabel);
+		left.getChildren().add(jobLabel);
 
 		// Center
 
@@ -64,6 +75,7 @@ public class BottomPane extends StackPane implements IGuiComponent {
 		getChildren().add(center);
 		StackPane.setAlignment(center, Pos.CENTER);
 		center.setAlignment(Pos.CENTER);
+		center.setPickOnBounds(false);
 
 		matchButton.setText("match");
 		matchButton.setOnAction(event -> match());
@@ -400,8 +412,8 @@ public class BottomPane extends StackPane implements IGuiComponent {
 		return progressBar;
 	}
 
-	public Label getTaskLabel() {
-		return taskLabel;
+	public Label getJobLabel() {
+		return jobLabel;
 	}
 
 	public Button getMatchButton() {
@@ -432,7 +444,7 @@ public class BottomPane extends StackPane implements IGuiComponent {
 	private final MatchPaneSrc srcPane;
 	private final MatchPaneDst dstPane;
 	private final ProgressBar progressBar = new ProgressBar();
-	private final Label taskLabel = new Label();
+	private final Label jobLabel = new Label();
 	private final Button matchButton = new Button();
 	private final Button matchableButton = new Button();
 	private final Button matchPerfectMembersButton = new Button();

@@ -1,6 +1,6 @@
-package matcher.task;
+package matcher.jobs;
 
-public enum TaskState {
+public enum JobState {
 	CREATED,
 	QUEUED,
 	RUNNING,

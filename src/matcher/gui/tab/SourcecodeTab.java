@@ -9,10 +9,10 @@ import javafx.application.Platform;
 import matcher.NameType;
 import matcher.gui.Gui;
 import matcher.gui.ISelectionProvider;
+import matcher.jobs.Job;
 import matcher.srcprocess.HtmlUtil;
 import matcher.srcprocess.SrcDecorator;
 import matcher.srcprocess.SrcDecorator.SrcParseException;
-import matcher.task.Task;
 import matcher.type.ClassInstance;
 import matcher.type.FieldInstance;
 import matcher.type.MatchType;
@@ -75,10 +75,10 @@ public class SourcecodeTab extends WebViewTab {
 
 		NameType nameType = gui.getNameType().withUnmatchedTmp(unmatchedTmp);
 
-		var decompileTask = new Task<String>("decompile",
+		var decompileJob = new Job<String>("decompile",
 				(progress) -> SrcDecorator.decorate(gui.getEnv().decompile(gui.getDecompiler().get(), cls, nameType), cls, nameType));
 
-		decompileTask.addOnError((error) -> Platform.runLater(() -> {
+		decompileJob.addOnError((error) -> Platform.runLater(() -> {
 			error.printStackTrace();
 
 			if (cDecompId == decompId) {
@@ -93,7 +93,7 @@ public class SourcecodeTab extends WebViewTab {
 				}
 			}
 		}));
-		decompileTask.addOnSuccess((code) -> Platform.runLater(() -> {
+		decompileJob.addOnSuccess((code) -> Platform.runLater(() -> {
 			if (cDecompId == decompId) {
 				double prevScroll = isRefresh ? getScrollTop() : 0;
 
@@ -104,7 +104,7 @@ public class SourcecodeTab extends WebViewTab {
 				}
 			}
 		}));
-		decompileTask.run();
+		decompileJob.run();
 	}
 
 	@Override

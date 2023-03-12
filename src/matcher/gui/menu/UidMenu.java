@@ -14,8 +14,8 @@ import javafx.scene.control.SeparatorMenuItem;
 import matcher.config.Config;
 import matcher.config.UidConfig;
 import matcher.gui.Gui;
-import matcher.task.tasks.ImportMatchesTask;
-import matcher.task.tasks.SubmitMatchesTask;
+import matcher.jobs.builtin.ImportMatchesJob;
+import matcher.jobs.builtin.SubmitMatchesJob;
 import matcher.type.ClassEnvironment;
 import matcher.type.ClassInstance;
 import matcher.type.FieldInstance;
@@ -39,20 +39,20 @@ public class UidMenu extends Menu {
 
 		getItems().add(new SeparatorMenuItem());
 
-		var importTask = new ImportMatchesTask(gui.getMatcher());
-		importTask.addOnError(Throwable::printStackTrace);
-		importTask.addOnSuccess((result) -> gui.onMatchChange(EnumSet.allOf(MatchType.class)));
+		var importJob = new ImportMatchesJob(gui.getMatcher());
+		importJob.addOnError(Throwable::printStackTrace);
+		importJob.addOnSuccess((result) -> gui.onMatchChange(EnumSet.allOf(MatchType.class)));
 
 		menuItem = new MenuItem("Import matches");
 		getItems().add(menuItem);
-		menuItem.setOnAction(event -> importTask.run());
+		menuItem.setOnAction(event -> importJob.run());
 
-		var submitTask = new SubmitMatchesTask(gui.getMatcher());
-		submitTask.addOnError(Throwable::printStackTrace);
+		var submitJob = new SubmitMatchesJob(gui.getMatcher());
+		submitJob.addOnError(Throwable::printStackTrace);
 
 		menuItem = new MenuItem("Submit matches");
 		getItems().add(menuItem);
-		menuItem.setOnAction(event -> submitTask.run());
+		menuItem.setOnAction(event -> submitJob.run());
 
 		getItems().add(new SeparatorMenuItem());
 

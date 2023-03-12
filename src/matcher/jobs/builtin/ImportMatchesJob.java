@@ -1,4 +1,4 @@
-package matcher.task.tasks;
+package matcher.jobs.builtin;
 
 import java.io.DataInputStream;
 import java.io.IOException;
@@ -10,7 +10,7 @@ import java.util.function.DoubleConsumer;
 import matcher.Matcher;
 import matcher.config.Config;
 import matcher.config.UidConfig;
-import matcher.task.Task;
+import matcher.jobs.Job;
 import matcher.type.ClassEnv;
 import matcher.type.ClassEnvironment;
 import matcher.type.ClassInstance;
@@ -19,8 +19,8 @@ import matcher.type.MatchableKind;
 import matcher.type.MethodInstance;
 import matcher.type.MethodVarInstance;
 
-public class ImportMatchesTask extends Task<Void> {
-	public ImportMatchesTask(Matcher matcher) {
+public class ImportMatchesJob extends Job<Void> {
+	public ImportMatchesJob(Matcher matcher) {
 		super(ID, null);
 
 		this.matcher = matcher;

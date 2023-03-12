@@ -34,9 +34,9 @@ import matcher.gui.Gui.SelectedFile;
 import matcher.gui.menu.LoadMappingsPane.MappingsLoadSettings;
 import matcher.gui.menu.LoadProjectPane.ProjectLoadSettings;
 import matcher.gui.menu.SaveMappingsPane.MappingsSaveSettings;
+import matcher.jobs.Job;
 import matcher.mapping.Mappings;
 import matcher.serdes.MatchesIo;
-import matcher.task.Task;
 import matcher.type.ClassEnvironment;
 import matcher.type.MatchType;
 
@@ -118,13 +118,13 @@ public class FileMenu extends Menu {
 		gui.getMatcher().reset();
 		gui.onProjectChange();
 
-		var task = new Task<Void>("initializing-files", progressReceiver -> {
+		var job = new Job<Void>("initializing-files", progressReceiver -> {
 			MatchesIo.read(res.path, newConfig.paths, newConfig.verifyFiles, gui.getMatcher(), progressReceiver);
 			return null;
 		});
-		task.addOnError(Throwable::printStackTrace);
-		task.addOnSuccess((result) -> gui.onProjectChange());
-		task.run();
+		job.addOnError(Throwable::printStackTrace);
+		job.addOnSuccess((result) -> gui.onProjectChange());
+		job.run();
 	}
 
 	public ProjectLoadSettings requestProjectLoadSettings() {

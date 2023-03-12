@@ -9,8 +9,8 @@ import javafx.scene.control.MenuItem;
 
 import matcher.gui.Gui;
 import matcher.gui.menu.FixRecordNamesPane.NamespaceSettings;
+import matcher.jobs.Job;
 import matcher.mapping.MappingPropagator;
-import matcher.task.Task;
 
 public class MappingMenu extends Menu {
 	MappingMenu(Gui gui) {
@@ -25,13 +25,13 @@ public class MappingMenu extends Menu {
 		MenuItem menuItem = new MenuItem("Propagate names");
 		getItems().add(menuItem);
 
-		var task = new Task<Void>("Propagating method names/args", progressReceiver -> {
+		var job = new Job<Void>("Propagating method names/args", progressReceiver -> {
 			MappingPropagator.propagateNames(gui.getEnv(), progressReceiver);
 			return null;
 		});
-		task.addOnError(Throwable::printStackTrace);
+		job.addOnError(Throwable::printStackTrace);
 
-		menuItem.setOnAction(event -> task.run());
+		menuItem.setOnAction(event -> job.run());
 
 		menuItem = new MenuItem("Fix record member names");
 		getItems().add(menuItem);

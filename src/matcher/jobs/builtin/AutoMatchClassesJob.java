@@ -1,4 +1,4 @@
-package matcher.task.tasks;
+package matcher.jobs.builtin;
 
 import java.util.List;
 import java.util.Map;
@@ -11,12 +11,12 @@ import matcher.Matcher;
 import matcher.classifier.ClassClassifier;
 import matcher.classifier.ClassifierLevel;
 import matcher.classifier.RankResult;
-import matcher.task.Task;
+import matcher.jobs.Job;
 import matcher.type.ClassEnvironment;
 import matcher.type.ClassInstance;
 
-public class AutoMatchClassesTask extends Task<Boolean> {
-	public AutoMatchClassesTask(Matcher matcher, ClassifierLevel level) {
+public class AutoMatchClassesJob extends Job<Boolean> {
+	public AutoMatchClassesJob(Matcher matcher, ClassifierLevel level) {
 		super(ID, null);
 
 		this.matcher = matcher;

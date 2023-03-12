@@ -1,4 +1,4 @@
-package matcher.task.tasks;
+package matcher.jobs.builtin;
 
 import java.util.List;
 import java.util.function.DoubleConsumer;
@@ -9,7 +9,7 @@ import matcher.classifier.FieldClassifier;
 import matcher.classifier.MethodClassifier;
 import matcher.classifier.MethodVarClassifier;
 import matcher.classifier.RankResult;
-import matcher.task.Task;
+import matcher.jobs.Job;
 import matcher.type.ClassEnvironment;
 import matcher.type.ClassInstance;
 import matcher.type.FieldInstance;
@@ -17,8 +17,8 @@ import matcher.type.Matchable;
 import matcher.type.MethodInstance;
 import matcher.type.MethodVarInstance;
 
-public class RankMatchResultsTask extends Task<List<? extends RankResult<? extends Matchable<?>>>> {
-	public RankMatchResultsTask(ClassEnvironment env, ClassifierLevel matchLevel, Matchable<?> selection, List<ClassInstance> cmpClasses) {
+public class RankMatchResultsJob extends Job<List<? extends RankResult<? extends Matchable<?>>>> {
+	public RankMatchResultsJob(ClassEnvironment env, ClassifierLevel matchLevel, Matchable<?> selection, List<ClassInstance> cmpClasses) {
 		super(ID, null);
 
 		this.env = env;

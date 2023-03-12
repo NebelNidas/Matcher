@@ -11,11 +11,11 @@ import javafx.scene.control.SeparatorMenuItem;
 import matcher.Matcher;
 import matcher.Matcher.MatchingStatus;
 import matcher.gui.Gui;
-import matcher.task.tasks.AutoMatchAllTask;
-import matcher.task.tasks.AutoMatchClassesTask;
-import matcher.task.tasks.AutoMatchFieldsTask;
-import matcher.task.tasks.AutoMatchMethodVarsTask;
-import matcher.task.tasks.AutoMatchMethodsTask;
+import matcher.jobs.builtin.AutoMatchAllJob;
+import matcher.jobs.builtin.AutoMatchClassesJob;
+import matcher.jobs.builtin.AutoMatchFieldsJob;
+import matcher.jobs.builtin.AutoMatchMethodVarsJob;
+import matcher.jobs.builtin.AutoMatchMethodsJob;
 import matcher.type.MatchType;
 
 public class MatchingMenu extends Menu {
@@ -62,65 +62,65 @@ public class MatchingMenu extends Menu {
 	}
 
 	public void autoMatchAll() {
-		var task = new AutoMatchAllTask(gui.getMatcher());
-		task.addOnError(Throwable::printStackTrace);
-		task.addOnSuccess((result) -> Platform.runLater(() -> gui.onMatchChange(result)));
-		task.run();
+		var job = new AutoMatchAllJob(gui.getMatcher());
+		job.addOnError(Throwable::printStackTrace);
+		job.addOnSuccess((result) -> Platform.runLater(() -> gui.onMatchChange(result)));
+		job.run();
 	}
 
 	public void autoMatchClasses() {
-		var task = new AutoMatchClassesTask(gui.getMatcher(), Matcher.defaultAutoMatchLevel);
-		task.addOnError(Throwable::printStackTrace);
-		task.addOnSuccess((matchedAny) -> {
+		var job = new AutoMatchClassesJob(gui.getMatcher(), Matcher.defaultAutoMatchLevel);
+		job.addOnError(Throwable::printStackTrace);
+		job.addOnSuccess((matchedAny) -> {
 			if (matchedAny) {
 				Platform.runLater(() -> gui.onMatchChange(EnumSet.allOf(MatchType.class)));
 			}
 		});
-		task.run();
+		job.run();
 	}
 
 	public void autoMatchMethods() {
-		var task = new AutoMatchMethodsTask(gui.getMatcher(), Matcher.defaultAutoMatchLevel);
-		task.addOnError(Throwable::printStackTrace);
-		task.addOnSuccess((matchedAny) -> {
+		var job = new AutoMatchMethodsJob(gui.getMatcher(), Matcher.defaultAutoMatchLevel);
+		job.addOnError(Throwable::printStackTrace);
+		job.addOnSuccess((matchedAny) -> {
 			if (matchedAny) {
 				Platform.runLater(() -> gui.onMatchChange(EnumSet.of(MatchType.Method)));
 			}
 		});
-		task.run();
+		job.run();
 	}
 
 	public void autoMatchFields() {
-		var task = new AutoMatchFieldsTask(gui.getMatcher(), Matcher.defaultAutoMatchLevel);
-		task.addOnError(Throwable::printStackTrace);
-		task.addOnSuccess((matchedAny) -> {
+		var job = new AutoMatchFieldsJob(gui.getMatcher(), Matcher.defaultAutoMatchLevel);
+		job.addOnError(Throwable::printStackTrace);
+		job.addOnSuccess((matchedAny) -> {
 			if (matchedAny) {
 				Platform.runLater(() -> gui.onMatchChange(EnumSet.of(MatchType.Field)));
 			}
 		});
-		task.run();
+		job.run();
 	}
 
 	public void autoMatchArgs() {
-		var task = new AutoMatchMethodVarsTask(gui.getMatcher(), Matcher.defaultAutoMatchLevel, true);
-		task.addOnError(Throwable::printStackTrace);
-		task.addOnSuccess((matchedAny) -> {
+		var job = new AutoMatchMethodVarsJob(gui.getMatcher(), Matcher.defaultAutoMatchLevel, true);
+		job.addOnError(Throwable::printStackTrace);
+		job.addOnSuccess((matchedAny) -> {
 			if (matchedAny) {
 				Platform.runLater(() -> gui.onMatchChange(EnumSet.of(MatchType.MethodVar)));
 			}
 		});
-		task.run();
+		job.run();
 	}
 
 	public void autoMatchVars() {
-		var task = new AutoMatchMethodVarsTask(gui.getMatcher(), Matcher.defaultAutoMatchLevel, false);
-		task.addOnError(Throwable::printStackTrace);
-		task.addOnSuccess((matchedAny) -> {
+		var job = new AutoMatchMethodVarsJob(gui.getMatcher(), Matcher.defaultAutoMatchLevel, false);
+		job.addOnError(Throwable::printStackTrace);
+		job.addOnSuccess((matchedAny) -> {
 			if (matchedAny) {
 				Platform.runLater(() -> gui.onMatchChange(EnumSet.of(MatchType.MethodVar)));
 			}
 		});
-		task.run();
+		job.run();
 	}
 
 	public void showMatchingStatus() {
