@@ -26,6 +26,7 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import job4j.Job;
 import matcher.classifier.ClassClassifier;
 import matcher.classifier.ClassifierLevel;
 import matcher.classifier.FieldClassifier;
@@ -35,7 +36,6 @@ import matcher.classifier.MethodVarClassifier;
 import matcher.classifier.RankResult;
 import matcher.config.Config;
 import matcher.config.ProjectConfig;
-import matcher.jobs.Job;
 import matcher.type.ClassEnv;
 import matcher.type.ClassEnvironment;
 import matcher.type.ClassInstance;

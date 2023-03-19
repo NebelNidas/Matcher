@@ -1,4 +1,4 @@
-package matcher.jobs;
+package job4j;
 
 public enum JobState {
 	CREATED,

@@ -23,7 +23,7 @@ def ENV = System.getenv()
 
 sourceSets {
     main {
-        java.srcDirs = ['src']
+        java.srcDirs = ['src', 'job4j']
 		resources.srcDirs = ['res']
     }
 }

@@ -1,14 +1,14 @@
-package matcher.jobs.builtin;
+package matcher.jobs;
 
 import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.DoubleConsumer;
 
+import job4j.Job;
+import job4j.JobState;
 import matcher.Matcher;
 import matcher.classifier.ClassifierLevel;
-import matcher.jobs.Job;
-import matcher.jobs.JobState;
 import matcher.type.MatchType;
 
 public class AutoMatchAllJob extends Job<Set<MatchType>> {

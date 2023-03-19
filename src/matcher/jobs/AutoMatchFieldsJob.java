@@ -1,13 +1,13 @@
-package matcher.jobs.builtin;
+package matcher.jobs;
 
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.DoubleConsumer;
 
+import job4j.Job;
 import matcher.Matcher;
 import matcher.classifier.ClassifierLevel;
 import matcher.classifier.FieldClassifier;
-import matcher.jobs.Job;
 import matcher.type.FieldInstance;
 
 public class AutoMatchFieldsJob extends Job<Boolean> {

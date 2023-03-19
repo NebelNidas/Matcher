@@ -1,4 +1,4 @@
-package matcher.jobs.builtin;
+package matcher.jobs;
 
 import java.io.DataInputStream;
 import java.io.IOException;
@@ -7,11 +7,11 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.util.function.DoubleConsumer;
 
+import job4j.Job;
+import job4j.JobState;
 import matcher.Matcher;
 import matcher.config.Config;
 import matcher.config.UidConfig;
-import matcher.jobs.Job;
-import matcher.jobs.JobState;
 import matcher.type.ClassEnv;
 import matcher.type.ClassEnvironment;
 import matcher.type.ClassInstance;

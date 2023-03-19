@@ -11,11 +11,11 @@ import javafx.scene.control.SeparatorMenuItem;
 import matcher.Matcher;
 import matcher.Matcher.MatchingStatus;
 import matcher.gui.Gui;
-import matcher.jobs.builtin.AutoMatchAllJob;
-import matcher.jobs.builtin.AutoMatchClassesJob;
-import matcher.jobs.builtin.AutoMatchFieldsJob;
-import matcher.jobs.builtin.AutoMatchMethodVarsJob;
-import matcher.jobs.builtin.AutoMatchMethodsJob;
+import matcher.jobs.AutoMatchAllJob;
+import matcher.jobs.AutoMatchClassesJob;
+import matcher.jobs.AutoMatchFieldsJob;
+import matcher.jobs.AutoMatchMethodVarsJob;
+import matcher.jobs.AutoMatchMethodsJob;
 import matcher.type.MatchType;
 
 public class MatchingMenu extends Menu {

@@ -1,4 +1,4 @@
-package matcher.jobs;
+package job4j;
 
 import java.util.ArrayList;
 import java.util.Collections;

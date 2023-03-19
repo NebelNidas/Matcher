@@ -6,12 +6,11 @@ import java.util.Set;
 import java.util.function.DoubleConsumer;
 
 import javafx.application.Platform;
-
+import job4j.Job;
+import job4j.JobState;
 import matcher.NameType;
 import matcher.gui.Gui;
 import matcher.gui.ISelectionProvider;
-import matcher.jobs.Job;
-import matcher.jobs.JobState;
 import matcher.srcprocess.HtmlUtil;
 import matcher.srcprocess.SrcDecorator;
 import matcher.srcprocess.SrcDecorator.SrcParseException;

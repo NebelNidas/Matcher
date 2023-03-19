@@ -20,9 +20,9 @@ import javafx.scene.control.SkinBase;
 import javafx.scene.control.Tooltip;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.VBox;
-import matcher.jobs.Job;
-import matcher.jobs.JobManager;
-import matcher.jobs.JobState;
+import job4j.Job;
+import job4j.JobManager;
+import job4j.JobState;
 
 public class JobProgressView extends Control {
 	public final ObservableList<Job<?>> jobs = FXCollections.observableArrayList();

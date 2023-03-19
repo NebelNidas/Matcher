@@ -18,7 +18,7 @@ import javafx.scene.layout.VBox;
 import matcher.Matcher;
 import matcher.NameType;
 import matcher.classifier.RankResult;
-import matcher.jobs.builtin.RankMatchResultsJob;
+import matcher.jobs.RankMatchResultsJob;
 import matcher.type.ClassEnv;
 import matcher.type.ClassInstance;
 import matcher.type.FieldInstance;

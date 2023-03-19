@@ -23,6 +23,7 @@ import javafx.scene.control.MenuItem;
 import javafx.scene.control.SeparatorMenuItem;
 import javafx.stage.FileChooser;
 import javafx.stage.FileChooser.ExtensionFilter;
+import job4j.Job;
 import javafx.stage.Window;
 
 import net.fabricmc.mappingio.MappingReader;
@@ -35,7 +36,6 @@ import matcher.gui.Gui.SelectedFile;
 import matcher.gui.menu.LoadMappingsPane.MappingsLoadSettings;
 import matcher.gui.menu.LoadProjectPane.ProjectLoadSettings;
 import matcher.gui.menu.SaveMappingsPane.MappingsSaveSettings;
-import matcher.jobs.Job;
 import matcher.mapping.Mappings;
 import matcher.serdes.MatchesIo;
 import matcher.type.ClassEnvironment;

@@ -1,4 +1,4 @@
-package matcher.jobs.builtin;
+package matcher.jobs;
 
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
@@ -10,11 +10,11 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.function.DoubleConsumer;
 
+import job4j.Job;
+import job4j.JobState;
 import matcher.Matcher;
 import matcher.config.Config;
 import matcher.config.UidConfig;
-import matcher.jobs.Job;
-import matcher.jobs.JobState;
 import matcher.type.ClassInstance;
 import matcher.type.FieldInstance;
 import matcher.type.Matchable;

@@ -1,4 +1,4 @@
-package matcher.jobs;
+package job4j;
 
 import java.util.AbstractMap.SimpleEntry;
 import java.util.ArrayList;
@@ -7,7 +7,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.BiConsumer;
-import java.util.function.Consumer;
 import java.util.function.DoubleConsumer;
 
 public abstract class Job<T> implements Runnable {
@@ -20,7 +19,7 @@ public abstract class Job<T> implements Runnable {
 	protected volatile double ownProgress = 0;
 	protected volatile double overallProgress = 0;
 	protected volatile JobState state = JobState.CREATED;
-	protected volatile List<Consumer<Double>> progressListeners = Collections.synchronizedList(new ArrayList<>());
+	protected volatile List<DoubleConsumer> progressListeners = Collections.synchronizedList(new ArrayList<>());
 	protected volatile List<Runnable> cancelListeners = Collections.synchronizedList(new ArrayList<>());
 	protected volatile List<BiConsumer<Optional<T>, Optional<Throwable>>> completionListeners = Collections.synchronizedList(new ArrayList<>());
 	protected volatile List<String> blockingJobIds = Collections.synchronizedList(new ArrayList<>());
@@ -50,7 +49,7 @@ public abstract class Job<T> implements Runnable {
 	 * Every time this job's progress changes, the double consumer gets invoked.
 	 * Progress is a value between -INF and 1, where negative values indicate an uncertain runtime.
 	 */
-	public void addProgressListener(Consumer<Double> listener) {
+	public void addProgressListener(DoubleConsumer listener) {
 		this.progressListeners.add(listener);
 	}
 

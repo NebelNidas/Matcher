@@ -1,4 +1,4 @@
-package matcher.jobs.builtin;
+package matcher.jobs;
 
 import java.util.Collections;
 import java.util.List;
@@ -10,12 +10,12 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import job4j.Job;
+import job4j.JobState;
 import matcher.Matcher;
 import matcher.classifier.ClassifierLevel;
 import matcher.classifier.MethodVarClassifier;
 import matcher.classifier.RankResult;
-import matcher.jobs.Job;
-import matcher.jobs.JobState;
 import matcher.type.MethodInstance;
 import matcher.type.MethodVarInstance;
 

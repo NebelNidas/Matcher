@@ -1,15 +1,15 @@
-package matcher.jobs.builtin;
+package matcher.jobs;
 
 import java.util.List;
 import java.util.function.DoubleConsumer;
 
+import job4j.Job;
 import matcher.classifier.ClassClassifier;
 import matcher.classifier.ClassifierLevel;
 import matcher.classifier.FieldClassifier;
 import matcher.classifier.MethodClassifier;
 import matcher.classifier.MethodVarClassifier;
 import matcher.classifier.RankResult;
-import matcher.jobs.Job;
 import matcher.type.ClassEnvironment;
 import matcher.type.ClassInstance;
 import matcher.type.FieldInstance;

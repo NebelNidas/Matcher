@@ -7,10 +7,9 @@ import javafx.scene.control.ButtonType;
 import javafx.scene.control.Dialog;
 import javafx.scene.control.Menu;
 import javafx.scene.control.MenuItem;
-
+import job4j.Job;
 import matcher.gui.Gui;
 import matcher.gui.menu.FixRecordNamesPane.NamespaceSettings;
-import matcher.jobs.Job;
 import matcher.mapping.MappingPropagator;
 
 public class MappingMenu extends Menu {
