@@ -25,7 +25,7 @@ public class AutoMatchClassesJob extends Job<Boolean> {
 	}
 
 	@Override
-	protected Boolean execute(DoubleConsumer progress) {
+	protected Boolean execute(DoubleConsumer progressReceiver) {
 		ClassEnvironment env = matcher.getEnv();
 		boolean assumeBothOrNoneObfuscated = env.assumeBothOrNoneObfuscated;
 		Predicate<ClassInstance> filter = cls -> cls.isReal() && (!assumeBothOrNoneObfuscated || cls.isNameObfuscated()) && !cls.hasMatch() && cls.isMatchable();
@@ -54,7 +54,7 @@ public class AutoMatchClassesJob extends Job<Boolean> {
 
 				matches.put(cls, match);
 			}
-		}, progress);
+		}, progressReceiver);
 
 		Matcher.sanitizeMatches(matches);
 

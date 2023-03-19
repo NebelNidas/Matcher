@@ -29,7 +29,7 @@ public class AutoMatchMethodVarsJob extends Job<Boolean> {
 	}
 
 	@Override
-	protected Boolean execute(DoubleConsumer progress) {
+	protected Boolean execute(DoubleConsumer progressReceiver) {
 		Function<MethodInstance, MethodVarInstance[]> supplier;
 		double absThreshold, relThreshold;
 
@@ -87,7 +87,7 @@ public class AutoMatchMethodVarsJob extends Job<Boolean> {
 				}
 
 				if (unmatched > 0) totalUnmatched.addAndGet(unmatched);
-			}, progress);
+			}, progressReceiver);
 
 			Matcher.sanitizeMatches(matches);
 		}

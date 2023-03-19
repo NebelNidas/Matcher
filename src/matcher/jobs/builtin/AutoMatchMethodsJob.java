@@ -20,11 +20,11 @@ public class AutoMatchMethodsJob extends Job<Boolean> {
 	}
 
 	@Override
-	protected Boolean execute(DoubleConsumer progress) {
+	protected Boolean execute(DoubleConsumer progressReceiver) {
 		AtomicInteger totalUnmatched = new AtomicInteger();
 		Map<MethodInstance, MethodInstance> matches = matcher.match(level, Matcher.absMethodAutoMatchThreshold, Matcher.relMethodAutoMatchThreshold,
 				cls -> cls.getMethods(), MethodClassifier::rank, MethodClassifier.getMaxScore(level),
-				progress, totalUnmatched);
+				progressReceiver, totalUnmatched);
 
 		for (Map.Entry<MethodInstance, MethodInstance> entry : matches.entrySet()) {
 			if (state == JobState.CANCELING) {

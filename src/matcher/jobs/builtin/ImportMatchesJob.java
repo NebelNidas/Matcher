@@ -28,12 +28,12 @@ public class ImportMatchesJob extends Job<Boolean> {
 	}
 
 	@Override
-	protected Boolean execute(DoubleConsumer progress) {
-		importMatches(progress);
+	protected Boolean execute(DoubleConsumer progressReceiver) {
+		importMatches(progressReceiver);
 		return importedAny;
 	}
 
-	private void importMatches(DoubleConsumer progressConsumer) {
+	private void importMatches(DoubleConsumer progressReceiver) {
 		UidConfig config = Config.getUidConfig();
 		if (!config.isValid()) return;
 
@@ -44,7 +44,7 @@ public class ImportMatchesJob extends Job<Boolean> {
 					String.format("/%s/matches/%s/%s", config.getProject(), config.getVersionA(), config.getVersionB())).openConnection();
 			conn.setRequestProperty("X-Token", config.getToken());
 
-			progressConsumer.accept(0.5);
+			progressReceiver.accept(0.5);
 
 			try (DataInputStream is = new DataInputStream(conn.getInputStream())) {
 				ClassEnvironment env = matcher.getEnv();
@@ -108,7 +108,7 @@ public class ImportMatchesJob extends Job<Boolean> {
 				}
 			}
 
-			progressConsumer.accept(1);
+			progressReceiver.accept(1);
 		} catch (IOException e) {
 			throw new UncheckedIOException(e);
 		}

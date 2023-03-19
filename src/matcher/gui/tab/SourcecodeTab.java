@@ -79,7 +79,7 @@ public class SourcecodeTab extends WebViewTab {
 
 		var decompileJob = new Job<String>("decompile") {
 			@Override
-			protected String execute(DoubleConsumer progress) {
+			protected String execute(DoubleConsumer progressReceiver) {
 				return SrcDecorator.decorate(gui.getEnv().decompile(gui.getDecompiler().get(), cls, nameType), cls, nameType);
 			}
 		};

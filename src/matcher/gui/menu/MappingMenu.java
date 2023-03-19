@@ -28,8 +28,8 @@ public class MappingMenu extends Menu {
 
 		var job = new Job<Void>("Propagating method names/args") {
 			@Override
-			protected Void execute(DoubleConsumer progress) {
-				MappingPropagator.propagateNames(gui.getEnv(), progress);
+			protected Void execute(DoubleConsumer progressReceiver) {
+				MappingPropagator.propagateNames(gui.getEnv(), progressReceiver);
 				return null;
 			}
 		};

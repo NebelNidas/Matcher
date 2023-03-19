@@ -121,8 +121,8 @@ public class FileMenu extends Menu {
 
 		var job = new Job<Void>("initializing-files") {
 			@Override
-			protected Void execute(DoubleConsumer progress) {
-				MatchesIo.read(res.path, newConfig.paths, newConfig.verifyFiles, gui.getMatcher(), progress);
+			protected Void execute(DoubleConsumer progressReceiver) {
+				MatchesIo.read(res.path, newConfig.paths, newConfig.verifyFiles, gui.getMatcher(), progressReceiver);
 				return null;
 			}
 		};

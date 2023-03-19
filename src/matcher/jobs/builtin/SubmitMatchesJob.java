@@ -30,12 +30,12 @@ public class SubmitMatchesJob extends Job<Void> {
 	}
 
 	@Override
-	protected Void execute(DoubleConsumer progress) {
-		submitMatches(progress);
+	protected Void execute(DoubleConsumer progressReceiver) {
+		submitMatches(progressReceiver);
 		return null;
 	}
 
-	private void submitMatches(DoubleConsumer progressConsumer) {
+	private void submitMatches(DoubleConsumer progressReceiver) {
 		UidConfig config = Config.getUidConfig();
 		if (!config.isValid()) return;
 
@@ -97,7 +97,7 @@ public class SubmitMatchesJob extends Job<Void> {
 				}
 			}
 
-			progressConsumer.accept(0.5);
+			progressReceiver.accept(0.5);
 
 			try (DataInputStream is = new DataInputStream(conn.getInputStream())) {
 				for (Matchable<?> matchable : requested) {
@@ -105,7 +105,7 @@ public class SubmitMatchesJob extends Job<Void> {
 				}
 			}
 
-			progressConsumer.accept(1);
+			progressReceiver.accept(1);
 		} catch (IOException e) {
 			throw new UncheckedIOException(e);
 		}

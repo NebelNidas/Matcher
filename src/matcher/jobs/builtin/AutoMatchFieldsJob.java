@@ -19,14 +19,14 @@ public class AutoMatchFieldsJob extends Job<Boolean> {
 	}
 
 	@Override
-	protected Boolean execute(DoubleConsumer progress) {
+	protected Boolean execute(DoubleConsumer progressReceiver) {
 		AtomicInteger totalUnmatched = new AtomicInteger();
 		double maxScore = FieldClassifier.getMaxScore(level);
 
 		Map<FieldInstance, FieldInstance> matches = matcher.match(level,
 				Matcher.absFieldAutoMatchThreshold, Matcher.relFieldAutoMatchThreshold,
 				cls -> cls.getFields(), FieldClassifier::rank, maxScore,
-				progress, totalUnmatched);
+				progressReceiver, totalUnmatched);
 
 		for (Map.Entry<FieldInstance, FieldInstance> entry : matches.entrySet()) {
 			matcher.match(entry.getKey(), entry.getValue());

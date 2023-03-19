@@ -63,10 +63,10 @@ public class Matcher {
 			protected void registerSubJobs() {
 				Job<Void> subJob = new Job<Void>("init-env") {
 					@Override
-					protected Void execute(DoubleConsumer progress) {
+					protected Void execute(DoubleConsumer progressReceiver) {
 						AtomicBoolean shouldCancel = new AtomicBoolean(false);
 						addCancelListener(() -> shouldCancel.set(true));
-						env.init(config, progress, shouldCancel);
+						env.init(config, progressReceiver, shouldCancel);
 						return null;
 					}
 				};
@@ -74,10 +74,10 @@ public class Matcher {
 
 				subJob = new Job<Void>("match-unobfuscated") {
 					@Override
-					protected Void execute(DoubleConsumer progress) {
+					protected Void execute(DoubleConsumer progressReceiver) {
 						AtomicBoolean shouldCancel = new AtomicBoolean(false);
 						addCancelListener(() -> shouldCancel.set(true));
-						matchUnobfuscated(progress, shouldCancel);
+						matchUnobfuscated(progressReceiver, shouldCancel);
 						return null;
 					}
 				};
@@ -85,7 +85,7 @@ public class Matcher {
 			}
 
 			@Override
-			protected Void execute(DoubleConsumer progress) {
+			protected Void execute(DoubleConsumer progressReceiver) {
 				for (Job<?> subJob : getSubJobs()) {
 					subJob.run();
 				}

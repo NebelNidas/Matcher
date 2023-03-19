@@ -18,7 +18,7 @@ public class AutoMatchAllJob extends Job<Set<MatchType>> {
 	}
 
 	@Override
-	protected Set<MatchType> execute(DoubleConsumer progress) {
+	protected Set<MatchType> execute(DoubleConsumer progressReceiver) {
 		for (Job<?> job : getSubJobs()) {
 			if (state == JobState.CANCELING) {
 				break;
@@ -63,7 +63,7 @@ public class AutoMatchAllJob extends Job<Set<MatchType>> {
 
 		Job<Boolean> job = new Job<>(ID + ":intermediate") {
 			@Override
-			protected Boolean execute(DoubleConsumer progress) {
+			protected Boolean execute(DoubleConsumer progressReceiver) {
 				autoMatchMembers(ClassifierLevel.Intermediate, this);
 				return matchedAnyMembersOverall.getAndSet(false);
 			}
@@ -72,7 +72,7 @@ public class AutoMatchAllJob extends Job<Set<MatchType>> {
 
 		job = new Job<>(ID + ":full") {
 			@Override
-			protected Boolean execute(DoubleConsumer progress) {
+			protected Boolean execute(DoubleConsumer progressReceiver) {
 				autoMatchMembers(ClassifierLevel.Full, this);
 				return matchedAnyMembersOverall.getAndSet(false);
 			};
@@ -81,7 +81,7 @@ public class AutoMatchAllJob extends Job<Set<MatchType>> {
 
 		job = new Job<>(ID + ":extra") {
 			@Override
-			protected Boolean execute(DoubleConsumer progress) {
+			protected Boolean execute(DoubleConsumer progressReceiver) {
 				autoMatchMembers(ClassifierLevel.Extra, this);
 				return matchedAnyMembersOverall.getAndSet(false);
 			};
@@ -90,7 +90,7 @@ public class AutoMatchAllJob extends Job<Set<MatchType>> {
 
 		job = new Job<Boolean>(ID + ":args-and-vars") {
 			@Override
-			protected Boolean execute(DoubleConsumer progress) {
+			protected Boolean execute(DoubleConsumer progressReceiver) {
 				autoMatchLocals(this);
 				return matchedAnyLocalsOverall.get();
 			};
