@@ -1,6 +1,7 @@
 package matcher.gui.menu;
 
 import java.util.Optional;
+import java.util.function.DoubleConsumer;
 
 import javafx.scene.control.ButtonType;
 import javafx.scene.control.Dialog;
@@ -25,11 +26,13 @@ public class MappingMenu extends Menu {
 		MenuItem menuItem = new MenuItem("Propagate names");
 		getItems().add(menuItem);
 
-		var job = new Job<Void>("Propagating method names/args", progressReceiver -> {
-			MappingPropagator.propagateNames(gui.getEnv(), progressReceiver);
-			return null;
-		});
-		job.addOnError(Throwable::printStackTrace);
+		var job = new Job<Void>("Propagating method names/args") {
+			@Override
+			protected Void execute(DoubleConsumer progress) {
+				MappingPropagator.propagateNames(gui.getEnv(), progress);
+				return null;
+			}
+		};
 
 		menuItem.setOnAction(event -> job.run());
 

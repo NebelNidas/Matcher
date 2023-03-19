@@ -3,6 +3,7 @@ package matcher.gui.tab;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.util.Set;
+import java.util.function.DoubleConsumer;
 
 import javafx.application.Platform;
 
@@ -10,6 +11,7 @@ import matcher.NameType;
 import matcher.gui.Gui;
 import matcher.gui.ISelectionProvider;
 import matcher.jobs.Job;
+import matcher.jobs.JobState;
 import matcher.srcprocess.HtmlUtil;
 import matcher.srcprocess.SrcDecorator;
 import matcher.srcprocess.SrcDecorator.SrcParseException;
@@ -75,32 +77,38 @@ public class SourcecodeTab extends WebViewTab {
 
 		NameType nameType = gui.getNameType().withUnmatchedTmp(unmatchedTmp);
 
-		var decompileJob = new Job<String>("decompile",
-				(progress) -> SrcDecorator.decorate(gui.getEnv().decompile(gui.getDecompiler().get(), cls, nameType), cls, nameType));
-
-		decompileJob.addOnError((error) -> Platform.runLater(() -> {
-			error.printStackTrace();
-
-			if (cDecompId == decompId) {
-				StringWriter sw = new StringWriter();
-				error.printStackTrace(new PrintWriter(sw));
-
-				if (error instanceof SrcParseException) {
-					SrcParseException parseExc = (SrcParseException) error;
-					displayText("parse error: "+parseExc.problems+"\ndecompiled source:\n"+parseExc.source);
-				} else {
-					displayText("decompile error: "+sw.toString());
-				}
+		var decompileJob = new Job<String>("decompile") {
+			@Override
+			protected String execute(DoubleConsumer progress) {
+				return SrcDecorator.decorate(gui.getEnv().decompile(gui.getDecompiler().get(), cls, nameType), cls, nameType);
 			}
-		}));
-		decompileJob.addOnSuccess((code) -> Platform.runLater(() -> {
+		};
+		decompileJob.dontPrintStacktraceOnError();
+		decompileJob.addCompletionListener((code, error) -> Platform.runLater(() -> {
 			if (cDecompId == decompId) {
-				double prevScroll = isRefresh ? getScrollTop() : 0;
+				if (code.isEmpty() && decompileJob.getState() == JobState.CANCELED) {
+					// The job got canceled before any code was generated. Ignore any errors.
+					return;
+				}
 
-				displayHtml(code);
+				if (error.isPresent()) {
+					StringWriter sw = new StringWriter();
+					error.get().printStackTrace(new PrintWriter(sw));
 
-				if (isRefresh && prevScroll > 0) {
-					setScrollTop(prevScroll);
+					if (error.get() instanceof SrcParseException) {
+						SrcParseException parseExc = (SrcParseException) error.get();
+						displayText("parse error: "+parseExc.problems+"\ndecompiled source:\n"+parseExc.source);
+					} else {
+						displayText("decompile error: "+sw.toString());
+					}
+				} else if (code.isPresent()) {
+					double prevScroll = isRefresh ? getScrollTop() : 0;
+
+					displayHtml(code.get());
+
+					if (isRefresh && prevScroll > 0) {
+						setScrollTop(prevScroll);
+					}
 				}
 			}
 		}));

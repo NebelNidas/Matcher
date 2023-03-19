@@ -12,20 +12,20 @@ import matcher.classifier.ClassClassifier;
 import matcher.classifier.ClassifierLevel;
 import matcher.classifier.RankResult;
 import matcher.jobs.Job;
+import matcher.jobs.JobState;
 import matcher.type.ClassEnvironment;
 import matcher.type.ClassInstance;
 
 public class AutoMatchClassesJob extends Job<Boolean> {
 	public AutoMatchClassesJob(Matcher matcher, ClassifierLevel level) {
-		super(ID, null);
+		super(ID);
 
 		this.matcher = matcher;
 		this.level = level;
-
-		setAction(this::autoMatchClasses);
 	}
 
-	public boolean autoMatchClasses(DoubleConsumer progress) {
+	@Override
+	protected Boolean execute(DoubleConsumer progress) {
 		ClassEnvironment env = matcher.getEnv();
 		boolean assumeBothOrNoneObfuscated = env.assumeBothOrNoneObfuscated;
 		Predicate<ClassInstance> filter = cls -> cls.isReal() && (!assumeBothOrNoneObfuscated || cls.isNameObfuscated()) && !cls.hasMatch() && cls.isMatchable();
@@ -43,6 +43,10 @@ public class AutoMatchClassesJob extends Job<Boolean> {
 		Map<ClassInstance, ClassInstance> matches = new ConcurrentHashMap<>(classes.size());
 
 		Matcher.runInParallel(classes, cls -> {
+			if (state == JobState.CANCELING) {
+				return;
+			}
+
 			List<RankResult<ClassInstance>> ranking = ClassClassifier.rank(cls, cmpClasses, level, env, maxMismatch);
 
 			if (Matcher.checkRank(ranking, Matcher.absClassAutoMatchThreshold, Matcher.relClassAutoMatchThreshold, maxScore)) {

@@ -10,6 +10,7 @@ import java.util.EnumSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
+import java.util.function.DoubleConsumer;
 import java.util.stream.Stream;
 
 import javafx.application.Platform;
@@ -118,12 +119,14 @@ public class FileMenu extends Menu {
 		gui.getMatcher().reset();
 		gui.onProjectChange();
 
-		var job = new Job<Void>("initializing-files", progressReceiver -> {
-			MatchesIo.read(res.path, newConfig.paths, newConfig.verifyFiles, gui.getMatcher(), progressReceiver);
-			return null;
-		});
-		job.addOnError(Throwable::printStackTrace);
-		job.addOnSuccess((result) -> gui.onProjectChange());
+		var job = new Job<Void>("initializing-files") {
+			@Override
+			protected Void execute(DoubleConsumer progress) {
+				MatchesIo.read(res.path, newConfig.paths, newConfig.verifyFiles, gui.getMatcher(), progress);
+				return null;
+			}
+		};
+		job.addCompletionListener((result, error) -> Platform.runLater(() -> gui.onProjectChange()));
 		job.run();
 	}
 

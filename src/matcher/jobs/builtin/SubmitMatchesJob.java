@@ -14,6 +14,7 @@ import matcher.Matcher;
 import matcher.config.Config;
 import matcher.config.UidConfig;
 import matcher.jobs.Job;
+import matcher.jobs.JobState;
 import matcher.type.ClassInstance;
 import matcher.type.FieldInstance;
 import matcher.type.Matchable;
@@ -23,14 +24,15 @@ import matcher.type.MethodVarInstance;
 
 public class SubmitMatchesJob extends Job<Void> {
 	public SubmitMatchesJob(Matcher matcher) {
-		super(ID, null);
+		super(ID);
 
 		this.matcher = matcher;
+	}
 
-		setAction((progress) -> {
-			submitMatches(progress);
-			return null;
-		});
+	@Override
+	protected Void execute(DoubleConsumer progress) {
+		submitMatches(progress);
+		return null;
 	}
 
 	private void submitMatches(DoubleConsumer progressConsumer) {
@@ -50,6 +52,10 @@ public class SubmitMatchesJob extends Job<Void> {
 
 			try (DataOutputStream os = new DataOutputStream(conn.getOutputStream())) {
 				for (ClassInstance cls : matcher.getEnv().getClassesA()) {
+					if (state == JobState.CANCELING) {
+						break;
+					}
+
 					if (!cls.hasMatch() || !cls.isInput()) continue; // TODO: skip with known + matched uids
 
 					assert cls.getMatch() != cls;

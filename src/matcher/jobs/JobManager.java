@@ -1,6 +1,7 @@
 package matcher.jobs;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
@@ -8,79 +9,76 @@ import java.util.concurrent.Executors;
 import java.util.function.BiConsumer;
 
 public class JobManager {
-	public static void registerEventListener(BiConsumer<Job<?>, JobManagerEvent> listener) {
-		eventListeners.add(listener);
+	private static final JobManager INSTANCE = new JobManager();
+
+	public static synchronized JobManager get() {
+		return INSTANCE;
 	}
 
-	public static void queue(Job<?> task) {
-		task.addOnFinish(() -> onTaskEnded(task));
-		queuedTasks.add(task);
-		onTaskQueued(task);
+	private static final ExecutorService threadPool = Executors.newCachedThreadPool();
+	private List<BiConsumer<Job<?>, JobManagerEvent>> eventListeners = Collections.synchronizedList(new ArrayList<>());
+	private List<Job<?>> queuedJobs = Collections.synchronizedList(new LinkedList<>());
+	private List<Job<?>> runningJobs = Collections.synchronizedList(new LinkedList<>());
+
+	public void registerEventListener(BiConsumer<Job<?>, JobManagerEvent> listener) {
+		this.eventListeners.add(listener);
 	}
 
-	private static void onTaskQueued(Job<?> task) {
-		eventListeners.forEach(listener -> listener.accept(task, JobManagerEvent.TASK_QUEUED));
+	private void notifyEventListeners(Job<?> job, JobManagerEvent event) {
+		synchronized (this.eventListeners) {
+			this.eventListeners.forEach(listener -> listener.accept(job, event));
+		}
+	}
+
+	/**
+	 * Queues the job for execution.
+	 */
+	void queue(Job<?> job) {
+		job.addCompletionListener((result, error) -> onJobFinished(job));
+		this.queuedJobs.add(job);
+		notifyEventListeners(job, JobManagerEvent.JOB_QUEUED);
 		tryLaunchNext();
 	}
 
-	private static void onTaskStarted(Job<?> task) {
-		eventListeners.forEach(listener -> listener.accept(task, JobManagerEvent.JOB_STARTED));
+	private void onJobFinished(Job<?> job) {
+		notifyEventListeners(job, JobManagerEvent.JOB_FINISHED);
+		this.runningJobs.remove(job);
+		tryLaunchNext();
 	}
 
-	private static void onTaskEnded(Job<?> task) {
-		new Thread(() -> {
-			try {
-				Thread.sleep(100);
-			} catch (InterruptedException e) {
-				// ignored
-			}
-
-			// Ensure thread hasn't been restarted
-			if (task.getState() != JobState.QUEUED
-					&& task.getState() != JobState.RUNNING) {
-				eventListeners.forEach(listener -> listener.accept(task, JobManagerEvent.JOB_ENDED));
-				runningTasks.remove(task);
-				tryLaunchNext();
-			}
-		}).run();
-	}
-
-	private static void tryLaunchNext() {
-		for (Job<?> queuedTask : queuedTasks) {
+	private void tryLaunchNext() {
+		for (Job<?> queuedJob : this.queuedJobs) {
 			boolean blocked = false;
 
-			for (Job<?> runningTask : runningTasks) {
-				if (queuedTask.isBlockedBy(runningTask.getId())) {
+			for (Job<?> runningJob : this.runningJobs) {
+				if (queuedJob.isBlockedBy(runningJob.getId())) {
 					blocked = true;
 					break;
 				}
 			}
 
 			if (!blocked) {
-				queuedTasks.remove(queuedTask);
-				runningTasks.add(queuedTask);
-				onTaskStarted(queuedTask);
-				threadPool.submit(() -> queuedTask.runNow());
+				this.queuedJobs.remove(queuedJob);
+				this.runningJobs.add(queuedJob);
+				notifyEventListeners(queuedJob, JobManagerEvent.JOB_STARTED);
+				threadPool.submit(() -> queuedJob.runNow());
 			}
 		}
 	}
 
-	public static void shutdown() {
-		threadPool.shutdown();
+	public List<Job<?>> getRunningJobs() {
+		return this.runningJobs;
 	}
 
-	public static List<Job<?>> getRunningTasks() {
-		return runningTasks;
+	public void shutdown() {
+		this.queuedJobs.clear();
+		this.runningJobs.forEach(job -> job.cancel());
+		threadPool.shutdownNow();
 	}
 
 	public enum JobManagerEvent {
-		TASK_QUEUED,
+		JOB_QUEUED,
 		JOB_STARTED,
-		JOB_ENDED
+		JOB_FINISHED
 	}
-
-	private static final ExecutorService threadPool = Executors.newCachedThreadPool();
-	private static List<BiConsumer<Job<?>, JobManagerEvent>> eventListeners = new ArrayList<>(2);
-	private static List<Job<?>> queuedTasks = new LinkedList<>();
-	private static List<Job<?>> runningTasks = new LinkedList<>();
 }

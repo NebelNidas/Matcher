@@ -12,22 +12,21 @@ import matcher.type.FieldInstance;
 
 public class AutoMatchFieldsJob extends Job<Boolean> {
 	public AutoMatchFieldsJob(Matcher matcher, ClassifierLevel level) {
-		super(ID, null);
+		super(ID);
 
 		this.matcher = matcher;
 		this.level = level;
-
-		setAction(this::autoMatchFields);
 	}
 
-	public boolean autoMatchFields(DoubleConsumer progressReceiver) {
+	@Override
+	protected Boolean execute(DoubleConsumer progress) {
 		AtomicInteger totalUnmatched = new AtomicInteger();
 		double maxScore = FieldClassifier.getMaxScore(level);
 
 		Map<FieldInstance, FieldInstance> matches = matcher.match(level,
 				Matcher.absFieldAutoMatchThreshold, Matcher.relFieldAutoMatchThreshold,
 				cls -> cls.getFields(), FieldClassifier::rank, maxScore,
-				progressReceiver, totalUnmatched);
+				progress, totalUnmatched);
 
 		for (Map.Entry<FieldInstance, FieldInstance> entry : matches.entrySet()) {
 			matcher.match(entry.getKey(), entry.getValue());

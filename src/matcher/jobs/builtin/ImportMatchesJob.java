@@ -11,6 +11,7 @@ import matcher.Matcher;
 import matcher.config.Config;
 import matcher.config.UidConfig;
 import matcher.jobs.Job;
+import matcher.jobs.JobState;
 import matcher.type.ClassEnv;
 import matcher.type.ClassEnvironment;
 import matcher.type.ClassInstance;
@@ -19,16 +20,17 @@ import matcher.type.MatchableKind;
 import matcher.type.MethodInstance;
 import matcher.type.MethodVarInstance;
 
-public class ImportMatchesJob extends Job<Void> {
+public class ImportMatchesJob extends Job<Boolean> {
 	public ImportMatchesJob(Matcher matcher) {
-		super(ID, null);
+		super(ID);
 
 		this.matcher = matcher;
+	}
 
-		setAction((progress) -> {
-			importMatches(progress);
-			return null;
-		});
+	@Override
+	protected Boolean execute(DoubleConsumer progress) {
+		importMatches(progress);
+		return importedAny;
 	}
 
 	private void importMatches(DoubleConsumer progressConsumer) {
@@ -50,6 +52,10 @@ public class ImportMatchesJob extends Job<Void> {
 				MatchableKind type;
 
 				while ((typeOrdinal = is.read()) != -1) {
+					if (state == JobState.CANCELING) {
+						break;
+					}
+
 					type = MatchableKind.VALUES[typeOrdinal];
 					int uid = is.readInt();
 					String idA = is.readUTF();
@@ -62,6 +68,7 @@ public class ImportMatchesJob extends Job<Void> {
 					switch (type) {
 					case CLASS:
 						matcher.match(clsA, clsB);
+						importedAny = true;
 						break;
 					case METHOD:
 					case METHOD_ARG:
@@ -72,6 +79,7 @@ public class ImportMatchesJob extends Job<Void> {
 
 						if (type == MatchableKind.METHOD) {
 							matcher.match(methodA, methodB);
+							importedAny = true;
 						} else {
 							idA = idA.substring(idA.lastIndexOf(')') + 1);
 							idB = idB.substring(idB.lastIndexOf(')') + 1);
@@ -81,6 +89,7 @@ public class ImportMatchesJob extends Job<Void> {
 
 							if (varA != null && varB != null) {
 								matcher.match(varA, varB);
+								importedAny = true;
 							}
 						}
 
@@ -92,6 +101,7 @@ public class ImportMatchesJob extends Job<Void> {
 						if (fieldA == null || fieldB == null) break;
 
 						matcher.match(fieldA, fieldB);
+						importedAny = true;
 						break;
 					}
 					}
@@ -130,4 +140,5 @@ public class ImportMatchesJob extends Job<Void> {
 
 	public static final String ID = "import-matches";
 	private final Matcher matcher;
+	private boolean importedAny;
 }

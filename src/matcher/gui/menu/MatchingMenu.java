@@ -63,16 +63,18 @@ public class MatchingMenu extends Menu {
 
 	public void autoMatchAll() {
 		var job = new AutoMatchAllJob(gui.getMatcher());
-		job.addOnError(Throwable::printStackTrace);
-		job.addOnSuccess((result) -> Platform.runLater(() -> gui.onMatchChange(result)));
+		job.addCompletionListener((result, error) -> {
+			if (result.isPresent()) {
+				Platform.runLater(() -> gui.onMatchChange(result.get()));
+			}
+		});
 		job.run();
 	}
 
 	public void autoMatchClasses() {
 		var job = new AutoMatchClassesJob(gui.getMatcher(), Matcher.defaultAutoMatchLevel);
-		job.addOnError(Throwable::printStackTrace);
-		job.addOnSuccess((matchedAny) -> {
-			if (matchedAny) {
+		job.addCompletionListener((matchedAny, error) -> {
+			if (matchedAny.orElse(false)) {
 				Platform.runLater(() -> gui.onMatchChange(EnumSet.allOf(MatchType.class)));
 			}
 		});
@@ -81,9 +83,8 @@ public class MatchingMenu extends Menu {
 
 	public void autoMatchMethods() {
 		var job = new AutoMatchMethodsJob(gui.getMatcher(), Matcher.defaultAutoMatchLevel);
-		job.addOnError(Throwable::printStackTrace);
-		job.addOnSuccess((matchedAny) -> {
-			if (matchedAny) {
+		job.addCompletionListener((matchedAny, error) -> {
+			if (matchedAny.orElse(false)) {
 				Platform.runLater(() -> gui.onMatchChange(EnumSet.of(MatchType.Method)));
 			}
 		});
@@ -92,9 +93,8 @@ public class MatchingMenu extends Menu {
 
 	public void autoMatchFields() {
 		var job = new AutoMatchFieldsJob(gui.getMatcher(), Matcher.defaultAutoMatchLevel);
-		job.addOnError(Throwable::printStackTrace);
-		job.addOnSuccess((matchedAny) -> {
-			if (matchedAny) {
+		job.addCompletionListener((matchedAny, error) -> {
+			if (matchedAny.orElse(false)) {
 				Platform.runLater(() -> gui.onMatchChange(EnumSet.of(MatchType.Field)));
 			}
 		});
@@ -103,9 +103,8 @@ public class MatchingMenu extends Menu {
 
 	public void autoMatchArgs() {
 		var job = new AutoMatchMethodVarsJob(gui.getMatcher(), Matcher.defaultAutoMatchLevel, true);
-		job.addOnError(Throwable::printStackTrace);
-		job.addOnSuccess((matchedAny) -> {
-			if (matchedAny) {
+		job.addCompletionListener((matchedAny, error) -> {
+			if (matchedAny.orElse(false)) {
 				Platform.runLater(() -> gui.onMatchChange(EnumSet.of(MatchType.MethodVar)));
 			}
 		});
@@ -114,9 +113,8 @@ public class MatchingMenu extends Menu {
 
 	public void autoMatchVars() {
 		var job = new AutoMatchMethodVarsJob(gui.getMatcher(), Matcher.defaultAutoMatchLevel, false);
-		job.addOnError(Throwable::printStackTrace);
-		job.addOnSuccess((matchedAny) -> {
-			if (matchedAny) {
+		job.addCompletionListener((matchedAny, error) -> {
+			if (matchedAny.orElse(false)) {
 				Platform.runLater(() -> gui.onMatchChange(EnumSet.of(MatchType.MethodVar)));
 			}
 		});

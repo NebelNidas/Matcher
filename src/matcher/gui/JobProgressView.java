@@ -1,5 +1,7 @@
 package matcher.gui;
 
+import java.util.List;
+
 import javafx.application.Platform;
 import javafx.beans.binding.Bindings;
 import javafx.collections.FXCollections;
@@ -20,20 +22,34 @@ import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.VBox;
 import matcher.jobs.Job;
 import matcher.jobs.JobManager;
+import matcher.jobs.JobState;
 
 public class JobProgressView extends Control {
-	public final ObservableList<Job<?>> tasks = FXCollections.observableArrayList();
+	public final ObservableList<Job<?>> jobs = FXCollections.observableArrayList();
 
     public JobProgressView() {
 		getStyleClass().add("task-progress-view");
 
-		JobManager.registerEventListener((task, event) -> Platform.runLater(() -> {
+		JobManager.get().registerEventListener((job, event) -> Platform.runLater(() -> {
+			List<Job<?>> subJobs = job.getSubJobs();
+
 			switch (event) {
-			case JOB_STARTED:
-				tasks.add(task);
+			case JOB_QUEUED:
+				jobs.add(job);
+
+				synchronized (subJobs) {
+					subJobs.forEach(jobs::add);
+				}
+
 				break;
-			case JOB_ENDED:
-				tasks.remove(task);
+
+			case JOB_FINISHED:
+				jobs.remove(job);
+
+				synchronized (subJobs) {
+					subJobs.forEach(jobs::remove);
+				}
+
 				break;
 			}
 		}));
@@ -41,11 +57,11 @@ public class JobProgressView extends Control {
 
 	@Override
 	protected Skin<?> createDefaultSkin() {
-		return new TaskProgressViewSkin(this);
+		return new JobProgressViewSkin(this);
 	}
 
-	private class TaskProgressViewSkin extends SkinBase<JobProgressView> {
-		TaskProgressViewSkin(JobProgressView progressView) {
+	private class JobProgressViewSkin extends SkinBase<JobProgressView> {
+		JobProgressViewSkin(JobProgressView progressView) {
 			super(progressView);
 
 			// list view
@@ -56,7 +72,7 @@ public class JobProgressView extends Control {
 			listView.setFocusTraversable(false);
 			listView.setPadding(new Insets(GuiConstants.padding, GuiConstants.padding, GuiConstants.padding, GuiConstants.padding));
 
-			Bindings.bindContent(listView.getItems(), progressView.tasks);
+			Bindings.bindContent(listView.getItems(), progressView.jobs);
 
 			getChildren().add(listView);
 		}
@@ -67,8 +83,9 @@ public class JobProgressView extends Control {
 			private Label messageText;
 			private Button cancelButton;
 
-			private Job<?> task;
+			private Job<?> job;
 			private BorderPane borderPane;
+			private VBox vbox;
 
 			public TaskCell() {
 				titleText = new Label();
@@ -85,21 +102,22 @@ public class JobProgressView extends Control {
 				cancelButton = new Button("Cancel");
 				cancelButton.getStyleClass().add("task-cancel-button");
 				cancelButton.setTooltip(new Tooltip("Cancel Task"));
-				cancelButton.setOnAction(evt -> {
-					if (task != null) {
+				cancelButton.setOnAction(event -> {
+					if (this.job != null) {
 						cancelButton.setDisable(true);
-						task.cancel();
+						this.job.cancel();
 					}
 				});
 
-				VBox vbox = new VBox();
-				vbox.setSpacing(GuiConstants.padding);
+				vbox = new VBox();
+				vbox.setPadding(new Insets(GuiConstants.padding, 0, 0, GuiConstants.padding));
+				vbox.setSpacing(GuiConstants.padding * 0.7f);
 				vbox.getChildren().add(titleText);
 				vbox.getChildren().add(progressBar);
 				vbox.getChildren().add(messageText);
 
 				BorderPane.setAlignment(cancelButton, Pos.CENTER);
-				BorderPane.setMargin(cancelButton, new Insets(0, 0, 0, GuiConstants.padding));
+				BorderPane.setMargin(cancelButton, new Insets(0, GuiConstants.padding, 0, GuiConstants.padding));
 
 				borderPane = new BorderPane();
 				borderPane.setCenter(vbox);
@@ -107,54 +125,70 @@ public class JobProgressView extends Control {
 				setContentDisplay(ContentDisplay.GRAPHIC_ONLY);
 			}
 
-			@Override
-			public void updateIndex(int index) {
-				super.updateIndex(index);
+			private void resetProperties() {
+				titleText.setText(null);
+				messageText.setText(null);
+				progressBar.setProgress(-1);
+				progressBar.setStyle(null);
+				cancelButton.setText("Cancel");
+				cancelButton.setDisable(false);
+			}
 
-				/*
-				 * I have no idea why this is necessary but it won't work without
-				 * it. Shouldn't the updateItem method be enough?
-				 */
-				if (index == -1) {
-					setGraphic(null);
-					getStyleClass().setAll("task-list-cell-empty");
+			private void update() {
+				if (job == null) return;
+
+				if (job.getProgress() <= 0) {
+					progressBar.setProgress(-1);
+				} else {
+					messageText.setText(String.format("%.0f%%", job.getProgress() * 100));
+					progressBar.setProgress(job.getProgress());
+				}
+
+				if (job.getState().isFinished()) {
+					cancelButton.setDisable(true);
+				}
+
+				if (job.getState() == JobState.CANCELING) {
+					cancelButton.setText("Canceling...");
+					cancelButton.setDisable(true);
+				}
+
+				if (job.getState() == JobState.CANCELED || job.getState() == JobState.ERRORED) {
+					progressBar.setStyle("-fx-accent: darkred");
+				}
+
+				if (job.getState() == JobState.CANCELED) {
+					cancelButton.setText("Canceled");
 				}
 			}
 
 			@Override
-			protected void updateItem(Job<?> task, boolean empty) {
-				super.updateItem(task, empty);
+			protected void updateItem(Job<?> job, boolean empty) {
+				super.updateItem(job, empty);
+				this.job = job;
 
-				this.task = task;
-
-				if (empty || task == null) {
+				if (empty || job == null) {
+					resetProperties();
 					getStyleClass().setAll("task-list-cell-empty");
 					setGraphic(null);
-				} else if (task != null) {
+				} else if (job != null) {
+					job.addCancelListener(() -> Platform.runLater(() -> update()));
+					job.addProgressListener((progress) -> Platform.runLater(() -> update()));
+					job.addCompletionListener((result, error) -> Platform.runLater(() -> update()));
+
+					update();
 					getStyleClass().setAll("task-list-cell");
-					titleText.setText(task.getId());
-					task.addProgressListener(progress -> Platform.runLater(() -> {
-						progressBar.setProgress(progress);
-						messageText.setText(String.format("%.0f%%", progress * 100));
-					}));
+					titleText.setText(job.getId());
 
-					// Callback<T, Node> factory = getSkinnable().getGraphicFactory();
-					// if (factory != null) {
-					// 	Node graphic = factory.call(task);
-					// 	if (graphic != null) {
-					// 		BorderPane.setAlignment(graphic, Pos.CENTER);
-					// 		BorderPane.setMargin(graphic, new Insets(0, 4, 0, 0));
-					// 		borderPane.setLeft(graphic);
-					// 	}
-					// } else {
-						/*
-						 * Really needed. The application might have used a graphic
-						 * factory before and then disabled it. In this case the border
-						 * pane might still have an old graphic in the left position.
-						 */
-						borderPane.setLeft(null);
-					// }
+					int nestLevel = 0;
+					Job<?> currentJob = job;
 
+					while (currentJob.getParent() != null) {
+						nestLevel++;
+						currentJob = currentJob.getParent();
+					}
+
+					BorderPane.setMargin(vbox, new Insets(0, 0, GuiConstants.padding, GuiConstants.padding * (nestLevel * 5)));
 					setGraphic(borderPane);
 				}
 			}

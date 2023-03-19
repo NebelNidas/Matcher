@@ -8,25 +8,29 @@ import matcher.Matcher;
 import matcher.classifier.ClassifierLevel;
 import matcher.classifier.MethodClassifier;
 import matcher.jobs.Job;
+import matcher.jobs.JobState;
 import matcher.type.MethodInstance;
 
 public class AutoMatchMethodsJob extends Job<Boolean> {
 	public AutoMatchMethodsJob(Matcher matcher, ClassifierLevel level) {
-		super(ID, null);
+		super(ID);
 
 		this.matcher = matcher;
 		this.level = level;
-
-		setAction(this::autoMatchMethods);
 	}
 
-	private boolean autoMatchMethods(DoubleConsumer progressReceiver) {
+	@Override
+	protected Boolean execute(DoubleConsumer progress) {
 		AtomicInteger totalUnmatched = new AtomicInteger();
 		Map<MethodInstance, MethodInstance> matches = matcher.match(level, Matcher.absMethodAutoMatchThreshold, Matcher.relMethodAutoMatchThreshold,
 				cls -> cls.getMethods(), MethodClassifier::rank, MethodClassifier.getMaxScore(level),
-				progressReceiver, totalUnmatched);
+				progress, totalUnmatched);
 
 		for (Map.Entry<MethodInstance, MethodInstance> entry : matches.entrySet()) {
+			if (state == JobState.CANCELING) {
+				break;
+			}
+
 			matcher.match(entry.getKey(), entry.getValue());
 		}
 

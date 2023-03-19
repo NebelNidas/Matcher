@@ -18,6 +18,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 import java.util.function.DoubleConsumer;
@@ -34,6 +35,7 @@ import matcher.classifier.MethodVarClassifier;
 import matcher.classifier.RankResult;
 import matcher.config.Config;
 import matcher.config.ProjectConfig;
+import matcher.jobs.Job;
 import matcher.type.ClassEnv;
 import matcher.type.ClassEnvironment;
 import matcher.type.ClassInstance;
@@ -56,18 +58,64 @@ public class Matcher {
 	}
 
 	public void init(ProjectConfig config, DoubleConsumer progressReceiver) {
-		try {
-			env.init(config, progressReceiver);
+		var job = new Job<Void>("init") {
+			@Override
+			protected void registerSubJobs() {
+				Job<Void> subJob = new Job<Void>("init-env") {
+					@Override
+					protected Void execute(DoubleConsumer progress) {
+						AtomicBoolean shouldCancel = new AtomicBoolean(false);
+						addCancelListener(() -> shouldCancel.set(true));
+						env.init(config, progress, shouldCancel);
+						return null;
+					}
+				};
+				addSubJob(subJob, true);
 
-			matchUnobfuscated();
-		} catch (Throwable t) {
-			reset();
-			throw t;
-		}
+				subJob = new Job<Void>("match-unobfuscated") {
+					@Override
+					protected Void execute(DoubleConsumer progress) {
+						AtomicBoolean shouldCancel = new AtomicBoolean(false);
+						addCancelListener(() -> shouldCancel.set(true));
+						matchUnobfuscated(progress, shouldCancel);
+						return null;
+					}
+				};
+				addSubJob(subJob, false);
+			}
+
+			@Override
+			protected Void execute(DoubleConsumer progress) {
+				for (Job<?> subJob : getSubJobs()) {
+					subJob.run();
+				}
+
+				return null;
+			}
+		};
+
+		job.addProgressListener((progress) -> progressReceiver.accept(progress));
+		job.addCompletionListener((result, error) -> {
+			if (error.isPresent()) {
+				reset();
+				throw new RuntimeException(error.get());
+			}
+		});
+		job.runAndAwait();
 	}
 
-	private void matchUnobfuscated() {
+	private void matchUnobfuscated(DoubleConsumer progressReceiver, AtomicBoolean cancelListener) {
+		final float classesCount = env.getClassesA().size();
+		float classesDone = 0;
+
 		for (ClassInstance cls : env.getClassesA()) {
+			if (cancelListener.get()) {
+				break;
+			}
+
+			double progress = classesDone++ / classesCount;
+			progressReceiver.accept(progress);
+
 			if (cls.isNameObfuscated() || !cls.isReal()) continue;
 
 			ClassInstance match = env.getLocalClsByIdB(cls.getId());
@@ -168,7 +216,7 @@ public class Matcher {
 		if (a.getArrayDimensions() != b.getArrayDimensions()) throw new IllegalArgumentException("the classes don't have the same amount of array dimensions");
 		if (a.getMatch() == b) return;
 
-		System.out.println("match class "+a+" -> "+b+(a.hasMappedName() ? " ("+a.getName(NameType.MAPPED_PLAIN)+")" : ""));
+		// System.out.println("match class "+a+" -> "+b+(a.hasMappedName() ? " ("+a.getName(NameType.MAPPED_PLAIN)+")" : ""));
 
 		if (a.getMatch() != null) {
 			a.getMatch().setMatch(null);
@@ -287,7 +335,7 @@ public class Matcher {
 		if (a.getCls().getMatch() != b.getCls()) throw new IllegalArgumentException("the methods don't belong to the same class");
 		if (a.getMatch() == b) return;
 
-		System.out.println("match method "+a+" -> "+b+(a.hasMappedName() ? " ("+a.getName(NameType.MAPPED_PLAIN)+")" : ""));
+		// System.out.println("match method "+a+" -> "+b+(a.hasMappedName() ? " ("+a.getName(NameType.MAPPED_PLAIN)+")" : ""));
 
 		Set<MethodInstance> membersA = a.getAllHierarchyMembers();
 		Set<MethodInstance> membersB = b.getAllHierarchyMembers();
@@ -356,7 +404,7 @@ public class Matcher {
 		if (a.getCls().getMatch() != b.getCls()) throw new IllegalArgumentException("the methods don't belong to the same class");
 		if (a.getMatch() == b) return;
 
-		System.out.println("match field "+a+" -> "+b+(a.hasMappedName() ? " ("+a.getName(NameType.MAPPED_PLAIN)+")" : ""));
+		// System.out.println("match field "+a+" -> "+b+(a.hasMappedName() ? " ("+a.getName(NameType.MAPPED_PLAIN)+")" : ""));
 
 		if (a.getMatch() != null) a.getMatch().setMatch(null);
 		if (b.getMatch() != null) b.getMatch().setMatch(null);
@@ -374,7 +422,7 @@ public class Matcher {
 		if (a.isArg() != b.isArg()) throw new IllegalArgumentException("the method vars are not of the same kind");
 		if (a.getMatch() == b) return;
 
-		System.out.println("match method arg "+a+" -> "+b+(a.hasMappedName() ? " ("+a.getName(NameType.MAPPED_PLAIN)+")" : ""));
+		// System.out.println("match method arg "+a+" -> "+b+(a.hasMappedName() ? " ("+a.getName(NameType.MAPPED_PLAIN)+")" : ""));
 
 		if (a.getMatch() != null) a.getMatch().setMatch(null);
 		if (b.getMatch() != null) b.getMatch().setMatch(null);

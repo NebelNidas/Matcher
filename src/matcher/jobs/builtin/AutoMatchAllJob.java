@@ -3,189 +3,179 @@ package matcher.jobs.builtin;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.function.Supplier;
+import java.util.function.DoubleConsumer;
 
 import matcher.Matcher;
 import matcher.classifier.ClassifierLevel;
 import matcher.jobs.Job;
-import matcher.jobs.JobGroup;
+import matcher.jobs.JobState;
 import matcher.type.MatchType;
 
-public class AutoMatchAllJob extends JobGroup<Set<MatchType>> {
+public class AutoMatchAllJob extends Job<Set<MatchType>> {
 	public AutoMatchAllJob(Matcher matcher) {
-		super(ID, null);
+		super(ID);
 		this.matcher = matcher;
-
-		setReturnValueSupplier(() -> {
-			// We could register the subjobs earlier, but it's a design decision
-			// that child jobs only show once the parent is started
-			registerJobs();
-
-			for (Job<?> job : subJobs) {
-				job.run();
-			}
-
-			matcher.getEnv().getCache().clear();
-
-			Set<MatchType> matchedTypes = new HashSet<>();
-
-			if (matchedAnyClasses.get()) {
-				matchedTypes.add(MatchType.Class);
-			}
-
-			if (matchedAnyMembers.get()) {
-				matchedTypes.add(MatchType.Method);
-				matchedTypes.add(MatchType.Field);
-			}
-
-			if (matchedAnyVars.get()) {
-				matchedTypes.add(MatchType.MethodVar);
-			}
-
-			return matchedTypes;
-		});
 	}
 
-	private void registerJobs() {
-		var job = new AutoMatchClassesJob(matcher, ClassifierLevel.Initial);
-		job.addOnSuccess((matchedAny) -> {
-			matchedAnyClasses.set(matchedAnyClasses.get() | matchedAny);
-		});
-		addSubJob(job, true);
-		addSubJob(job, true);
+	@Override
+	protected Set<MatchType> execute(DoubleConsumer progress) {
+		for (Job<?> job : getSubJobs()) {
+			if (state == JobState.CANCELING) {
+				break;
+			}
 
-		Job<Boolean> levelJob = new JobGroup<>(ID + ":intermediate", null) {{
-			setReturnValueSupplier(() -> {
+			job.run();
+		}
+
+		matcher.getEnv().getCache().clear();
+
+		Set<MatchType> matchedTypes = new HashSet<>();
+
+		if (matchedAnyClassesOverall.get()) {
+			matchedTypes.add(MatchType.Class);
+		}
+
+		if (matchedAnyMembersOverall.get()) {
+			matchedTypes.add(MatchType.Method);
+			matchedTypes.add(MatchType.Field);
+		}
+
+		if (matchedAnyLocalsOverall.get()) {
+			matchedTypes.add(MatchType.MethodVar);
+		}
+
+		return matchedTypes;
+	}
+
+	@Override
+	protected void registerSubJobs() {
+		var matchClassesJob = new AutoMatchClassesJob(matcher, ClassifierLevel.Initial);
+		matchClassesJob.addCompletionListener((matchedAnyClasses, error) -> {
+			matchedAnyClassesOverall.set(matchedAnyClassesOverall.get() | matchedAnyClasses.orElse(false));
+		});
+		addSubJob(matchClassesJob, true);
+
+		matchClassesJob = new AutoMatchClassesJob(matcher, ClassifierLevel.Initial);
+		matchClassesJob.addCompletionListener((matchedAnyClasses, error) -> {
+			matchedAnyClassesOverall.set(matchedAnyClassesOverall.get() | matchedAnyClasses.orElse(false));
+		});
+		addSubJob(matchClassesJob, false);
+
+		Job<Boolean> job = new Job<>(ID + ":intermediate") {
+			@Override
+			protected Boolean execute(DoubleConsumer progress) {
 				autoMatchMembers(ClassifierLevel.Intermediate, this);
-				return matchedAnyMembers.getAndSet(false);
-			});
-		}};
-		addSubJob(levelJob, true);
+				return matchedAnyMembersOverall.getAndSet(false);
+			}
+		};
+		addSubJob(job, false);
 
-		levelJob = new JobGroup<Boolean>(ID + ":full", null) {{
-			setReturnValueSupplier(() -> {
+		job = new Job<>(ID + ":full") {
+			@Override
+			protected Boolean execute(DoubleConsumer progress) {
 				autoMatchMembers(ClassifierLevel.Full, this);
-				return matchedAnyMembers.getAndSet(false);
-			});
-		}};
-		addSubJob(levelJob, false);
+				return matchedAnyMembersOverall.getAndSet(false);
+			};
+		};
+		addSubJob(job, false);
 
-		levelJob = new JobGroup<Boolean>(ID + ":extra", null) {{
-			setReturnValueSupplier(() -> {
+		job = new Job<>(ID + ":extra") {
+			@Override
+			protected Boolean execute(DoubleConsumer progress) {
 				autoMatchMembers(ClassifierLevel.Extra, this);
-				return matchedAnyMembers.getAndSet(false);
-			});
-		}};
-		addSubJob(levelJob, false);
+				return matchedAnyMembersOverall.getAndSet(false);
+			};
+		};
+		addSubJob(job, false);
 
-		var argVarJob = new JobGroup<Boolean>(ID + ":args-and-vars", null) {{
-			setReturnValueSupplier(() -> {
-				autoMatchVars(this);
-				return matchedAnyVars.get();
-			});
-		}};
-		addSubJob(argVarJob, true);
+		job = new Job<Boolean>(ID + ":args-and-vars") {
+			@Override
+			protected Boolean execute(DoubleConsumer progress) {
+				autoMatchLocals(this);
+				return matchedAnyLocalsOverall.get();
+			};
+		};
+		addSubJob(job, false);
 	}
 
-	private void autoMatchMembers(ClassifierLevel level, JobGroup<Boolean> parentJob) {
-		AtomicBoolean methodsDone = new AtomicBoolean(false);
-		AtomicBoolean fieldsDone = new AtomicBoolean(false);
+	private void autoMatchMembers(ClassifierLevel level, Job<Boolean> parentJob) {
+		if (parentJob.getState() == JobState.CANCELING) {
+			return;
+		}
 
 		// Methods
 		var methodJob = new AutoMatchMethodsJob(matcher, level);
-		methodJob.addOnSuccess((result) -> matchedAnyMembers.set(matchedAnyMembers.get() | result));
-		methodJob.addOnFinish(() -> {
-			methodsDone.set(true);
-			System.out.println("Matching methods finished");
-
-			autoMatchMembers0(methodsDone.get(), fieldsDone.get(), level, parentJob);
+		methodJob.addCompletionListener((matchedAnyMethods, error) -> {
+			matchedAnyMembersOverall.set(matchedAnyMembersOverall.get() | matchedAnyMethods.orElse(false));
 		});
 		parentJob.addSubJob(methodJob, false);
 
 		// Fields
 		var fieldJob = new AutoMatchFieldsJob(matcher, level);
-		fieldJob.addOnSuccess((result) -> matchedAnyMembers.set(matchedAnyMembers.get() | result));
-		fieldJob.addOnFinish(() -> {
-			fieldsDone.set(true);
-			System.out.println("Matching fields finished");
-
-			autoMatchMembers0(methodsDone.get(), fieldsDone.get(), level, parentJob);
+		fieldJob.addCompletionListener((matchedAnyFields, error) -> {
+			matchedAnyMembersOverall.set(matchedAnyMembersOverall.get() | matchedAnyFields.orElse(false));
 		});
 		parentJob.addSubJob(fieldJob, false);
 
-		for (Job<?> job : parentJob.getSubJobs()) {
-			job.run();
-		}
+		// Run subjobs
+		methodJob.run();
+		fieldJob.run();
+		autoMatchMembers0(level, parentJob);
 	}
 
-	private void autoMatchMembers0(boolean methodsDone, boolean fieldsDone, ClassifierLevel level, JobGroup<Boolean> parentJob) {
-		if (!methodsDone || !fieldsDone
-				|| (!matchedAnyMembers.get() && !matchedClassesBefore.get())) {
+	private void autoMatchMembers0(ClassifierLevel level, Job<Boolean> parentJob) {
+		if (parentJob.getState() == JobState.CANCELING) {
+			return;
+		}
+
+		if (!matchedAnyMembersOverall.get()) {
 			return;
 		}
 
 		var job = new AutoMatchClassesJob(matcher, level);
-		job.addOnSuccess((matchedAny) -> {
-			matchedClassesBefore.set(matchedAny);
-			matchedAnyMembers.set(matchedAnyMembers.get() | matchedAny);
+		job.addCompletionListener((matchedAnyClasses, error) -> {
+			matchedAnyClassesBefore.set(matchedAnyClasses.orElse(false));
+			matchedAnyMembersOverall.set(matchedAnyMembersOverall.get() | matchedAnyClasses.orElse(false));
 
-			if (matchedAnyMembers.get()) {
+			if (matchedAnyMembersOverall.get()) {
 				autoMatchMembers(level, parentJob);
 			}
 		});
-		matchedAnyMembers.set(false);
-		parentJob.addSubJob(job, fieldsDone);
+		matchedAnyMembersOverall.set(false);
+		parentJob.addSubJob(job, false);
 		job.run();
 	}
 
-	private void autoMatchVars(JobGroup<Boolean> parentJob) {
-		AtomicBoolean argsDone = new AtomicBoolean(false);
-		AtomicBoolean varsDone = new AtomicBoolean(false);
+	private void autoMatchLocals(Job<Boolean> parentJob) {
+		do {
+			matchedAnyLocalsOverall.set(false);
 
-		// Args
-		var argJob = new AutoMatchMethodVarsJob(matcher, ClassifierLevel.Full, true);
-		argJob.addOnSuccess((result) -> matchedAnyVars.set(matchedAnyVars.get() | result));
-		argJob.addOnFinish(() -> {
-			argsDone.set(true);
-			System.out.println("Matching args finished");
+			// Args
+			var argJob = new AutoMatchMethodVarsJob(matcher, ClassifierLevel.Full, true);
+			argJob.addCompletionListener((matchedAnyArgs, error) -> {
+				matchedAnyLocalsOverall.set(matchedAnyLocalsOverall.get() | matchedAnyArgs.orElse(false));
+				System.out.println("Matching args finished");
+			});
+			parentJob.addSubJob(argJob, false);
 
-			autoMatchVars0(argsDone.get(), varsDone.get(), parentJob);
-		});
-		parentJob.addSubJob(argJob, false);
+			// Vars
+			var varJob = new AutoMatchMethodVarsJob(matcher, ClassifierLevel.Full, false);
+			varJob.addCompletionListener((matchedAnyVars, error) -> {
+				matchedAnyLocalsOverall.set(matchedAnyLocalsOverall.get() | matchedAnyVars.orElse(false));
+				System.out.println("Matching vars finished");
+			});
+			parentJob.addSubJob(varJob, false);
 
-		// Vars
-		var varJob = new AutoMatchMethodVarsJob(matcher, ClassifierLevel.Full, false);
-		varJob.addOnSuccess((result) -> matchedAnyVars.set(matchedAnyVars.get() | result));
-		varJob.addOnFinish(() -> {
-			varsDone.set(true);
-			System.out.println("Matching vars finished");
-
-			autoMatchVars0(argsDone.get(), varsDone.get(), parentJob);
-		});
-		parentJob.addSubJob(varJob, false);
-
-		for (Job<?> job : parentJob.getSubJobs()) {
-			job.run();
-		}
-	}
-
-	private void autoMatchVars0(boolean argsDone, boolean varsDone, JobGroup<Boolean> parentJob) {
-		if (!argsDone || !varsDone) {
-			return;
-		} else if (!matchedAnyVars.get()) {
-			matcher.getEnv().getCache().clear();
-			return;
-		}
-
-		matchedAnyVars.set(false);
-		autoMatchVars(parentJob);
+			// Run subjobs
+			argJob.run();
+			varJob.run();
+		} while (matchedAnyLocalsOverall.get() && parentJob.getState() != JobState.CANCELING);
 	}
 
 	public static final String ID = "auto-match-all";
-	private static final Supplier<Set<MatchType>> returnValue = ;
 	private final Matcher matcher;
-	private final AtomicBoolean matchedClassesBefore = new AtomicBoolean(true);
-	private final AtomicBoolean matchedAnyClasses = new AtomicBoolean(false);
-	private final AtomicBoolean matchedAnyMembers = new AtomicBoolean(false);
-	private final AtomicBoolean matchedAnyVars = new AtomicBoolean(false);
+	private final AtomicBoolean matchedAnyClassesBefore = new AtomicBoolean(true);
+	private final AtomicBoolean matchedAnyClassesOverall = new AtomicBoolean(false);
+	private final AtomicBoolean matchedAnyMembersOverall = new AtomicBoolean(false);
+	private final AtomicBoolean matchedAnyLocalsOverall = new AtomicBoolean(false);
 }

@@ -59,7 +59,7 @@ public class Gui extends Application {
 		env = new ClassEnvironment();
 		matcher = new Matcher(env);
 
-		JobManager.registerEventListener((job, event) -> Platform.runLater(() -> onJobManagerEvent(job, event)));
+		JobManager.get().registerEventListener((job, event) -> Platform.runLater(() -> onJobManagerEvent(job, event)));
 
 		GridPane border = new GridPane();
 
@@ -107,7 +107,7 @@ public class Gui extends Application {
 
 	@Override
 	public void stop() throws Exception {
-		JobManager.shutdown();
+		JobManager.get().shutdown();
 	}
 
 	private void handleStartupArgs(List<String> args) {
@@ -253,43 +253,82 @@ public class Gui extends Application {
 		matcher.reset();
 		onProjectChange();
 
-		var job = new Job<Void>("initializing-files", progressReceiver -> {
-			matcher.init(newConfig, progressReceiver);
-			return null;
-		});
-		job.addOnError(Throwable::printStackTrace);
-		job.addOnSuccess((result) -> Platform.runLater(() -> {
-			if (newConfig.getMappingsPathA() != null) {
-				Path mappingsPath = newConfig.getMappingsPathA();
+		// var job = new Job<Void>("initializing-files") {
+		// 	@Override
+		// 	protected Void execute(DoubleConsumer progress) {
+		// 		matcher.init(newConfig, progress);
+		// 		return null;
+		// 	}
+		// };
+		// job.addOnError(Throwable::printStackTrace);
+		// job.addOnSuccess((result) -> Platform.runLater(() -> {
+		// 	if (newConfig.getMappingsPathA() != null) {
+		// 		Path mappingsPath = newConfig.getMappingsPathA();
 
-				try {
-					List<String> namespaces = MappingReader.getNamespaces(mappingsPath, null);
-					Mappings.load(mappingsPath, null,
-							namespaces.get(0), namespaces.get(1),
-							MappingField.PLAIN, MappingField.MAPPED,
-							env.getEnvA(), true);
-				} catch (IOException e) {
-					e.printStackTrace();
+		// 		try {
+		// 			List<String> namespaces = MappingReader.getNamespaces(mappingsPath, null);
+		// 			Mappings.load(mappingsPath, null,
+		// 					namespaces.get(0), namespaces.get(1),
+		// 					MappingField.PLAIN, MappingField.MAPPED,
+		// 					env.getEnvA(), true);
+		// 		} catch (IOException e) {
+		// 			e.printStackTrace();
+		// 		}
+		// 	}
+
+		// 	if (newConfig.getMappingsPathB() != null) {
+		// 		Path mappingsPath = newConfig.getMappingsPathB();
+
+		// 		try {
+		// 			List<String> namespaces = MappingReader.getNamespaces(mappingsPath, null);
+		// 			Mappings.load(mappingsPath, null,
+		// 					namespaces.get(0), namespaces.get(1),
+		// 					MappingField.PLAIN, MappingField.MAPPED,
+		// 					env.getEnvB(), true);
+		// 		} catch (IOException e) {
+		// 			e.printStackTrace();
+		// 		}
+		// 	}
+
+		// 	onProjectChange();
+		// }));
+		// job.run();
+
+		new Thread(() -> {
+			matcher.init(newConfig, (p) -> {});
+
+			Platform.runLater(() -> {
+				if (newConfig.getMappingsPathA() != null) {
+					Path mappingsPath = newConfig.getMappingsPathA();
+
+					try {
+						List<String> namespaces = MappingReader.getNamespaces(mappingsPath, null);
+						Mappings.load(mappingsPath, null,
+								namespaces.get(0), namespaces.get(1),
+								MappingField.PLAIN, MappingField.MAPPED,
+								env.getEnvA(), true);
+					} catch (IOException e) {
+						e.printStackTrace();
+					}
 				}
-			}
 
-			if (newConfig.getMappingsPathB() != null) {
-				Path mappingsPath = newConfig.getMappingsPathB();
+				if (newConfig.getMappingsPathB() != null) {
+					Path mappingsPath = newConfig.getMappingsPathB();
 
-				try {
-					List<String> namespaces = MappingReader.getNamespaces(mappingsPath, null);
-					Mappings.load(mappingsPath, null,
-							namespaces.get(0), namespaces.get(1),
-							MappingField.PLAIN, MappingField.MAPPED,
-							env.getEnvB(), true);
-				} catch (IOException e) {
-					e.printStackTrace();
+					try {
+						List<String> namespaces = MappingReader.getNamespaces(mappingsPath, null);
+						Mappings.load(mappingsPath, null,
+								namespaces.get(0), namespaces.get(1),
+								MappingField.PLAIN, MappingField.MAPPED,
+								env.getEnvB(), true);
+					} catch (IOException e) {
+						e.printStackTrace();
+					}
 				}
-			}
 
-			onProjectChange();
-		}));
-		job.run();
+				onProjectChange();
+			});
+		}).start();
 	}
 
 	public ClassEnvironment getEnv() {
@@ -474,7 +513,7 @@ public class Gui extends Application {
 			activeJobs.add(job);
 			job.addProgressListener((progress) -> Platform.runLater(() -> onProgressChange(progress)));
 			break;
-		case JOB_ENDED:
+		case JOB_FINISHED:
 			activeJobs.remove(job);
 			break;
 		}
@@ -489,17 +528,18 @@ public class Gui extends Application {
 		if (activeJobs.size() == 0) {
 			jobLabel.setText("");
 			progressBar.setVisible(false);
-			progressBar.setProgress(-1);
+			progressBar.setProgress(0);
 			bottomPane.blockMatchButtons(false);
 		} else {
 			bottomPane.blockMatchButtons(true);
 			progressBar.setVisible(true);
-			progressBar.setProgress(0);
 
 			for (Job<?> job : activeJobs) {
-				if (job.getProgress() < 0) {
+				if (job.getProgress() <= 0) {
 					progressBar.setProgress(-1);
 					break;
+				} else if (progressBar.getProgress() < 0) {
+					progressBar.setProgress(job.getProgress() / activeJobs.size());
 				} else {
 					progressBar.setProgress(progressBar.getProgress() + (job.getProgress() / activeJobs.size()));
 				}
@@ -528,6 +568,8 @@ public class Gui extends Application {
 	}
 
 	private void onProgressChange(double progress) {
+		if (activeJobs.size() == 0) return;
+
 		ProgressBar progressBar = bottomPane.getProgressBar();
 		// bottomPane.getJobLabel().setText(bottomPane.getJobLabel().getText());
 

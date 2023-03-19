@@ -15,21 +15,21 @@ import matcher.classifier.ClassifierLevel;
 import matcher.classifier.MethodVarClassifier;
 import matcher.classifier.RankResult;
 import matcher.jobs.Job;
+import matcher.jobs.JobState;
 import matcher.type.MethodInstance;
 import matcher.type.MethodVarInstance;
 
 public class AutoMatchMethodVarsJob extends Job<Boolean> {
 	public AutoMatchMethodVarsJob(Matcher matcher, ClassifierLevel level, boolean isArgs) {
-		super(ID, null);
+		super(ID);
 
 		this.matcher = matcher;
 		this.level = level;
 		this.isArgs = isArgs;
-
-		setAction(this::autoMatchMethodVars);
 	}
 
-	private boolean autoMatchMethodVars(DoubleConsumer progress) {
+	@Override
+	protected Boolean execute(DoubleConsumer progress) {
 		Function<MethodInstance, MethodVarInstance[]> supplier;
 		double absThreshold, relThreshold;
 
@@ -69,6 +69,10 @@ public class AutoMatchMethodVarsJob extends Job<Boolean> {
 				int unmatched = 0;
 
 				for (MethodVarInstance var : supplier.apply(m)) {
+					if (state == JobState.CANCELING) {
+						break;
+					}
+
 					if (var.hasMatch() || !var.isMatchable()) continue;
 
 					List<RankResult<MethodVarInstance>> ranking = MethodVarClassifier.rank(var, supplier.apply(m.getMatch()), level, matcher.getEnv(), maxMismatch);
@@ -89,6 +93,10 @@ public class AutoMatchMethodVarsJob extends Job<Boolean> {
 		}
 
 		for (Map.Entry<MethodVarInstance, MethodVarInstance> entry : matches.entrySet()) {
+			if (state == JobState.CANCELING) {
+				break;
+			}
+
 			matcher.match(entry.getKey(), entry.getValue());
 		}
 

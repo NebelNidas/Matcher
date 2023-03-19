@@ -19,17 +19,16 @@ import matcher.type.MethodVarInstance;
 
 public class RankMatchResultsJob extends Job<List<? extends RankResult<? extends Matchable<?>>>> {
 	public RankMatchResultsJob(ClassEnvironment env, ClassifierLevel matchLevel, Matchable<?> selection, List<ClassInstance> cmpClasses) {
-		super(ID, null);
+		super(ID);
 
 		this.env = env;
 		this.selection = selection;
 		this.matchLevel = matchLevel;
 		this.cmpClasses = cmpClasses;
-
-		setAction(this::rankResults);
 	}
 
-	private List<? extends RankResult<? extends Matchable<?>>> rankResults(DoubleConsumer progress) {
+	@Override
+	protected List<? extends RankResult<? extends Matchable<?>>> execute(DoubleConsumer progress) {
 		if (selection instanceof ClassInstance) { // unmatched class or no member/method var selected
 			ClassInstance cls = (ClassInstance) selection;
 			return ClassClassifier.rankParallel(cls, cmpClasses.toArray(new ClassInstance[0]), matchLevel, env, MAX_MISMATCH);

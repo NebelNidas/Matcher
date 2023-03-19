@@ -231,7 +231,7 @@ public class ClassFeatureExtractor implements LocalClassEnv {
 
 	private void processMethodInsns(MethodInstance method) {
 		if (!method.isReal()) { // artificial method to capture calls to types with incomplete/unknown hierarchy/super type method info
-			System.out.println("skipping empty method "+method);
+			// System.out.println("skipping empty method "+method);
 			return;
 		}
 
@@ -319,7 +319,7 @@ public class ClassFeatureExtractor implements LocalClassEnv {
 		MethodInstance ret = cls.resolveMethod(name, desc, toInterface);
 
 		if (ret == null && create) {
-			System.out.printf("creating synthetic method %s/%s%s%n", owner, name, desc);
+			// System.out.printf("creating synthetic method %s/%s%s%n", owner, name, desc);
 
 			ret = new MethodInstance(cls, name, desc, isStatic);
 			cls.addMethod(ret);

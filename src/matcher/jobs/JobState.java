@@ -7,5 +7,11 @@ public enum JobState {
 	CANCELING,
 	CANCELED,
 	ERRORED,
-	SUCCEEDED
+	SUCCEEDED;
+
+	public boolean isFinished() {
+		return this == CANCELED
+				|| this == ERRORED
+				|| this == SUCCEEDED;
+	}
 }

@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.List;
 
+import javafx.application.Platform;
 import javafx.scene.Node;
 import javafx.scene.control.ButtonType;
 import javafx.scene.control.Dialog;
@@ -40,15 +41,17 @@ public class UidMenu extends Menu {
 		getItems().add(new SeparatorMenuItem());
 
 		var importJob = new ImportMatchesJob(gui.getMatcher());
-		importJob.addOnError(Throwable::printStackTrace);
-		importJob.addOnSuccess((result) -> gui.onMatchChange(EnumSet.allOf(MatchType.class)));
+		importJob.addCompletionListener((importedAny, error) -> {
+			if (importedAny.isPresent()) {
+				Platform.runLater(() -> gui.onMatchChange(EnumSet.allOf(MatchType.class)));
+			}
+		});
 
 		menuItem = new MenuItem("Import matches");
 		getItems().add(menuItem);
 		menuItem.setOnAction(event -> importJob.run());
 
 		var submitJob = new SubmitMatchesJob(gui.getMatcher());
-		submitJob.addOnError(Throwable::printStackTrace);
 
 		menuItem = new MenuItem("Submit matches");
 		getItems().add(menuItem);

@@ -679,11 +679,13 @@ public class MatchPaneDst extends SplitPane implements IFwdGuiComponent, ISelect
 
 			var job = new RankMatchResultsJob(gui.getEnv(),
 					Matcher.defaultAutoMatchLevel, newSrcSelection, cmpClasses);
-			job.addOnError(Throwable::printStackTrace);
-			job.addOnSuccess((results) -> Platform.runLater(() -> {
+			job.addCompletionListener((results, error) -> Platform.runLater(() -> {
 				if (jobId == cJobId) {
 					assert rankResults.isEmpty();
-					rankResults.addAll(results);
+
+					if (results.isPresent()) {
+						rankResults.addAll(results.get());
+					}
 
 					updateResults(oldDstSelection);
 					oldDstSelection = null;
