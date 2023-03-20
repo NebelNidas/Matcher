@@ -7,6 +7,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.BiConsumer;
+import java.util.function.Consumer;
 import java.util.function.DoubleConsumer;
 
 public abstract class Job<T> implements Runnable {
@@ -15,10 +16,12 @@ public abstract class Job<T> implements Runnable {
 	private volatile Throwable error;
 	private volatile boolean printStackTraceOnError = true;
 	private volatile List<Job<?>> subJobs = Collections.synchronizedList(new ArrayList<>());
+	private volatile Thread currentThread;
 	protected volatile Job<?> parent;
 	protected volatile double ownProgress = 0;
 	protected volatile double overallProgress = 0;
 	protected volatile JobState state = JobState.CREATED;
+	protected volatile List<Consumer<Job<?>>> subJobAddedListeners = Collections.synchronizedList(new ArrayList<>());
 	protected volatile List<DoubleConsumer> progressListeners = Collections.synchronizedList(new ArrayList<>());
 	protected volatile List<Runnable> cancelListeners = Collections.synchronizedList(new ArrayList<>());
 	protected volatile List<BiConsumer<Optional<T>, Optional<Throwable>>> completionListeners = Collections.synchronizedList(new ArrayList<>());
@@ -44,6 +47,14 @@ public abstract class Job<T> implements Runnable {
 	 * from the individual subjobs' progresses.
 	 */
 	protected abstract T execute(DoubleConsumer progressReceiver);
+
+	/**
+	 * Every time a subjob is registered, the listener gets invoked with the
+	 * newly added job instance.
+	 */
+	public void addSubJobAddedListener(Consumer<Job<?>> listener) {
+		this.subJobAddedListeners.add(listener);
+	}
 
 	/**
 	 * Every time this job's progress changes, the double consumer gets invoked.
@@ -86,7 +97,7 @@ public abstract class Job<T> implements Runnable {
 	 * where jobs indirectly start other jobs, so that the JobManager can
 	 * group the latter ones as children of the caller jobs.
 	 */
-	void setParent(Job<?> parent) {
+	private void setParent(Job<?> parent) {
 		if (containsSubJob(parent, true)) {
 			throw new IllegalArgumentException("Can't set an already added subjob as parent job!");
 		}
@@ -113,6 +124,10 @@ public abstract class Job<T> implements Runnable {
 
 		if (cancelsParentWhenCanceled) {
 			subJob.addCancelListener(() -> cancel());
+		}
+
+		synchronized (this.subJobAddedListeners) {
+			this.subJobAddedListeners.forEach((listener) -> listener.accept(subJob));
 		}
 	}
 
@@ -198,12 +213,16 @@ public abstract class Job<T> implements Runnable {
 			return;
 		}
 
-		registerSubJobs();
 		this.state = JobState.QUEUED;
 
 		if (this.parent == null) {
+			// This job is an orphan / top-level job.
+			// It will be executed on its own thread,
+			// managed by the JobManager.
 			JobManager.get().queue(this);
 		} else {
+			// This is a subjob. Subjobs get executed
+			// synchronously directly on the parent thread.
 			runNow();
 		}
 	}
@@ -226,7 +245,7 @@ public abstract class Job<T> implements Runnable {
 			try {
 				Thread.sleep(200);
 			} catch (InterruptedException e) {
-				// ignore
+				// ignored
 			}
 		}
 
@@ -239,7 +258,9 @@ public abstract class Job<T> implements Runnable {
 			return;
 		}
 
+		currentThread = Thread.currentThread();
 		this.state = JobState.RUNNING;
+		registerSubJobs();
 
 		try {
 			this.result = execute(this::onOwnProgressChange);
@@ -258,6 +279,10 @@ public abstract class Job<T> implements Runnable {
 			default:
 				throw new IllegalStateException("Job finished running but isn't in a valid state!");
 		}
+	}
+
+	Thread getThread() {
+		return currentThread;
 	}
 
 	public void cancel() {

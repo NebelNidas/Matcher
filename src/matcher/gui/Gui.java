@@ -9,6 +9,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 import java.util.function.Consumer;
+import java.util.function.DoubleConsumer;
 import java.util.stream.Collectors;
 
 import javafx.application.Application;
@@ -253,82 +254,45 @@ public class Gui extends Application {
 		matcher.reset();
 		onProjectChange();
 
-		// var job = new Job<Void>("initializing-files") {
-		// 	@Override
-		// 	protected Void execute(DoubleConsumer progress) {
-		// 		matcher.init(newConfig, progress);
-		// 		return null;
-		// 	}
-		// };
-		// job.addOnError(Throwable::printStackTrace);
-		// job.addOnSuccess((result) -> Platform.runLater(() -> {
-		// 	if (newConfig.getMappingsPathA() != null) {
-		// 		Path mappingsPath = newConfig.getMappingsPathA();
+		var job = new Job<Void>("initializing-files") {
+			@Override
+			protected Void execute(DoubleConsumer progressReceiver) {
+				matcher.init(newConfig, progressReceiver);
+				return null;
+			}
+		};
+		job.addCompletionListener((result, error) -> Platform.runLater(() -> {
+			if (newConfig.getMappingsPathA() != null) {
+				Path mappingsPath = newConfig.getMappingsPathA();
 
-		// 		try {
-		// 			List<String> namespaces = MappingReader.getNamespaces(mappingsPath, null);
-		// 			Mappings.load(mappingsPath, null,
-		// 					namespaces.get(0), namespaces.get(1),
-		// 					MappingField.PLAIN, MappingField.MAPPED,
-		// 					env.getEnvA(), true);
-		// 		} catch (IOException e) {
-		// 			e.printStackTrace();
-		// 		}
-		// 	}
-
-		// 	if (newConfig.getMappingsPathB() != null) {
-		// 		Path mappingsPath = newConfig.getMappingsPathB();
-
-		// 		try {
-		// 			List<String> namespaces = MappingReader.getNamespaces(mappingsPath, null);
-		// 			Mappings.load(mappingsPath, null,
-		// 					namespaces.get(0), namespaces.get(1),
-		// 					MappingField.PLAIN, MappingField.MAPPED,
-		// 					env.getEnvB(), true);
-		// 		} catch (IOException e) {
-		// 			e.printStackTrace();
-		// 		}
-		// 	}
-
-		// 	onProjectChange();
-		// }));
-		// job.run();
-
-		new Thread(() -> {
-			matcher.init(newConfig, (p) -> {});
-
-			Platform.runLater(() -> {
-				if (newConfig.getMappingsPathA() != null) {
-					Path mappingsPath = newConfig.getMappingsPathA();
-
-					try {
-						List<String> namespaces = MappingReader.getNamespaces(mappingsPath, null);
-						Mappings.load(mappingsPath, null,
-								namespaces.get(0), namespaces.get(1),
-								MappingField.PLAIN, MappingField.MAPPED,
-								env.getEnvA(), true);
-					} catch (IOException e) {
-						e.printStackTrace();
-					}
+				try {
+					List<String> namespaces = MappingReader.getNamespaces(mappingsPath, null);
+					Mappings.load(mappingsPath, null,
+							namespaces.get(0), namespaces.get(1),
+							MappingField.PLAIN, MappingField.MAPPED,
+							env.getEnvA(), true);
+				} catch (IOException e) {
+					e.printStackTrace();
 				}
+			}
 
-				if (newConfig.getMappingsPathB() != null) {
-					Path mappingsPath = newConfig.getMappingsPathB();
+			if (newConfig.getMappingsPathB() != null) {
+				Path mappingsPath = newConfig.getMappingsPathB();
 
-					try {
-						List<String> namespaces = MappingReader.getNamespaces(mappingsPath, null);
-						Mappings.load(mappingsPath, null,
-								namespaces.get(0), namespaces.get(1),
-								MappingField.PLAIN, MappingField.MAPPED,
-								env.getEnvB(), true);
-					} catch (IOException e) {
-						e.printStackTrace();
-					}
+				try {
+					List<String> namespaces = MappingReader.getNamespaces(mappingsPath, null);
+					Mappings.load(mappingsPath, null,
+							namespaces.get(0), namespaces.get(1),
+							MappingField.PLAIN, MappingField.MAPPED,
+							env.getEnvB(), true);
+				} catch (IOException e) {
+					e.printStackTrace();
 				}
+			}
 
-				onProjectChange();
-			});
-		}).start();
+			onProjectChange();
+		}));
+		job.run();
 	}
 
 	public ClassEnvironment getEnv() {

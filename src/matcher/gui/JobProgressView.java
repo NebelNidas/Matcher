@@ -30,30 +30,34 @@ public class JobProgressView extends Control {
     public JobProgressView() {
 		getStyleClass().add("task-progress-view");
 
-		JobManager.get().registerEventListener((job, event) -> Platform.runLater(() -> {
-			List<Job<?>> subJobs = job.getSubJobs();
-
+		JobManager.get().registerEventListener((job, event) -> {
 			switch (event) {
 			case JOB_QUEUED:
-				jobs.add(job);
-
-				synchronized (subJobs) {
-					subJobs.forEach(jobs::add);
-				}
-
+				Platform.runLater(() -> jobs.add(job));
+				job.addSubJobAddedListener((subJob) -> onSubJobAdded(subJob));
 				break;
 
 			case JOB_FINISHED:
-				jobs.remove(job);
-
-				synchronized (subJobs) {
-					subJobs.forEach(jobs::remove);
-				}
-
+				Platform.runLater(() -> removeJob(job));
 				break;
 			}
-		}));
+		});
     }
+
+	private void removeJob(Job<?> job) {
+		jobs.remove(job);
+		List<Job<?>> subJobs = job.getSubJobs();
+
+		synchronized (subJobs) {
+			subJobs.forEach(this::removeJob);
+		}
+
+	}
+
+	private void onSubJobAdded(Job<?> job) {
+		Platform.runLater(() -> jobs.add(job));
+		job.addSubJobAddedListener((subJob) -> onSubJobAdded(subJob));
+	}
 
 	@Override
 	protected Skin<?> createDefaultSkin() {

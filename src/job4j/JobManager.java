@@ -34,6 +34,20 @@ public class JobManager {
 	 * Queues the job for execution.
 	 */
 	void queue(Job<?> job) {
+		synchronized (this.runningJobs) {
+			for (Job<?> runningJob : this.runningJobs) {
+				if (runningJob.getThread() == Thread.currentThread()) {
+					// An already running job indirectly started another job.
+					// Neither one declared the correct hierarchy (they don't know each other),
+					// nevertheless one job indirectly parents the other one.
+					// Now we're declaring the correct hierarchy ourselves.
+					runningJob.addSubJob(job, false);
+					job.runNow();
+					return;
+				}
+			}
+		}
+
 		job.addCompletionListener((result, error) -> onJobFinished(job));
 		this.queuedJobs.add(job);
 		notifyEventListeners(job, JobManagerEvent.JOB_QUEUED);
@@ -66,8 +80,11 @@ public class JobManager {
 		}
 	}
 
+	/**
+	 * {@return an unmodifiable view of the running jobs list}.
+	 */
 	public List<Job<?>> getRunningJobs() {
-		return this.runningJobs;
+		return Collections.unmodifiableList(this.runningJobs);
 	}
 
 	public void shutdown() {
