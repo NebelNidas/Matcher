@@ -1,6 +1,9 @@
 package job4j;
 
-import java.util.AbstractMap.SimpleEntry;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -10,30 +13,54 @@ import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.DoubleConsumer;
 
+import job4j.JobSettings.MutableJobSettings;
+
+import matcher.Util;
+
 public abstract class Job<T> implements Runnable {
 	private final String id;
+	private final JobCategory category;
+	private final MutableJobSettings settings = new MutableJobSettings();
 	private volatile T result;
 	private volatile Throwable error;
-	private volatile boolean printStackTraceOnError = true;
 	private volatile List<Job<?>> subJobs = Collections.synchronizedList(new ArrayList<>());
-	private volatile Thread currentThread;
+	private volatile Thread thread;
 	protected volatile Job<?> parent;
 	protected volatile double ownProgress = 0;
 	protected volatile double overallProgress = 0;
+	protected volatile boolean killed;
 	protected volatile JobState state = JobState.CREATED;
 	protected volatile List<Consumer<Job<?>>> subJobAddedListeners = Collections.synchronizedList(new ArrayList<>());
 	protected volatile List<DoubleConsumer> progressListeners = Collections.synchronizedList(new ArrayList<>());
 	protected volatile List<Runnable> cancelListeners = Collections.synchronizedList(new ArrayList<>());
 	protected volatile List<BiConsumer<Optional<T>, Optional<Throwable>>> completionListeners = Collections.synchronizedList(new ArrayList<>());
-	protected volatile List<String> blockingJobIds = Collections.synchronizedList(new ArrayList<>());
+	protected volatile List<JobCategory> blockingJobCategories = Collections.synchronizedList(new ArrayList<>());
 
-	public Job(String id) {
-		this.id = id;
+	public Job(JobCategory category) {
+		this(category, category.getId());
 	}
+
+	public Job(JobCategory category, String id) {
+		this.category = category;
+		this.id = id;
+
+		changeDefaultSettings(settings);
+	}
+
+
+	//======================================================================================
+	// Overridable methods
+	//======================================================================================
+
+	/**
+	 * Override this method to modify the job's default settings.
+	 * Make changes directly on the passed {@link #settings} object.
+	 */
+	protected void changeDefaultSettings(MutableJobSettings settings) {}
 
 	/**
 	 * Override this method to register any subjobs known ahead of time.
-	 * Compared to the dynamic {@code addSubJob} this improves the UX
+	 * Compared to the dynamic {@link #addSubJob} this improves the UX
 	 * by letting the users know which tasks are going to be ran ahead of time
 	 * and giving more accurate progress reports.
 	 */
@@ -47,6 +74,11 @@ public abstract class Job<T> implements Runnable {
 	 * from the individual subjobs' progresses.
 	 */
 	protected abstract T execute(DoubleConsumer progressReceiver);
+
+
+	//======================================================================================
+	// Listener registration
+	//======================================================================================
 
 	/**
 	 * Every time a subjob is registered, the listener gets invoked with the
@@ -84,18 +116,53 @@ public abstract class Job<T> implements Runnable {
 		this.completionListeners.add(listener);
 	}
 
+
+	//======================================================================================
+	// User-definable configuration
+	//======================================================================================
+
 	/**
 	 * Add IDs of other jobs which must be completed first.
 	 */
-	public void addBlockedBy(String... blockingJobIds) {
-		this.blockingJobIds.addAll(Arrays.asList(blockingJobIds));
+	public void addBlockedBy(JobCategory... blockingJobCategories) {
+		this.blockingJobCategories.addAll(Arrays.asList(blockingJobCategories));
+	}
+
+
+	//======================================================================================
+	// Hierarchy modification
+	//======================================================================================
+
+	/**
+	 * Dynamically add subjobs. Please consider overriding {@link #registerSubJobs}
+	 * to register any subjobs known ahead of time!
+	 */
+	public void addSubJob(Job<?> subJob, boolean cancelsParentWhenCanceledOrErrored) {
+		if (hasParentJobInHierarchy(subJob)) {
+			throw new IllegalArgumentException("Can't add a subjob which is already a parent job!");
+		}
+
+		subJob.setParent(this);
+		subJob.addProgressListener(this::onSubJobProgressChange);
+		this.subJobs.add(subJob);
+
+		if (cancelsParentWhenCanceledOrErrored) {
+			subJob.addCancelListener(() -> cancel());
+			subJob.addCompletionListener((subJobResult, subJobError) -> {
+				if (subJobError.isPresent()) {
+					onError(subJobError.get());
+				}
+			});
+		}
+
+		List.copyOf(this.subJobAddedListeners).forEach((listener) -> listener.accept(subJob));
 	}
 
 	/**
 	 * Parents are considered effectively final, so don't ever call this method
 	 * while the job is already running. It is only exposed for situations
-	 * where jobs indirectly start other jobs, so that the JobManager can
-	 * group the latter ones as children of the caller jobs.
+	 * where jobs indirectly start other jobs, so that the latter ones can
+	 * be turned into direct children of the caller jobs.
 	 */
 	private void setParent(Job<?> parent) {
 		if (containsSubJob(parent, true)) {
@@ -109,99 +176,10 @@ public abstract class Job<T> implements Runnable {
 		this.parent = parent;
 	}
 
-	/**
-	 * Dynamically add subjobs. Please consider overriding {@code registerSubJobs}
-	 * to register any subjobs known ahead of time!
-	 */
-	public void addSubJob(Job<?> subJob, boolean cancelsParentWhenCanceled) {
-		if (hasParentJobInHierarchy(subJob)) {
-			throw new IllegalArgumentException("Can't add a subjob which is already a parent job!");
-		}
 
-		subJob.setParent(this);
-		subJob.addProgressListener(this::onSubJobProgressChange);
-		this.subJobs.add(subJob);
-
-		if (cancelsParentWhenCanceled) {
-			subJob.addCancelListener(() -> cancel());
-		}
-
-		synchronized (this.subJobAddedListeners) {
-			this.subJobAddedListeners.forEach((listener) -> listener.accept(subJob));
-		}
-	}
-
-	protected void validateProgress(double progress) {
-		if (progress >= 1.001) {
-			throw new IllegalArgumentException("Progress has to be a value between -INF and 1!");
-		}
-	}
-
-	private void onOwnProgressChange(double progress) {
-		validateProgress(progress);
-
-		if (Math.abs(progress - ownProgress) < 0.005) {
-			// Avoid time consuming computations for
-			// unnoticeable progress deltas
-			return;
-		}
-
-		this.ownProgress = progress;
-		onProgressChange();
-	}
-
-	private void onSubJobProgressChange(double progress) {
-		validateProgress(progress);
-		onProgressChange();
-	}
-
-	protected void onProgressChange() {
-		double progress = 0;
-		List<Double> progresses = new ArrayList<>(subJobs.size() + 1);
-
-		synchronized (this.subJobs) {
-			for (Job<?> job : this.subJobs) {
-				progresses.add(job.getProgress());
-			}
-		}
-
-		if (ownProgress	> 0) {
-			// Don't use own progress if it's never been set.
-			// This happens if the current job is only used as an
-			// empty shell for hosting subjobs.
-			progresses.add(ownProgress);
-		}
-
-		for (double value : progresses) {
-			if (value < 0) {
-				progress = -1;
-				break;
-			} else {
-				if (value >= 1.001) {
-					throw new IllegalArgumentException("Progress has to be a value between -INF and 1!");
-				}
-
-				progress += value / progresses.size();
-			}
-		}
-
-		this.overallProgress = Math.min(1.0, progress);
-
-		synchronized (this.progressListeners) {
-			this.progressListeners.forEach(listener -> listener.accept(this.overallProgress));
-		}
-	}
-
-	/**
-	 * {@return an unmodifiable view of the subjob list}.
-	 */
-	public List<Job<?>> getSubJobs() {
-		return Collections.unmodifiableList(this.subJobs);
-	}
-
-	public void dontPrintStacktraceOnError() {
-		printStackTraceOnError = false;
-	}
+	//======================================================================================
+	// Lifecycle
+	//======================================================================================
 
 	/**
 	 * Queues the job for execution.
@@ -233,10 +211,10 @@ public abstract class Job<T> implements Runnable {
 	 * This is basically the synchronous version of registering a
 	 * CompletionListener.
 	 */
-	public SimpleEntry<Optional<T>, Optional<Throwable>> runAndAwait() {
+	public JobResult<T> runAndAwait() {
 		if (this.state.compareTo(JobState.QUEUED) > 0) {
 			// Already running/finished
-			return new SimpleEntry<>(Optional.ofNullable(null), Optional.ofNullable(null));
+			return new JobResult<>(null, null);
 		}
 
 		run();
@@ -249,7 +227,7 @@ public abstract class Job<T> implements Runnable {
 			}
 		}
 
-		return new SimpleEntry<>(Optional.ofNullable(result), Optional.ofNullable(error));
+		return new JobResult<T>(result, error);
 	}
 
 	void runNow() {
@@ -258,7 +236,7 @@ public abstract class Job<T> implements Runnable {
 			return;
 		}
 
-		currentThread = Thread.currentThread();
+		thread = Thread.currentThread();
 		this.state = JobState.RUNNING;
 		registerSubJobs();
 
@@ -266,42 +244,94 @@ public abstract class Job<T> implements Runnable {
 			this.result = execute(this::onOwnProgressChange);
 		} catch (Exception e) {
 			onError(e);
-			return;
 		}
 
 		switch (this.state) {
+			case RUNNING:
+				onSuccess();
+				break;
 			case CANCELING:
 				onCanceled();
 				break;
-			case RUNNING:
-				onSuccess();
+			case ERRORED:
 				break;
 			default:
 				throw new IllegalStateException("Job finished running but isn't in a valid state!");
 		}
 	}
 
-	Thread getThread() {
-		return currentThread;
+	private void onOwnProgressChange(double progress) {
+		validateProgress(progress);
+
+		if (Math.abs(progress - ownProgress) < 0.005) {
+			// Avoid time consuming computations for
+			// unnoticeable progress deltas
+			return;
+		}
+
+		this.ownProgress = progress;
+		onProgressChange();
 	}
 
-	public void cancel() {
+	private void onSubJobProgressChange(double progress) {
+		validateProgress(progress);
+		onProgressChange();
+	}
+
+	protected void validateProgress(double progress) {
+		if (progress >= 1.001) {
+			throw new IllegalArgumentException("Progress has to be a value between -INF and 1!");
+		}
+	}
+
+	protected void onProgressChange() {
+		double progress = 0;
+		List<Double> progresses = new ArrayList<>(subJobs.size() + 1);
+
+		for (Job<?> job : List.copyOf(this.subJobs)) {
+			progresses.add(job.getProgress());
+		}
+
+		if (ownProgress > 0) {
+			// Don't use own progress if it's never been set.
+			// This happens if the current job is only used as an
+			// empty shell for hosting subjobs.
+			progresses.add(ownProgress);
+		}
+
+		for (double value : progresses) {
+			if (value < 0) {
+				progress = -1;
+				break;
+			} else {
+				if (value >= 1.001) {
+					throw new IllegalArgumentException("Progress has to be a value between -INF and 1!");
+				}
+
+				progress += value / progresses.size();
+			}
+		}
+
+		this.overallProgress = Math.min(1.0, progress);
+
+		List.copyOf(this.progressListeners).forEach(listener -> listener.accept(this.overallProgress));
+	}
+
+	public boolean cancel() {
 		if (this.state != JobState.CANCELING && !this.state.isFinished()) {
 			onCancel();
+			return true;
 		}
+
+		return false;
 	}
 
 	protected void onCancel() {
 		JobState previousState = this.state;
 		this.state = JobState.CANCELING;
 
-		synchronized (this.cancelListeners) {
-			this.cancelListeners.forEach(listener -> listener.run());
-		}
-
-		synchronized (this.subJobs) {
-			this.subJobs.forEach(job -> job.cancel());
-		}
+		List.copyOf(this.cancelListeners).forEach(listener -> listener.run());
+		List.copyOf(this.subJobs).forEach(job -> job.cancel());
 
 		if (previousState.compareTo(JobState.RUNNING) < 0) {
 			onCanceled();
@@ -313,13 +343,26 @@ public abstract class Job<T> implements Runnable {
 		onFinish();
 	}
 
+	void killRecursive(Throwable error) {
+		if (this.state.isFinished() || this.killed || this.thread == null) {
+			return;
+		}
+
+		this.thread.interrupt();
+		this.killed = true;
+		onError(error);
+	}
+
 	protected void onError(Throwable error) {
-		state = JobState.ERRORED;
+		this.state = JobState.ERRORED;
 		this.error = error;
 
-		if (printStackTraceOnError) {
-			this.error.printStackTrace();
+		if (this.settings.isPrintStackTraceOnError() && !this.killed) {
+			System.err.println(String.format("An exception has been encountered in job '%s':\n%s",
+					id, Util.getStacktrace(error)));
 		}
+
+		List.copyOf(this.subJobs).forEach((subJob) -> subJob.cancel());
 
 		onFinish();
 	}
@@ -332,13 +375,24 @@ public abstract class Job<T> implements Runnable {
 	protected void onFinish() {
 		onOwnProgressChange(1);
 
-		synchronized (this.completionListeners) {
-			this.completionListeners.forEach(listener -> listener.accept(Optional.ofNullable(result), Optional.ofNullable(error)));
-		}
+		List.copyOf(this.completionListeners).forEach(listener -> listener.accept(Optional.ofNullable(result), Optional.ofNullable(error)));
+	}
+
+
+	//======================================================================================
+	// Getters & Checkers
+	//======================================================================================
+
+	Thread getThread() {
+		return thread;
 	}
 
 	public String getId() {
 		return this.id;
+	}
+
+	public JobCategory getCategory() {
+		return category;
 	}
 
 	public Job<?> getParent() {
@@ -353,35 +407,117 @@ public abstract class Job<T> implements Runnable {
 		return this.state;
 	}
 
-	public boolean isBlockedBy(String jobId) {
-		boolean blocked = this.blockingJobIds.contains(jobId);
+	public JobSettings getSettings() {
+		return settings.getImmutable();
+	}
+
+	/**
+	 * {@return an unmodifiable view of the subjob list}.
+	 */
+	public List<Job<?>> getSubJobs() {
+		return Collections.unmodifiableList(this.subJobs);
+	}
+
+	public boolean isBlockedBy(JobCategory category) {
+		boolean blocked = this.blockingJobCategories.contains(category);
 
 		if (blocked) return true;
 
-		synchronized (this.subJobs) {
-			return this.subJobs.parallelStream()
-					.filter(job -> job.isBlockedBy(jobId))
-					.findAny()
-					.isPresent();
-		}
+		blocked = List.copyOf(this.blockingJobCategories).stream()
+				.filter((blocking) -> category.hasParent(blocking))
+				.findAny()
+				.isPresent();
+
+		if (blocked) return true;
+
+		return List.copyOf(this.subJobs).stream()
+				.filter(job -> job.isBlockedBy(category))
+				.findAny()
+				.isPresent();
 	}
 
-	boolean containsSubJob(Job<?> subJob, boolean recursive) {
+	public boolean containsSubJob(Job<?> subJob, boolean recursive) {
 		boolean contains = this.subJobs.contains(subJob);
 
 		if (contains || !recursive) return contains;
 
-		synchronized (this.subJobs) {
-			return subJobs.parallelStream()
-					.filter(nestedSubJob -> nestedSubJob.containsSubJob(subJob, true))
-					.findAny()
-					.isPresent();
-		}
+		return List.copyOf(this.subJobs).stream()
+				.filter(nestedSubJob -> nestedSubJob.containsSubJob(subJob, true))
+				.findAny()
+				.isPresent();
 	}
 
-	boolean hasParentJobInHierarchy(Job<?> job) {
+	public boolean hasParentJobInHierarchy(Job<?> job) {
 		if (parent == null) return false;
 
 		return job == parent || parent.hasParentJobInHierarchy(job);
+	}
+
+
+	//======================================================================================
+	// Conversions
+	//======================================================================================
+
+	public interface JobFuture<V> extends Future<V> {
+		Job<V> getUnderlyingJob();
+	}
+
+	public JobFuture<T> asFuture() {
+		Job<T> job = this;
+
+		return new JobFuture<T>() {
+			@Override
+			public Job<T> getUnderlyingJob() {
+				return job;
+			}
+
+			@Override
+			public boolean cancel(boolean mayInterruptIfRunning) {
+				return job.cancel();
+			}
+
+			@Override
+			public boolean isCancelled() {
+				return job.getState() == JobState.CANCELED;
+			}
+
+			@Override
+			public boolean isDone() {
+				return job.getState().isFinished();
+			}
+
+			@Override
+			public T get() throws InterruptedException, ExecutionException {
+				job.runAndAwait();
+
+				if (job.error == null) {
+					return job.result;
+				} else if (job.error instanceof InterruptedException) {
+					throw (InterruptedException) error;
+				} else if (job.error instanceof ExecutionException) {
+					throw (ExecutionException) error;
+				} else {
+					throw new ExecutionException(error);
+				}
+			}
+
+			@Override
+			public T get(long timeout, TimeUnit unit) throws InterruptedException, ExecutionException, TimeoutException {
+				job.settings.setTimeout(unit.toSeconds(timeout));
+				job.runAndAwait();
+
+				if (job.error == null) {
+					return job.result;
+				} else if (job.error instanceof InterruptedException) {
+					throw (InterruptedException) error;
+				} else if (job.error instanceof ExecutionException) {
+					throw (ExecutionException) error;
+				} else if (job.error instanceof TimeoutException) {
+					throw (TimeoutException) error;
+				} else {
+					throw new ExecutionException(error);
+				}
+			}
+		};
 	}
 }

@@ -15,6 +15,7 @@ import javafx.scene.control.SeparatorMenuItem;
 import matcher.config.Config;
 import matcher.config.UidConfig;
 import matcher.gui.Gui;
+import matcher.gui.panes.UidSetupPane;
 import matcher.jobs.ImportMatchesJob;
 import matcher.jobs.SubmitMatchesJob;
 import matcher.type.ClassEnvironment;

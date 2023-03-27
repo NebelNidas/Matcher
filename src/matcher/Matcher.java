@@ -15,8 +15,8 @@ import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -27,6 +27,7 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import job4j.Job;
+
 import matcher.classifier.ClassClassifier;
 import matcher.classifier.ClassifierLevel;
 import matcher.classifier.FieldClassifier;
@@ -36,6 +37,8 @@ import matcher.classifier.MethodVarClassifier;
 import matcher.classifier.RankResult;
 import matcher.config.Config;
 import matcher.config.ProjectConfig;
+import matcher.jobs.JobCategories;
+import matcher.jobs.MatcherJob;
 import matcher.type.ClassEnv;
 import matcher.type.ClassEnvironment;
 import matcher.type.ClassInstance;
@@ -57,11 +60,11 @@ public class Matcher {
 		this.env = env;
 	}
 
-	public void init(ProjectConfig config, DoubleConsumer progressReceiver) {
-		var job = new Job<Void>("init") {
+	public void init(ProjectConfig config) {
+		var job = new MatcherJob<Void>(JobCategories.LOAD_PROJECT) {
 			@Override
 			protected void registerSubJobs() {
-				Job<Void> subJob = new Job<Void>("init-env") {
+				Job<Void> subJob = new MatcherJob<Void>(JobCategories.INIT_ENV) {
 					@Override
 					protected Void execute(DoubleConsumer progressReceiver) {
 						AtomicBoolean shouldCancel = new AtomicBoolean(false);
@@ -72,7 +75,7 @@ public class Matcher {
 				};
 				addSubJob(subJob, true);
 
-				subJob = new Job<Void>("match-unobfuscated") {
+				subJob = new MatcherJob<Void>(JobCategories.MATCH_UNOBFUSCATED) {
 					@Override
 					protected Void execute(DoubleConsumer progressReceiver) {
 						AtomicBoolean shouldCancel = new AtomicBoolean(false);
@@ -94,7 +97,6 @@ public class Matcher {
 			}
 		};
 
-		job.addProgressListener((progress) -> progressReceiver.accept(progress));
 		job.addCompletionListener((result, error) -> {
 			if (error.isPresent()) {
 				reset();
@@ -138,8 +140,8 @@ public class Matcher {
 			List<InputFile> inputFilesA, List<InputFile> inputFilesB,
 			List<InputFile> cpFiles,
 			List<InputFile> cpFilesA, List<InputFile> cpFilesB,
-			String nonObfuscatedClassPatternA, String nonObfuscatedClassPatternB, String nonObfuscatedMemberPatternA, String nonObfuscatedMemberPatternB,
-			DoubleConsumer progressReceiver) throws IOException {
+			String nonObfuscatedClassPatternA, String nonObfuscatedClassPatternB,
+			String nonObfuscatedMemberPatternA, String nonObfuscatedMemberPatternB) throws IOException {
 		List<Path> pathsA = resolvePaths(inputDirs, inputFilesA);
 		List<Path> pathsB = resolvePaths(inputDirs, inputFilesB);
 		List<Path> sharedClassPath = resolvePaths(inputDirs, cpFiles);
@@ -160,7 +162,7 @@ public class Matcher {
 		Config.saveAsLast();
 
 		reset();
-		init(config, progressReceiver);
+		init(config);
 	}
 
 	public static Path resolvePath(Collection<Path> inputDirs, InputFile inputFile) throws IOException {
@@ -689,7 +691,8 @@ public class Matcher {
 		public final int matchedFieldCount;
 	}
 
-	public static final ExecutorService threadPool = Executors.newWorkStealingPool();
+	public static volatile ForkJoinPool threadPool = (ForkJoinPool) Executors.newWorkStealingPool(4);
+	public volatile boolean debugMode;
 
 	private final ClassEnvironment env;
 	public static final ClassifierLevel defaultAutoMatchLevel = ClassifierLevel.Extra;

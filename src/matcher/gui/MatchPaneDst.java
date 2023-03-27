@@ -14,6 +14,7 @@ import javafx.scene.control.SplitPane;
 import javafx.scene.control.TextField;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
+import job4j.JobSettings.MutableJobSettings;
 
 import matcher.Matcher;
 import matcher.NameType;
@@ -677,8 +678,13 @@ public class MatchPaneDst extends SplitPane implements IFwdGuiComponent, ISelect
 			// update matches list
 			final int cJobId = ++jobId;
 
-			var job = new RankMatchResultsJob(gui.getEnv(),
-					Matcher.defaultAutoMatchLevel, newSrcSelection, cmpClasses);
+			var job = new RankMatchResultsJob(gui.getEnv(), Matcher.defaultAutoMatchLevel, newSrcSelection, cmpClasses) {
+				@Override
+				protected void changeDefaultSettings(MutableJobSettings settings) {
+					super.changeDefaultSettings(settings);
+					settings.cancelPreviousJobsWithSameId();
+				}
+			};
 			job.addCompletionListener((results, error) -> Platform.runLater(() -> {
 				if (jobId == cJobId) {
 					assert rankResults.isEmpty();

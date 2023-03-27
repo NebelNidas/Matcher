@@ -33,6 +33,7 @@ import javafx.stage.FileChooser.ExtensionFilter;
 import job4j.Job;
 import job4j.JobManager;
 import job4j.JobManager.JobManagerEvent;
+import job4j.JobSettings.MutableJobSettings;
 import javafx.stage.Stage;
 import javafx.stage.Window;
 
@@ -44,8 +45,10 @@ import matcher.config.Config;
 import matcher.config.ProjectConfig;
 import matcher.config.Theme;
 import matcher.gui.IGuiComponent.ViewChangeCause;
+import matcher.gui.jobs.GuiJobCategories;
 import matcher.gui.menu.MainMenuBar;
-import matcher.gui.menu.NewProjectPane;
+import matcher.gui.panes.NewProjectPane;
+import matcher.jobs.MatcherJob;
 import matcher.mapping.MappingField;
 import matcher.mapping.Mappings;
 import matcher.srcprocess.BuiltinDecompiler;
@@ -254,10 +257,15 @@ public class Gui extends Application {
 		matcher.reset();
 		onProjectChange();
 
-		var job = new Job<Void>("initializing-files") {
+		var job = new MatcherJob<Void>(GuiJobCategories.OPEN_NEW_PROJECT) {
+			@Override
+			protected void changeDefaultSettings(MutableJobSettings settings) {
+				settings.enableVisualPassthrough();
+			};
+
 			@Override
 			protected Void execute(DoubleConsumer progressReceiver) {
-				matcher.init(newConfig, progressReceiver);
+				matcher.init(newConfig);
 				return null;
 			}
 		};
@@ -651,7 +659,7 @@ public class Gui extends Application {
 	private MatchPaneDst dstPane;
 	private BottomPane bottomPane;
 
-	private List<Job<?>> activeJobs = new ArrayList<>(5);
+	private List<Job<?>> activeJobs = new ArrayList<>();
 
 	private SortKey sortKey = SortKey.Name;
 	private boolean sortMatchesAlphabetically;

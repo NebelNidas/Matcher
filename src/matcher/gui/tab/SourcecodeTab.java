@@ -1,16 +1,18 @@
 package matcher.gui.tab;
 
-import java.io.PrintWriter;
-import java.io.StringWriter;
 import java.util.Set;
 import java.util.function.DoubleConsumer;
 
 import javafx.application.Platform;
-import job4j.Job;
 import job4j.JobState;
+import job4j.JobSettings.MutableJobSettings;
+
 import matcher.NameType;
+import matcher.Util;
 import matcher.gui.Gui;
 import matcher.gui.ISelectionProvider;
+import matcher.jobs.JobCategories;
+import matcher.jobs.MatcherJob;
 import matcher.srcprocess.HtmlUtil;
 import matcher.srcprocess.SrcDecorator;
 import matcher.srcprocess.SrcDecorator.SrcParseException;
@@ -20,12 +22,12 @@ import matcher.type.MatchType;
 import matcher.type.MethodInstance;
 
 public class SourcecodeTab extends WebViewTab {
-	public SourcecodeTab(Gui gui, ISelectionProvider selectionProvider, boolean unmatchedTmp) {
+	public SourcecodeTab(Gui gui, ISelectionProvider selectionProvider, boolean isSource) {
 		super("source", "ui/templates/CodeViewTemplate.htm");
 
 		this.gui = gui;
 		this.selectionProvider = selectionProvider;
-		this.unmatchedTmp = unmatchedTmp;
+		this.isSource = isSource;
 
 		init();
 	}
@@ -74,15 +76,20 @@ public class SourcecodeTab extends WebViewTab {
 			displayText("decompiling...");
 		}
 
-		NameType nameType = gui.getNameType().withUnmatchedTmp(unmatchedTmp);
+		NameType nameType = gui.getNameType().withUnmatchedTmp(isSource);
 
-		var decompileJob = new Job<String>("decompile") {
+		var decompileJob = new MatcherJob<String>(isSource ? JobCategories.DECOMPILE_SOURCE : JobCategories.DECOMPILE_DEST) {
+			@Override
+			protected void changeDefaultSettings(MutableJobSettings settings) {
+				settings.dontPrintStacktraceOnError();
+				settings.cancelPreviousJobsWithSameId();
+			}
+
 			@Override
 			protected String execute(DoubleConsumer progressReceiver) {
 				return SrcDecorator.decorate(gui.getEnv().decompile(gui.getDecompiler().get(), cls, nameType), cls, nameType);
 			}
 		};
-		decompileJob.dontPrintStacktraceOnError();
 		decompileJob.addCompletionListener((code, error) -> Platform.runLater(() -> {
 			if (cDecompId == decompId) {
 				if (code.isEmpty() && decompileJob.getState() == JobState.CANCELED) {
@@ -91,14 +98,11 @@ public class SourcecodeTab extends WebViewTab {
 				}
 
 				if (error.isPresent()) {
-					StringWriter sw = new StringWriter();
-					error.get().printStackTrace(new PrintWriter(sw));
-
 					if (error.get() instanceof SrcParseException) {
 						SrcParseException parseExc = (SrcParseException) error.get();
-						displayText("parse error: "+parseExc.problems+"\ndecompiled source:\n"+parseExc.source);
+						displayText("parse error: " + parseExc.problems + "\ndecompiled source:\n" + parseExc.source);
 					} else {
-						displayText("decompile error: "+sw.toString());
+						displayText("decompile error: " + Util.getStacktrace(error.get()));
 					}
 				} else if (code.isPresent()) {
 					double prevScroll = isRefresh ? getScrollTop() : 0;
@@ -126,7 +130,7 @@ public class SourcecodeTab extends WebViewTab {
 
 	private final Gui gui;
 	private final ISelectionProvider selectionProvider;
-	private final boolean unmatchedTmp;
+	private final boolean isSource;
 
 	private int decompId;
 }

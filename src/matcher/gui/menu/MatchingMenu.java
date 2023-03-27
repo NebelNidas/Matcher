@@ -14,7 +14,7 @@ import matcher.gui.Gui;
 import matcher.jobs.AutoMatchAllJob;
 import matcher.jobs.AutoMatchClassesJob;
 import matcher.jobs.AutoMatchFieldsJob;
-import matcher.jobs.AutoMatchMethodVarsJob;
+import matcher.jobs.AutoMatchLocalsJob;
 import matcher.jobs.AutoMatchMethodsJob;
 import matcher.type.MatchType;
 
@@ -102,7 +102,7 @@ public class MatchingMenu extends Menu {
 	}
 
 	public void autoMatchArgs() {
-		var job = new AutoMatchMethodVarsJob(gui.getMatcher(), Matcher.defaultAutoMatchLevel, true);
+		var job = new AutoMatchLocalsJob(gui.getMatcher(), Matcher.defaultAutoMatchLevel, true);
 		job.addCompletionListener((matchedAny, error) -> {
 			if (matchedAny.orElse(false)) {
 				Platform.runLater(() -> gui.onMatchChange(EnumSet.of(MatchType.MethodVar)));
@@ -112,7 +112,7 @@ public class MatchingMenu extends Menu {
 	}
 
 	public void autoMatchVars() {
-		var job = new AutoMatchMethodVarsJob(gui.getMatcher(), Matcher.defaultAutoMatchLevel, false);
+		var job = new AutoMatchLocalsJob(gui.getMatcher(), Matcher.defaultAutoMatchLevel, false);
 		job.addCompletionListener((matchedAny, error) -> {
 			if (matchedAny.orElse(false)) {
 				Platform.runLater(() -> gui.onMatchChange(EnumSet.of(MatchType.MethodVar)));

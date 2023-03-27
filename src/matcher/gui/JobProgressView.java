@@ -25,16 +25,16 @@ import job4j.JobManager;
 import job4j.JobState;
 
 public class JobProgressView extends Control {
-	public final ObservableList<Job<?>> jobs = FXCollections.observableArrayList();
+	@SuppressWarnings("incomplete-switch")
+	public JobProgressView(Gui gui) {
+		this.gui = gui;
 
-    public JobProgressView() {
 		getStyleClass().add("task-progress-view");
 
 		JobManager.get().registerEventListener((job, event) -> {
 			switch (event) {
 			case JOB_QUEUED:
-				Platform.runLater(() -> jobs.add(job));
-				job.addSubJobAddedListener((subJob) -> onSubJobAdded(subJob));
+				addJob(job, true);
 				break;
 
 			case JOB_FINISHED:
@@ -42,21 +42,55 @@ public class JobProgressView extends Control {
 				break;
 			}
 		});
-    }
+	}
+
+	private void addJob(Job<?> job, boolean append) {
+		if (job.getSettings().isInvisible() && !gui.getMatcher().debugMode) {
+			return;
+		}
+
+		job.addSubJobAddedListener((subJob) -> addJob(subJob, false));
+
+		Platform.runLater(() -> {
+			if (jobs.contains(job)) return;
+
+			boolean passthrough = job.getSettings().isVisualPassthrough();
+
+			if (passthrough && !gui.getMatcher().debugMode) {
+				return;
+			}
+
+			if (append || jobs.isEmpty()) {
+				jobs.add(job);
+			} else {
+				boolean isParent;
+				boolean shareParents;
+
+				for (int i = jobs.size() - 1; i >= 0; i--) {
+					Job<?> currentJob = jobs.get(i);
+
+					isParent = currentJob == job.getParent();
+					shareParents = currentJob.hasParentJobInHierarchy(job.getParent());
+
+					if (isParent || shareParents) {
+						jobs.add(i+1, job);
+						break;
+					}
+				}
+			}
+		});
+	}
 
 	private void removeJob(Job<?> job) {
-		jobs.remove(job);
 		List<Job<?>> subJobs = job.getSubJobs();
 
 		synchronized (subJobs) {
-			subJobs.forEach(this::removeJob);
+			for (int i = subJobs.size() - 1; i >= 0; i--) {
+				removeJob(subJobs.get(i));
+			}
 		}
 
-	}
-
-	private void onSubJobAdded(Job<?> job) {
-		Platform.runLater(() -> jobs.add(job));
-		job.addSubJobAddedListener((subJob) -> onSubJobAdded(subJob));
+		jobs.remove(job);
 	}
 
 	@Override
@@ -70,9 +104,9 @@ public class JobProgressView extends Control {
 
 			// list view
 			ListView<Job<?>> listView = new ListView<>();
-			listView.setPrefSize(400, 300);
+			listView.setPrefSize(400, 380);
 			listView.setPlaceholder(new Label("No tasks running"));
-			listView.setCellFactory(param -> new TaskCell());
+			listView.setCellFactory(list -> new TaskCell());
 			listView.setFocusTraversable(false);
 			listView.setPadding(new Insets(GuiConstants.padding, GuiConstants.padding, GuiConstants.padding, GuiConstants.padding));
 
@@ -83,20 +117,20 @@ public class JobProgressView extends Control {
 
 		class TaskCell extends ListCell<Job<?>> {
 			private ProgressBar progressBar;
-			private Label titleText;
-			private Label messageText;
+			private Label titleLabel;
+			private Label progressLabel;
 			private Button cancelButton;
 
 			private Job<?> job;
 			private BorderPane borderPane;
 			private VBox vbox;
 
-			public TaskCell() {
-				titleText = new Label();
-				titleText.getStyleClass().add("task-title");
+			TaskCell() {
+				titleLabel = new Label();
+				titleLabel.getStyleClass().add("task-title");
 
-				messageText = new Label();
-				messageText.getStyleClass().add("task-message");
+				progressLabel = new Label();
+				progressLabel.getStyleClass().add("task-message");
 
 				progressBar = new ProgressBar();
 				progressBar.setMaxWidth(Double.MAX_VALUE);
@@ -116,9 +150,9 @@ public class JobProgressView extends Control {
 				vbox = new VBox();
 				vbox.setPadding(new Insets(GuiConstants.padding, 0, 0, GuiConstants.padding));
 				vbox.setSpacing(GuiConstants.padding * 0.7f);
-				vbox.getChildren().add(titleText);
+				vbox.getChildren().add(titleLabel);
 				vbox.getChildren().add(progressBar);
-				vbox.getChildren().add(messageText);
+				vbox.getChildren().add(progressLabel);
 
 				BorderPane.setAlignment(cancelButton, Pos.CENTER);
 				BorderPane.setMargin(cancelButton, new Insets(0, GuiConstants.padding, 0, GuiConstants.padding));
@@ -130,39 +164,55 @@ public class JobProgressView extends Control {
 			}
 
 			private void resetProperties() {
-				titleText.setText(null);
-				messageText.setText(null);
+				titleLabel.setText(null);
+				progressLabel.setText(null);
 				progressBar.setProgress(-1);
 				progressBar.setStyle(null);
 				cancelButton.setText("Cancel");
 				cancelButton.setDisable(false);
 			}
 
-			private void update() {
-				if (job == null) return;
+			@SuppressWarnings("incomplete-switch")
+			private void update(Job<?> originatingJob) {
+				if (originatingJob != this.job) {
+					return;
+				}
 
-				if (job.getProgress() <= 0) {
+				if (this.job == null) {
+					resetProperties();
+					return;
+				}
+
+				if (this.job.getProgress() <= 0) {
 					progressBar.setProgress(-1);
 				} else {
-					messageText.setText(String.format("%.0f%%", job.getProgress() * 100));
-					progressBar.setProgress(job.getProgress());
+					progressLabel.setText(String.format("%.0f%%", this.job.getProgress() * 100));
+					progressBar.setProgress(this.job.getProgress());
 				}
 
-				if (job.getState().isFinished()) {
+				JobState state = this.job.getState();
+
+				if (state.isFinished()) {
 					cancelButton.setDisable(true);
 				}
 
-				if (job.getState() == JobState.CANCELING) {
-					cancelButton.setText("Canceling...");
+				if (state.compareTo(JobState.CANCELING) >= 0) {
 					cancelButton.setDisable(true);
-				}
 
-				if (job.getState() == JobState.CANCELED || job.getState() == JobState.ERRORED) {
-					progressBar.setStyle("-fx-accent: darkred");
-				}
+					String text = state.toString();
+					text = text.charAt(0) + text.substring(1).toLowerCase();
 
-				if (job.getState() == JobState.CANCELED) {
-					cancelButton.setText("Canceled");
+					switch (state) {
+					case CANCELING:
+						text += "...";
+						break;
+					case CANCELED:
+					case ERRORED:
+						progressBar.setStyle("-fx-accent: darkred");
+						break;
+					}
+
+					cancelButton.setText(text);
 				}
 			}
 
@@ -176,20 +226,24 @@ public class JobProgressView extends Control {
 					getStyleClass().setAll("task-list-cell-empty");
 					setGraphic(null);
 				} else if (job != null) {
-					job.addCancelListener(() -> Platform.runLater(() -> update()));
-					job.addProgressListener((progress) -> Platform.runLater(() -> update()));
-					job.addCompletionListener((result, error) -> Platform.runLater(() -> update()));
+					job.addCancelListener(() -> Platform.runLater(() -> update(job)));
+					job.addProgressListener((progress) -> Platform.runLater(() -> update(job)));
+					job.addCompletionListener((result, error) -> Platform.runLater(() -> update(job)));
 
-					update();
+					update(job);
 					getStyleClass().setAll("task-list-cell");
-					titleText.setText(job.getId());
+					titleLabel.setText(job.getId());
 
 					int nestLevel = 0;
 					Job<?> currentJob = job;
+					Job<?> currentJobParent;
 
-					while (currentJob.getParent() != null) {
-						nestLevel++;
-						currentJob = currentJob.getParent();
+					while ((currentJobParent = currentJob.getParent()) != null) {
+						if (!currentJobParent.getSettings().isVisualPassthrough() || gui.getMatcher().debugMode) {
+							nestLevel++;
+						}
+
+						currentJob = currentJobParent;
 					}
 
 					BorderPane.setMargin(vbox, new Insets(0, 0, GuiConstants.padding, GuiConstants.padding * (nestLevel * 5)));
@@ -198,4 +252,7 @@ public class JobProgressView extends Control {
 			}
 		}
 	}
+
+	private final Gui gui;
+	private final ObservableList<Job<?>> jobs = FXCollections.observableArrayList();
 }

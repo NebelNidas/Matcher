@@ -7,9 +7,12 @@ import javafx.scene.control.ButtonType;
 import javafx.scene.control.Dialog;
 import javafx.scene.control.Menu;
 import javafx.scene.control.MenuItem;
-import job4j.Job;
+
 import matcher.gui.Gui;
-import matcher.gui.menu.FixRecordNamesPane.NamespaceSettings;
+import matcher.gui.panes.FixRecordNamesPane;
+import matcher.gui.panes.FixRecordNamesPane.NamespaceSettings;
+import matcher.jobs.JobCategories;
+import matcher.jobs.MatcherJob;
 import matcher.mapping.MappingPropagator;
 
 public class MappingMenu extends Menu {
@@ -25,7 +28,7 @@ public class MappingMenu extends Menu {
 		MenuItem menuItem = new MenuItem("Propagate names");
 		getItems().add(menuItem);
 
-		var job = new Job<Void>("Propagating method names/args") {
+		var job = new MatcherJob<Void>(JobCategories.PROPAGATE_METHOD_NAMES) {
 			@Override
 			protected Void execute(DoubleConsumer progressReceiver) {
 				MappingPropagator.propagateNames(gui.getEnv(), progressReceiver);

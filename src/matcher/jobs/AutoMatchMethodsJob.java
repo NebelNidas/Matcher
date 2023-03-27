@@ -4,16 +4,16 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.DoubleConsumer;
 
-import job4j.Job;
 import job4j.JobState;
+
 import matcher.Matcher;
 import matcher.classifier.ClassifierLevel;
 import matcher.classifier.MethodClassifier;
 import matcher.type.MethodInstance;
 
-public class AutoMatchMethodsJob extends Job<Boolean> {
+public class AutoMatchMethodsJob extends MatcherJob<Boolean> {
 	public AutoMatchMethodsJob(Matcher matcher, ClassifierLevel level) {
-		super(ID);
+		super(JobCategories.AUTOMATCH_METHODS);
 
 		this.matcher = matcher;
 		this.level = level;
@@ -39,7 +39,6 @@ public class AutoMatchMethodsJob extends Job<Boolean> {
 		return !matches.isEmpty();
 	}
 
-	public static final String ID = "auto-match-methods";
 	private final Matcher matcher;
 	private final ClassifierLevel level;
 }

@@ -10,8 +10,8 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import job4j.Job;
 import job4j.JobState;
+
 import matcher.Matcher;
 import matcher.classifier.ClassifierLevel;
 import matcher.classifier.MethodVarClassifier;
@@ -19,9 +19,9 @@ import matcher.classifier.RankResult;
 import matcher.type.MethodInstance;
 import matcher.type.MethodVarInstance;
 
-public class AutoMatchMethodVarsJob extends Job<Boolean> {
-	public AutoMatchMethodVarsJob(Matcher matcher, ClassifierLevel level, boolean isArgs) {
-		super(ID);
+public class AutoMatchLocalsJob extends MatcherJob<Boolean> {
+	public AutoMatchLocalsJob(Matcher matcher, ClassifierLevel level, boolean isArgs) {
+		super(JobCategories.AUTOMATCH_LOCALS);
 
 		this.matcher = matcher;
 		this.level = level;
@@ -105,7 +105,6 @@ public class AutoMatchMethodVarsJob extends Job<Boolean> {
 		return !matches.isEmpty();
 	}
 
-	public static final String ID = "auto-match-method-vars";
 	private final Matcher matcher;
 	private final ClassifierLevel level;
 	private final boolean isArgs;

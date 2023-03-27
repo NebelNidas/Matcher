@@ -16,6 +16,7 @@ import java.util.stream.Stream;
 import javafx.application.Platform;
 import javafx.scene.Node;
 import javafx.scene.control.Alert.AlertType;
+import javafx.scene.control.Button;
 import javafx.scene.control.ButtonType;
 import javafx.scene.control.Dialog;
 import javafx.scene.control.Menu;
@@ -23,7 +24,6 @@ import javafx.scene.control.MenuItem;
 import javafx.scene.control.SeparatorMenuItem;
 import javafx.stage.FileChooser;
 import javafx.stage.FileChooser.ExtensionFilter;
-import job4j.Job;
 import javafx.stage.Window;
 
 import net.fabricmc.mappingio.MappingReader;
@@ -33,9 +33,15 @@ import matcher.Util;
 import matcher.config.Config;
 import matcher.gui.Gui;
 import matcher.gui.Gui.SelectedFile;
-import matcher.gui.menu.LoadMappingsPane.MappingsLoadSettings;
-import matcher.gui.menu.LoadProjectPane.ProjectLoadSettings;
-import matcher.gui.menu.SaveMappingsPane.MappingsSaveSettings;
+import matcher.gui.panes.LoadMappingsPane;
+import matcher.gui.panes.LoadProjectPane;
+import matcher.gui.panes.PreferencesPane;
+import matcher.gui.panes.SaveMappingsPane;
+import matcher.gui.panes.LoadMappingsPane.MappingsLoadSettings;
+import matcher.gui.panes.LoadProjectPane.ProjectLoadSettings;
+import matcher.gui.panes.SaveMappingsPane.MappingsSaveSettings;
+import matcher.jobs.JobCategories;
+import matcher.jobs.MatcherJob;
 import matcher.mapping.Mappings;
 import matcher.serdes.MatchesIo;
 import matcher.type.ClassEnvironment;
@@ -100,6 +106,12 @@ public class FileMenu extends Menu {
 
 		getItems().add(new SeparatorMenuItem());
 
+		menuItem = new MenuItem("Preferences");
+		getItems().add(menuItem);
+		menuItem.setOnAction(event -> openPreferences());
+
+		getItems().add(new SeparatorMenuItem());
+
 		menuItem = new MenuItem("Exit");
 		getItems().add(menuItem);
 		menuItem.setOnAction(event -> Platform.exit());
@@ -119,10 +131,10 @@ public class FileMenu extends Menu {
 		gui.getMatcher().reset();
 		gui.onProjectChange();
 
-		var job = new Job<Void>("initializing-files") {
+		var job = new MatcherJob<Void>(JobCategories.LOAD_PROJECT) {
 			@Override
 			protected Void execute(DoubleConsumer progressReceiver) {
-				MatchesIo.read(res.path, newConfig.paths, newConfig.verifyFiles, gui.getMatcher(), progressReceiver);
+				MatchesIo.read(res.path, newConfig.paths, newConfig.verifyFiles, gui.getMatcher());
 				return null;
 			}
 		};
@@ -350,7 +362,7 @@ public class FileMenu extends Menu {
 		SelectedFile res = Gui.requestFile("Select matches file", gui.getScene().getWindow(), getMatchesLoadExtensionFilters(), true);
 		if (res == null) return;
 
-		MatchesIo.read(res.path, null, false, gui.getMatcher(), progress -> { });
+		MatchesIo.read(res.path, null, false, gui.getMatcher());
 		gui.onMatchChange(EnumSet.allOf(MatchType.class));
 	}
 
@@ -383,6 +395,20 @@ public class FileMenu extends Menu {
 			e.printStackTrace();
 			return;
 		}
+	}
+
+	private void openPreferences() {
+		Dialog<?> dialog = new Dialog<>();
+		//dialog.initModality(Modality.APPLICATION_MODAL);
+		dialog.setResizable(true);
+		dialog.setTitle("Preferences");
+		dialog.getDialogPane().getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
+
+		Button okButton = (Button) dialog.getDialogPane().lookupButton(ButtonType.OK);
+
+		PreferencesPane content = new PreferencesPane(okButton);
+		dialog.getDialogPane().setContent(content);
+		dialog.showAndWait();
 	}
 
 	private final Gui gui;

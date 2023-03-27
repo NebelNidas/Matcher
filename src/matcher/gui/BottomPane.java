@@ -8,7 +8,6 @@ import java.util.Set;
 
 import org.controlsfx.control.PopOver;
 import org.controlsfx.control.PopOver.ArrowLocation;
-
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.control.Button;
@@ -58,10 +57,11 @@ public class BottomPane extends StackPane implements IGuiComponent {
 		progressBar.setVisible(false);
 		progressBar.setPrefWidth(200);
 
-		JobProgressView jobProgressView = new JobProgressView();
+		JobProgressView jobProgressView = new JobProgressView(gui);
 
 		PopOver jobPopOver = new PopOver(jobProgressView);
 		jobPopOver.setAnimated(false);
+		jobPopOver.setTitle("Active Jobs");
 		jobPopOver.setArrowLocation(ArrowLocation.BOTTOM_LEFT);
 
 		progressBar.setOnMouseClicked((e) -> {

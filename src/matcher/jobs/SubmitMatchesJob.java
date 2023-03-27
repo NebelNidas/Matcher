@@ -10,8 +10,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.function.DoubleConsumer;
 
-import job4j.Job;
 import job4j.JobState;
+
 import matcher.Matcher;
 import matcher.config.Config;
 import matcher.config.UidConfig;
@@ -22,9 +22,9 @@ import matcher.type.MatchableKind;
 import matcher.type.MethodInstance;
 import matcher.type.MethodVarInstance;
 
-public class SubmitMatchesJob extends Job<Void> {
+public class SubmitMatchesJob extends MatcherJob<Void> {
 	public SubmitMatchesJob(Matcher matcher) {
-		super(ID);
+		super(JobCategories.SUBMIT_MATCHES);
 
 		this.matcher = matcher;
 	}
@@ -111,6 +111,5 @@ public class SubmitMatchesJob extends Job<Void> {
 		}
 	}
 
-	public static final String ID = "submit-matches";
 	private final Matcher matcher;
 }

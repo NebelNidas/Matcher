@@ -7,8 +7,8 @@ import java.util.function.DoubleConsumer;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
-import job4j.Job;
 import job4j.JobState;
+
 import matcher.Matcher;
 import matcher.classifier.ClassClassifier;
 import matcher.classifier.ClassifierLevel;
@@ -16,9 +16,9 @@ import matcher.classifier.RankResult;
 import matcher.type.ClassEnvironment;
 import matcher.type.ClassInstance;
 
-public class AutoMatchClassesJob extends Job<Boolean> {
+public class AutoMatchClassesJob extends MatcherJob<Boolean> {
 	public AutoMatchClassesJob(Matcher matcher, ClassifierLevel level) {
-		super(ID);
+		super(JobCategories.AUTOMATCH_CLASSES);
 
 		this.matcher = matcher;
 		this.level = level;
@@ -67,7 +67,6 @@ public class AutoMatchClassesJob extends Job<Boolean> {
 		return !matches.isEmpty();
 	}
 
-	public static final String ID = "auto-match-classes";
 	private final Matcher matcher;
 	private final ClassifierLevel level;
 }

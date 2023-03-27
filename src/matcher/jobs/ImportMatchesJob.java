@@ -7,8 +7,8 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.util.function.DoubleConsumer;
 
-import job4j.Job;
 import job4j.JobState;
+
 import matcher.Matcher;
 import matcher.config.Config;
 import matcher.config.UidConfig;
@@ -20,9 +20,9 @@ import matcher.type.MatchableKind;
 import matcher.type.MethodInstance;
 import matcher.type.MethodVarInstance;
 
-public class ImportMatchesJob extends Job<Boolean> {
+public class ImportMatchesJob extends MatcherJob<Boolean> {
 	public ImportMatchesJob(Matcher matcher) {
-		super(ID);
+		super(JobCategories.IMPORT_MATCHES);
 
 		this.matcher = matcher;
 	}
@@ -138,7 +138,6 @@ public class ImportMatchesJob extends Job<Boolean> {
 		return cls.getField(fullId.substring(fullId.lastIndexOf('/', fullId.lastIndexOf(";;") - 2) + 1));
 	}
 
-	public static final String ID = "import-matches";
 	private final Matcher matcher;
 	private boolean importedAny;
 }

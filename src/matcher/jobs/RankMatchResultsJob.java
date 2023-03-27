@@ -3,7 +3,6 @@ package matcher.jobs;
 import java.util.List;
 import java.util.function.DoubleConsumer;
 
-import job4j.Job;
 import matcher.classifier.ClassClassifier;
 import matcher.classifier.ClassifierLevel;
 import matcher.classifier.FieldClassifier;
@@ -17,9 +16,9 @@ import matcher.type.Matchable;
 import matcher.type.MethodInstance;
 import matcher.type.MethodVarInstance;
 
-public class RankMatchResultsJob extends Job<List<? extends RankResult<? extends Matchable<?>>>> {
+public class RankMatchResultsJob extends MatcherJob<List<? extends RankResult<? extends Matchable<?>>>> {
 	public RankMatchResultsJob(ClassEnvironment env, ClassifierLevel matchLevel, Matchable<?> selection, List<ClassInstance> cmpClasses) {
-		super(ID);
+		super(JobCategories.RANK_MATCHES);
 
 		this.env = env;
 		this.selection = selection;
@@ -48,7 +47,6 @@ public class RankMatchResultsJob extends Job<List<? extends RankResult<? extends
 		}
 	}
 
-	public static final String ID = "rank-match-results";
 	public static final double MAX_MISMATCH = Double.POSITIVE_INFINITY;
 	private final ClassEnvironment env;
 	private final Matchable<?> selection;
