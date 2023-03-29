@@ -199,7 +199,7 @@ Here you can see how `Job::run` works internally:
 	</tr>
 	<tr>
 		<td></td>
-		<td>Create wrapper thread</td>
+		<td>Create & start wrapper thread</td>
 		<td></td>
 		<td colspan="2"></td>
 		<td></td>
