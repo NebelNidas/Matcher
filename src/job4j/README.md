@@ -72,7 +72,7 @@ var job = new Job<Void>(category) {
 ### Adding subjobs
 Each job can have an arbitrary amount of subjobs. These can be added at any time during the parent job's lifespan, however it's recommended to register all known subjobs ahead of time in the `registerSubJobs` method. It gets called right before the parent job starts executing, and ensures a great user experience by letting users know which jobs are going to run and how long they're gonna be waiting.
 ```java
-var job = new Job<String>(category) {
+var job = new Job<Void>(category) {
 	@Override
 	protected void registerSubJobs() {
 		addSubJob(importantSubJob, true)
