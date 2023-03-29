@@ -141,7 +141,7 @@ Here you can see how `Job::run` works internally:
 	<tr>
 		<th colspan="2">Caller thread</th>
 		<th>Wrapper thread</th>
-		<th colspan="5">Job thread</th>
+		<th colspan="6">Job thread</th>
 	</tr>
 	<tr>
 		<th>Caller class</th>
