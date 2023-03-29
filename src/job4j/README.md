@@ -265,12 +265,12 @@ Here you can see how `Job::run` works internally:
 		<td></td>
 		<td></td>
 		<td></td>
-		<td rowspan="2">Handle progress update, run event listeners</td>
+		<td rowspan="2">Handle progress update & run event listeners</td>
 	</tr>
 	<tr>
 		<td></td>
 		<td></td>
-		<td>Handle progress update, run event listeners</td>
+		<td>Handle progress update & run event listeners</td>
 	</tr>
 	<tr>
 		<td></td>
@@ -283,7 +283,7 @@ Here you can see how `Job::run` works internally:
 		<td></td>
 		<td></td>
 		<td></td>
-		<td colspan="2">Finish, run event listeners</td>
+		<td colspan="2">Finish & run event listeners</td>
 		<td></td>
 	</tr>
 	<tr>
@@ -297,7 +297,7 @@ Here you can see how `Job::run` works internally:
 	<tr>
 		<td></td>
 		<td></td>
-		<td colspan="2">Finish, run event listeners</td>
+		<td colspan="2">Finish & run event listeners</td>
 		<td></td>
 		<td colspan="2"></td>
 		<td></td>
