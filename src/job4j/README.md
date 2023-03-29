@@ -90,7 +90,7 @@ var job = new Job<Void>(category) {
 A few things to note:
 - Subjobs are executed synchronously.
 - Once added, subjobs cannot be removed, only canceled.
-- Jobs are smart and automatically handle progress correctly. In the example above, when `importantSubJob`'s progress reaches 50%, the overall progress of `job` will be 25%.
+- Jobs are smart and automatically handle progress correctly. In the example above, when `importantSubJob`'s progress reaches 50%, the overall progress of `job` will be set to 25%.
 - When you have subjobs, you usually don't want to pass the parent job's `progressReceiver` any values, as progress is automatically calculated from the subjobs' progress stats anyway. If you _do_ modify the parent jobs' progress, it won't modify the overall progress directly, instead it will be counted like progress from another subjob.
 - The second argument passed to `addSubJob` defines whether or not the parent job should be canceled as well, should the passed subjob be canceled or have an error. This is useful for job groups where all other subjobs depend on the calculated result from the preceding subjob.
 
