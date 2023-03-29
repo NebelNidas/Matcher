@@ -80,9 +80,10 @@ var job = new Job<String>(category) {
 	}
 
 	@Override
-	protected String execute(DoubleConsumer progressReceiver) {
-		String result = doHeavyComputation();
-		return result;
+	protected Void execute(DoubleConsumer progressReceiver) {
+		importantSubJob.run();
+		unimportantSubJob.run();
+		return null;
 	}
 }
 ```
