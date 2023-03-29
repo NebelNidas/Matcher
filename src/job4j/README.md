@@ -122,7 +122,7 @@ If a job, somewhere in the code it executes, indirectly starts another job (with
 
 
 ## Job lifecycle
-When you create a job, any overridden JobSettings will be applied immediately. The job's ID is also going to be set right away, either taking the supplied `JobCategory`'s ID directly, or, if created via the overloaded constructor, the `JobCategory`'s ID plus a semicolon and the supplied ID-appendix..
+When you create a job, any overridden JobSettings will be applied immediately. The job's ID is also going to be set right away, either taking the supplied `JobCategory`'s ID directly, or, if created via the overloaded constructor, the `JobCategory`'s ID plus a semicolon and the supplied ID-appendix.
 
 Once you call `job.run()`, its state gets changed to `QUEUED`, and it will continue as described [above](#running-a-job). Once the JobManager decides it's time for the job to start, it will call the internal `Job::runNow` method. This is when the state gets updated to `RUNNING`, all subjobs are registered and the actual task gets executed. Note that subjobs don't get started automatically, they have to be ran individually from the parent job's `execute` method. A parent and its subjobs always run on the same thread.
 
