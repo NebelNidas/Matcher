@@ -1,5 +1,5 @@
 # Job4j
-Job4j is an asynchronous task system for Java. At its core it isn't that much different from other task/worker systems provided by Swing or JavaFX, but in contrast to those Job4j, isn't bound to any UI libraries which may or may not be available at runtime (headless deployment on servers, Graal native etc).
+Job4j is an asynchronous task system for Java. At its core it isn't that much different from other task/worker systems provided by Swing or JavaFX, but in contrast to those, Job4j isn't bound to any UI libraries which may or may not be available at runtime (headless deployment on servers, Graal native etc).
 
 
 ## Architecture
