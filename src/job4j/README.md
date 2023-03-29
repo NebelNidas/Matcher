@@ -94,7 +94,7 @@ A few things to note:
 - When you have subjobs, you usually don't want to pass the parent job's `progressReceiver` any values, as progress is automatically calculated from the subjobs' progress stats anyway. If you _do_ modify the parent jobs' progress, it won't modify the overall progress directly, instead it will be counted like progress from another subjob.
 - The second argument passed to `addSubJob` defines whether or not the parent job should be canceled as well, should the passed subjob be canceled or have an error. This is useful for job groups where all other subjobs depend on the calculated result from the preceding subjob.
 
-#### Invisible subjobs
+### Invisible jobs
 If you're adding lots of small subjobs, consider using `JobSettings::makeInvisible`, which hides this job and all its subjobs from potential users' UIs, so they don't get flooded with dozens of UI-cluttering progress bars etc. This option doesn't do anything other than setting a flag, which can then be read by potential GUI implementations. It doesn't change any functionality and the parent's overall progress will still be influenced by them.<br>
 There's a second, similar setting, called `enableVisualPassthrough`. It does basically the same thing, except that only the job you set this on becomes invisible, not however its subjobs. So if you have the following job constellation:
 ```
