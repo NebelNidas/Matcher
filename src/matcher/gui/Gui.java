@@ -501,9 +501,7 @@ public class Gui extends Application {
 			jobLabel.setText("");
 			progressBar.setVisible(false);
 			progressBar.setProgress(0);
-			bottomPane.blockMatchButtons(false);
 		} else {
-			bottomPane.blockMatchButtons(true);
 			progressBar.setVisible(true);
 
 			for (Job<?> job : activeJobs) {

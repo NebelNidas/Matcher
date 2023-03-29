@@ -16,12 +16,13 @@ import matcher.type.MatchType;
 public class AutoMatchAllJob extends MatcherJob<Set<MatchType>> {
 	public AutoMatchAllJob(Matcher matcher) {
 		super(JobCategories.AUTOMATCH_ALL);
+
 		this.matcher = matcher;
 	}
 
 	@Override
 	protected Set<MatchType> execute(DoubleConsumer progressReceiver) {
-		for (Job<?> job : getSubJobs()) {
+		for (Job<?> job : getSubJobs(false)) {
 			if (state == JobState.CANCELING) {
 				break;
 			}

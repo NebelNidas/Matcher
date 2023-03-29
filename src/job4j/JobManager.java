@@ -14,7 +14,7 @@ import matcher.Util;
 
 public class JobManager {
 	private static final JobManager INSTANCE = new JobManager();
-	public static final ThreadPoolExecutor threadPool = (ThreadPoolExecutor) Executors.newFixedThreadPool(Math.max(1, Runtime.getRuntime().availableProcessors() / 2));
+	private static final ThreadPoolExecutor threadPool = (ThreadPoolExecutor) Executors.newFixedThreadPool(Math.max(2, Runtime.getRuntime().availableProcessors() / 2));
 
 	static {
 		threadPool.setKeepAliveTime(60L, TimeUnit.SECONDS);
@@ -25,9 +25,10 @@ public class JobManager {
 		return INSTANCE;
 	}
 
-	private List<BiConsumer<Job<?>, JobManagerEvent>> eventListeners = Collections.synchronizedList(new ArrayList<>());
-	private List<Job<?>> queuedJobs = Collections.synchronizedList(new LinkedList<>());
-	private List<Job<?>> runningJobs = Collections.synchronizedList(new LinkedList<>());
+	private volatile List<BiConsumer<Job<?>, JobManagerEvent>> eventListeners = Collections.synchronizedList(new ArrayList<>());
+	private volatile List<Job<?>> queuedJobs = Collections.synchronizedList(new LinkedList<>());
+	private volatile List<Job<?>> runningJobs = Collections.synchronizedList(new LinkedList<>());
+	private volatile boolean shuttingDown;
 
 	public void registerEventListener(BiConsumer<Job<?>, JobManagerEvent> listener) {
 		this.eventListeners.add(listener);
@@ -42,31 +43,43 @@ public class JobManager {
 	/**
 	 * Queues the job for execution.
 	 */
-	synchronized void queue(Job<?> job) {
-		for (Job<?> runningJob : this.runningJobs) {
-			if (runningJob.getThread() == Thread.currentThread()) {
-				// An already running job indirectly started another job.
-				// Neither one declared the correct hierarchy (they don't know each other),
-				// nevertheless one job indirectly parents the other one.
-				// Now we're declaring the correct hierarchy ourselves.
-				runningJob.addSubJob(job, false);
-				job.run();
-				return;
+	void queue(Job<?> job) {
+		boolean threadAlreadyExecutingJob = false;
+
+		synchronized (this.runningJobs) {
+			for (Job<?> runningJob : this.runningJobs) {
+				if (runningJob.getThread() == Thread.currentThread()) {
+					// An already running job indirectly started another job.
+					// Neither one declared the correct hierarchy (they don't know each other),
+					// nevertheless one job indirectly parents the other one.
+					// Now we're declaring the correct hierarchy ourselves.
+					threadAlreadyExecutingJob = true;
+					runningJob.addSubJob(job, false);
+				}
 			}
 		}
 
+		if (threadAlreadyExecutingJob) {
+			job.run();
+			return;
+		}
+
 		if (job.getSettings().isCancelPreviousJobsWithSameId()) {
-			for (Job<?> queuedJob : this.queuedJobs) {
-				if (queuedJob.getCategory() == job.getCategory()
-						&& queuedJob.getId().equals(job.getId())) {
-					queuedJob.cancel();
+			synchronized (queuedJobs) {
+				for (Job<?> queuedJob : this.queuedJobs) {
+					if (queuedJob.getCategory() == job.getCategory()
+							&& queuedJob.getId().equals(job.getId())) {
+						queuedJob.cancel();
+					}
 				}
 			}
 
-			for (Job<?> runningJob : this.runningJobs) {
-				if (runningJob.getCategory() == job.getCategory()
-						&& runningJob.getId().equals(job.getId())) {
-					runningJob.cancel();
+			synchronized (runningJobs) {
+				for (Job<?> runningJob : this.runningJobs) {
+					if (runningJob.getCategory() == job.getCategory()
+							&& runningJob.getId().equals(job.getId())) {
+						runningJob.cancel();
+					}
 				}
 			}
 		}
@@ -88,10 +101,22 @@ public class JobManager {
 		for (Job<?> queuedJob : this.queuedJobs) {
 			boolean blocked = false;
 
-			for (Job<?> runningJob : this.runningJobs) {
-				if (queuedJob.isBlockedBy(runningJob.getCategory())) {
-					blocked = true;
-					break;
+			synchronized (this.runningJobs) {
+				List<Job<?>> jobsToCheckAgainst = new ArrayList<>();
+
+				for (Job<?> runningJob : this.runningJobs) {
+					jobsToCheckAgainst.add(runningJob);
+
+					for (Job<?> runningSubJob : runningJob.getSubJobs(true)) {
+						jobsToCheckAgainst.add(runningSubJob);
+					}
+				}
+
+				for (Job<?> jobToCheckAgainst : jobsToCheckAgainst) {
+					if (queuedJob.isBlockedBy(jobToCheckAgainst.getCategory())) {
+						blocked = true;
+						break;
+					}
 				}
 			}
 
@@ -106,8 +131,8 @@ public class JobManager {
 					} catch (Exception e) {
 						if (e instanceof TimeoutException) {
 							queuedJob.cancel();
-						} else {
-							throw new RuntimeException(String.format("Exception encountered in job %s:\n%s",
+						} else if (!shuttingDown) {
+							throw new RuntimeException(String.format("An exception has been encountered in job '%s':\n%s",
 									queuedJob.getId(), Util.getStacktrace(e)));
 						}
 					}
@@ -132,7 +157,49 @@ public class JobManager {
 		return Collections.unmodifiableList(this.runningJobs);
 	}
 
+	/**
+	 * @param id the job in question's ID
+	 * @param recursive whether or not all running jobs' subjobs should be checked too
+	 */
+	public boolean isJobRunning(String id, boolean recursive) {
+		List<Job<?>> jobs = List.copyOf(this.runningJobs);
+
+		boolean running = jobs.stream()
+				.filter((job -> job.getId().equals(id)))
+				.findAny()
+				.isPresent();
+
+		if (!recursive) return running;
+
+		running = jobs.stream()
+				.filter((job -> job.hasSubJob(id, recursive)))
+				.findAny()
+				.isPresent();
+
+		return running;
+	}
+
+	public int getMaxJobExecutorThreads() {
+		return threadPool.getMaximumPoolSize();
+	}
+
+	public void setMaxJobExecutorThreads(int maxThreads) {
+		int oldSize = threadPool.getMaximumPoolSize();
+		int newSize = maxThreads;
+
+		if (newSize < oldSize) {
+			JobManager.threadPool.setCorePoolSize(newSize);
+			JobManager.threadPool.setMaximumPoolSize(newSize);
+		} else if (newSize > oldSize) {
+			JobManager.threadPool.setMaximumPoolSize(newSize);
+			JobManager.threadPool.setCorePoolSize(newSize);
+		}
+	}
+
 	public void shutdown() {
+		if (shuttingDown) return;
+
+		shuttingDown = true;
 		this.queuedJobs.clear();
 
 		synchronized (this.runningJobs) {
@@ -140,6 +207,10 @@ public class JobManager {
 		}
 
 		threadPool.shutdownNow();
+	}
+
+	public boolean isShuttingDown() {
+		return shuttingDown;
 	}
 
 	public enum JobManagerEvent {

@@ -37,12 +37,12 @@ public abstract class Job<T> implements Runnable {
 	protected volatile List<JobCategory> blockingJobCategories = Collections.synchronizedList(new ArrayList<>());
 
 	public Job(JobCategory category) {
-		this(category, category.getId());
+		this(category, null);
 	}
 
-	public Job(JobCategory category, String id) {
+	public Job(JobCategory category, String idAppendix) {
 		this.category = category;
-		this.id = id;
+		this.id = category.getId() + idAppendix == null ? "" : ":" + idAppendix;
 
 		changeDefaultSettings(settings);
 	}
@@ -263,7 +263,7 @@ public abstract class Job<T> implements Runnable {
 	private void onOwnProgressChange(double progress) {
 		validateProgress(progress);
 
-		if (Math.abs(progress - ownProgress) < 0.005) {
+		if (progress < 0.995 && Math.abs(progress - ownProgress) < 0.005) {
 			// Avoid time consuming computations for
 			// unnoticeable progress deltas
 			return;
@@ -357,7 +357,9 @@ public abstract class Job<T> implements Runnable {
 		this.state = JobState.ERRORED;
 		this.error = error;
 
-		if (this.settings.isPrintStackTraceOnError() && !this.killed) {
+		if (this.settings.isPrintStackTraceOnError()
+				&& !JobManager.get().isShuttingDown()
+				&& !this.killed) {
 			System.err.println(String.format("An exception has been encountered in job '%s':\n%s",
 					id, Util.getStacktrace(error)));
 		}
@@ -412,12 +414,50 @@ public abstract class Job<T> implements Runnable {
 	}
 
 	/**
-	 * {@return an unmodifiable view of the subjob list}.
+	 * {@return an unmodifiable list of subjobs}.
 	 */
-	public List<Job<?>> getSubJobs() {
-		return Collections.unmodifiableList(this.subJobs);
+	public List<Job<?>> getSubJobs(boolean recursive) {
+		if (!recursive) {
+			return Collections.unmodifiableList(this.subJobs);
+		}
+
+		List<Job<?>> subjobs = List.copyOf(this.subJobs);
+		List<Job<?>> subjobsRecursive = new ArrayList<>(subjobs);
+
+		for (Job<?> subjob : subjobs) {
+			subjobsRecursive.addAll(subjob.getSubJobs(true));
+		}
+
+		return Collections.unmodifiableList(subjobsRecursive);
 	}
 
+	public boolean hasSubJob(String id, boolean recursive) {
+		List<Job<?>> subjobs = List.copyOf(this.subJobs);
+		boolean hasSubJob = false;
+
+		for (Job<?> subjob : subjobs) {
+			if (subjob.getId().equals(id)) {
+				hasSubJob = true;
+				break;
+			}
+		}
+
+		if (!recursive) return hasSubJob;
+
+		for (Job<?> subjob : subjobs) {
+			if (subjob.hasSubJob(id, recursive)) {
+				hasSubJob = true;
+				break;
+			}
+		}
+
+		return hasSubJob;
+	}
+
+	/**
+	 * Checks if this job or any of its subjobs are
+	 * blocked by the passed job category.
+	 */
 	public boolean isBlockedBy(JobCategory category) {
 		boolean blocked = this.blockingJobCategories.contains(category);
 

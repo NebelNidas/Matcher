@@ -82,7 +82,7 @@ public class JobProgressView extends Control {
 	}
 
 	private void removeJob(Job<?> job) {
-		List<Job<?>> subJobs = job.getSubJobs();
+		List<Job<?>> subJobs = job.getSubJobs(false);
 
 		synchronized (subJobs) {
 			for (int i = subJobs.size() - 1; i >= 0; i--) {
@@ -186,7 +186,7 @@ public class JobProgressView extends Control {
 				if (this.job.getProgress() <= 0) {
 					progressBar.setProgress(-1);
 				} else {
-					progressLabel.setText(String.format("%.0f%%", this.job.getProgress() * 100));
+					progressLabel.setText(String.format("%.0f%%", Math.floor(this.job.getProgress() * 100)));
 					progressBar.setProgress(this.job.getProgress());
 				}
 

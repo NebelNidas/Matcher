@@ -89,7 +89,7 @@ public class Matcher {
 
 			@Override
 			protected Void execute(DoubleConsumer progressReceiver) {
-				for (Job<?> subJob : getSubJobs()) {
+				for (Job<?> subJob : getSubJobs(false)) {
 					subJob.run();
 				}
 

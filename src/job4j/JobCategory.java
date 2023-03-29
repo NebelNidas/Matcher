@@ -53,7 +53,7 @@ public class JobCategory {
 
 	@Override
 	public boolean equals(Object obj) {
-		if (obj instanceof JobCategory) {
+		if (!(obj instanceof JobCategory)) {
 			return false;
 		}
 

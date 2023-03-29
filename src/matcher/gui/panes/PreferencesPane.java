@@ -53,7 +53,7 @@ public class PreferencesPane extends VBox {
 		getChildren().add(text);
 
 		alignedMaxSliderValue = Math.max(2, alignedMaxSliderValue);
-		jobExecutorsSlider = newSlider(minSliderValue, alignedMaxSliderValue, sliderLabelStep, JobManager.threadPool.getMaximumPoolSize());
+		jobExecutorsSlider = newSlider(minSliderValue, alignedMaxSliderValue, sliderLabelStep, JobManager.get().getMaxJobExecutorThreads());
 		jobExecutorsSlider.valueProperty().addListener((newValue) -> showWarningIfNecessary());
 		getChildren().add(jobExecutorsSlider);
 
@@ -130,16 +130,7 @@ public class PreferencesPane extends VBox {
 			Matcher.threadPool = (ForkJoinPool) Executors.newWorkStealingPool(newThreadPoolSize);
 		}
 
-		oldThreadPoolSize = JobManager.threadPool.getMaximumPoolSize();
-		newThreadPoolSize = (int) jobExecutorsSlider.getValue();
-
-		if (newThreadPoolSize < oldThreadPoolSize) {
-			JobManager.threadPool.setCorePoolSize(newThreadPoolSize);
-			JobManager.threadPool.setMaximumPoolSize(newThreadPoolSize);
-		} else if (newThreadPoolSize > oldThreadPoolSize) {
-			JobManager.threadPool.setMaximumPoolSize(newThreadPoolSize);
-			JobManager.threadPool.setCorePoolSize(newThreadPoolSize);
-		}
+		JobManager.get().setMaxJobExecutorThreads((int) jobExecutorsSlider.getValue());
 	}
 
 	private final Button okButton;
