@@ -360,5 +360,5 @@ public class Util {
 		}
 	}
 
-	public static final Object asmNodeSync = new Object();
+	public static final Object bytecodeClassSync = new Object();
 }

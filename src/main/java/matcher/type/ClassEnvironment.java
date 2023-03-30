@@ -26,8 +26,6 @@ import java.util.concurrent.ExecutionException;
 import java.util.function.DoubleConsumer;
 import java.util.regex.Pattern;
 
-import org.objectweb.asm.ClassReader;
-import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.tree.ClassNode;
 import org.objectweb.asm.tree.FieldNode;
 import org.objectweb.asm.tree.InnerClassNode;
@@ -35,6 +33,9 @@ import org.objectweb.asm.tree.MethodNode;
 
 import matcher.NameType;
 import matcher.Util;
+import matcher.bcprovider.BytecodeClass;
+import matcher.bcprovider.BytecodeClassReader;
+import matcher.bcprovider.BytecodeOpcodes;
 import matcher.classifier.ClassifierUtil;
 import matcher.classifier.MatchingCache;
 import matcher.config.ProjectConfig;
@@ -376,7 +377,7 @@ public final class ClassEnvironment implements ClassEnv {
 			}
 
 			if (file != null) {
-				ClassNode cn = readClass(file, true);
+				BytecodeClass cn = readClass(file, true);
 				ClassInstance cls = new ClassInstance(ClassInstance.getId(cn.name), getContainingUri(file.toUri(), cn.name), this, cn);
 				if (!cls.getId().equals(id)) throw new RuntimeException("mismatched cls id "+id+" for "+file+", expected "+name);
 
@@ -465,11 +466,11 @@ public final class ClassEnvironment implements ClassEnv {
 		}
 	}
 
-	static ClassNode readClass(Path path, boolean skipCode) {
+	static BytecodeClass readClass(Path path, boolean skipCode) {
 		try {
-			ClassReader reader = new ClassReader(Files.readAllBytes(path));
-			ClassNode cn = new ClassNode();
-			reader.accept(cn, ClassReader.EXPAND_FRAMES | (skipCode ? ClassReader.SKIP_CODE : 0));
+			BytecodeClassReader reader = new BytecodeClassReader(Files.readAllBytes(path));
+			BytecodeClass cn = new BytecodeClass();
+			reader.accept(cn, BytecodeClassReader.EXPAND_FRAMES | (skipCode ? BytecodeClassReader.SKIP_CODE : 0));
 
 			return cn;
 		} catch (IOException e) {
@@ -486,12 +487,12 @@ public final class ClassEnvironment implements ClassEnv {
 
 		Set<String> strings = cls.strings;
 
-		for (ClassNode cn : cls.getAsmNodes()) {
+		for (ClassNode cn : cls.getBytecodeClasses()) {
 			if (cls.isInput() && cls.getSignature() == null && cn.signature != null) {
 				cls.setSignature(ClassSignature.parse(cn.signature, cls.getEnv()));
 			}
 
-			boolean isEnum = (cn.access & Opcodes.ACC_ENUM) != 0;
+			boolean isEnum = (cn.access & BytecodeOpcodes.ACC_ENUM) != 0;
 
 			for (int i = 0; i < cn.methods.size(); i++) {
 				MethodNode mn = cn.methods.get(i);
@@ -500,7 +501,7 @@ public final class ClassEnvironment implements ClassEnv {
 					boolean nameObfuscated = cls.isInput()
 							&& !mn.name.equals("<clinit>")
 							&& !mn.name.equals("<init>")
-							&& (!mn.name.equals("main") || !mn.desc.equals("([Ljava/lang/String;)V") || mn.access != (Opcodes.ACC_PUBLIC | Opcodes.ACC_STATIC))
+							&& (!mn.name.equals("main") || !mn.desc.equals("([Ljava/lang/String;)V") || mn.access != (BytecodeOpcodes.ACC_PUBLIC | BytecodeOpcodes.ACC_STATIC))
 							&& (!isEnum || !isStandardEnumMethod(cn.name, mn))
 							&& (nonObfuscatedMemberPattern == null || !nonObfuscatedMemberPattern.matcher(cn.name+"/"+mn.name+mn.desc).matches());
 
@@ -540,7 +541,7 @@ public final class ClassEnvironment implements ClassEnv {
 	}
 
 	private static boolean isStandardEnumMethod(String clsName, MethodNode m) {
-		final int reqFlags = Opcodes.ACC_STATIC | Opcodes.ACC_PUBLIC;
+		final int reqFlags = BytecodeOpcodes.ACC_STATIC | BytecodeOpcodes.ACC_PUBLIC;
 		if ((m.access & reqFlags) != reqFlags) return false;
 
 		return m.name.equals("values") && m.desc.startsWith("()[L") && m.desc.startsWith(clsName, 4) && m.desc.length() == clsName.length() + 5

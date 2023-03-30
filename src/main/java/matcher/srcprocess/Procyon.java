@@ -48,7 +48,7 @@ public class Procyon implements Decompiler {
 				return false;
 			}
 
-			if (cls.getAsmNodes() == null) {
+			if (cls.getBytecodeClasses() == null) {
 				if (checkWarn(internalName)) {
 					System.out.printf("unknown cls: %s%n", internalName);
 				}

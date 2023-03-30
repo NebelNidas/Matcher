@@ -14,16 +14,15 @@ import java.util.Map;
 import java.util.Queue;
 import java.util.Set;
 
-import org.objectweb.asm.ClassVisitor;
-import org.objectweb.asm.ClassWriter;
-import org.objectweb.asm.Opcodes;
-import org.objectweb.asm.tree.ClassNode;
-
 import matcher.NameType;
 import matcher.SimilarityChecker;
 import matcher.Util;
-import matcher.bcremap.AsmClassRemapper;
-import matcher.bcremap.AsmRemapper;
+import matcher.bcprovider.BytecodeClass;
+import matcher.bcprovider.BytecodeClassVisitor;
+import matcher.bcprovider.BytecodeClassWriter;
+import matcher.bcprovider.BytecodeOpcodes;
+import matcher.bcremap.BytecodeClassRemapper;
+import matcher.bcremap.BytecodeRemapper;
 import matcher.classifier.ClassifierUtil;
 import matcher.type.Signature.ClassSignature;
 
@@ -40,8 +39,8 @@ public final class ClassInstance implements Matchable<ClassInstance> {
 	/**
 	 * Create a known class (class path).
 	 */
-	public ClassInstance(String id, URI origin, ClassEnv env, ClassNode asmNode) {
-		this(id, origin, env, asmNode, false, false, null);
+	public ClassInstance(String id, URI origin, ClassEnv env, BytecodeClass bytecodeClass) {
+		this(id, origin, env, bytecodeClass, false, false, null);
 
 		assert id.indexOf('[') == -1 : id;
 	}
@@ -62,22 +61,22 @@ public final class ClassInstance implements Matchable<ClassInstance> {
 	/**
 	 * Create a non-array class.
 	 */
-	ClassInstance(String id, URI origin, ClassEnv env, ClassNode asmNode, boolean nameObfuscated) {
-		this(id, origin, env, asmNode, nameObfuscated, true, null);
+	ClassInstance(String id, URI origin, ClassEnv env, BytecodeClass bytecodeClass, boolean nameObfuscated) {
+		this(id, origin, env, bytecodeClass, nameObfuscated, true, null);
 
 		assert id.startsWith("L") : id;
 		assert id.indexOf('[') == -1 : id;
-		assert asmNode != null;
+		assert bytecodeClass != null;
 	}
 
-	private ClassInstance(String id, URI origin, ClassEnv env, ClassNode asmNode, boolean nameObfuscated, boolean input, ClassInstance elementClass) {
+	private ClassInstance(String id, URI origin, ClassEnv env, BytecodeClass bytecodeClass, boolean nameObfuscated, boolean input, ClassInstance elementClass) {
 		if (id.isEmpty()) throw new IllegalArgumentException("empty id");
 		if (env == null) throw new NullPointerException("null env");
 
 		this.id = id;
 		this.origin = origin;
 		this.env = env;
-		this.asmNodes = asmNode == null ? null : new ClassNode[] { asmNode };
+		this.bytecodeClasses = bytecodeClass == null ? null : new BytecodeClass[] { bytecodeClass };
 		this.nameObfuscated = nameObfuscated;
 		this.input = input;
 		this.elementClass = elementClass;
@@ -277,37 +276,37 @@ public final class ClassInstance implements Matchable<ClassInstance> {
 		return env;
 	}
 
-	public ClassNode[] getAsmNodes() {
-		return asmNodes;
+	public BytecodeClass[] getBytecodeClasses() {
+		return bytecodeClasses;
 	}
 
 	public URI getAsmNodeOrigin(int index) {
-		if (index < 0 || index > 0 && (asmNodeOrigins == null || index >= asmNodeOrigins.length)) throw new IndexOutOfBoundsException(index);
+		if (index < 0 || index > 0 && (bytecodeClassOrigins == null || index >= bytecodeClassOrigins.length)) throw new IndexOutOfBoundsException(index);
 
-		return index == 0 ? origin : asmNodeOrigins[index];
+		return index == 0 ? origin : bytecodeClassOrigins[index];
 	}
 
-	public ClassNode getMergedAsmNode() {
-		if (asmNodes == null) return null;
-		if (asmNodes.length == 1) return asmNodes[0];
+	public BytecodeClass getMergedBytecodeClass() {
+		if (bytecodeClasses == null) return null;
+		if (bytecodeClasses.length == 1) return bytecodeClasses[0];
 
-		return asmNodes[0]; // TODO: actually merge
+		return bytecodeClasses[0]; // TODO: actually merge
 	}
 
-	void addAsmNode(ClassNode node, URI origin) {
+	void addBytecodeClass(BytecodeClass node, URI origin) {
 		if (!input) throw new IllegalStateException("not mergeable");
 
-		asmNodes = Arrays.copyOf(asmNodes, asmNodes.length + 1);
-		asmNodes[asmNodes.length - 1] = node;
+		bytecodeClasses = Arrays.copyOf(bytecodeClasses, bytecodeClasses.length + 1);
+		bytecodeClasses[bytecodeClasses.length - 1] = node;
 
-		if (asmNodeOrigins == null) {
-			asmNodeOrigins = new URI[2];
-			asmNodeOrigins[0] = this.origin;
+		if (bytecodeClassOrigins == null) {
+			bytecodeClassOrigins = new URI[2];
+			bytecodeClassOrigins[0] = this.origin;
 		} else {
-			asmNodeOrigins = Arrays.copyOf(asmNodeOrigins, asmNodeOrigins.length + 1);
+			bytecodeClassOrigins = Arrays.copyOf(bytecodeClassOrigins, bytecodeClassOrigins.length + 1);
 		}
 
-		asmNodeOrigins[asmNodeOrigins.length - 1] = origin;
+		bytecodeClassOrigins[bytecodeClassOrigins.length - 1] = origin;
 	}
 
 	@Override
@@ -448,25 +447,25 @@ public final class ClassInstance implements Matchable<ClassInstance> {
 	public int getAccess() {
 		int ret;
 
-		if (asmNodes != null) {
-			ret = asmNodes[0].access;
+		if (bytecodeClasses != null) {
+			ret = bytecodeClasses[0].access;
 
 			if (superClass != null && superClass.id.equals("Ljava/lang/Record;")) { // ACC_RECORD is added by ASM through Record component attribute presence, don't trust the flag to handle stripping of the attribute
-				ret |= Opcodes.ACC_RECORD;
+				ret |= BytecodeOpcodes.ACC_RECORD;
 			}
 		} else {
-			ret = Opcodes.ACC_PUBLIC;
+			ret = BytecodeOpcodes.ACC_PUBLIC;
 
 			if (!implementers.isEmpty()) {
-				ret |= Opcodes.ACC_INTERFACE | Opcodes.ACC_ABSTRACT;
+				ret |= BytecodeOpcodes.ACC_INTERFACE | BytecodeOpcodes.ACC_ABSTRACT;
 			} else if (superClass != null && superClass.id.equals("Ljava/lang/Enum;")) {
-				ret |= Opcodes.ACC_ENUM;
-				if (childClasses.isEmpty()) ret |= Opcodes.ACC_FINAL;
+				ret |= BytecodeOpcodes.ACC_ENUM;
+				if (childClasses.isEmpty()) ret |= BytecodeOpcodes.ACC_FINAL;
 			} else if (superClass != null && superClass.id.equals("Ljava/lang/Record;")) {
-				ret |= Opcodes.ACC_RECORD;
-				if (childClasses.isEmpty()) ret |= Opcodes.ACC_FINAL;
+				ret |= BytecodeOpcodes.ACC_RECORD;
+				if (childClasses.isEmpty()) ret |= BytecodeOpcodes.ACC_FINAL;
 			} else if (interfaces.size() == 1 && interfaces.iterator().next().id.equals("Ljava/lang/annotation/Annotation;")) {
-				ret |= Opcodes.ACC_ANNOTATION | Opcodes.ACC_INTERFACE | Opcodes.ACC_ABSTRACT;
+				ret |= BytecodeOpcodes.ACC_ANNOTATION | BytecodeOpcodes.ACC_INTERFACE | BytecodeOpcodes.ACC_ABSTRACT;
 			}
 		}
 
@@ -474,19 +473,19 @@ public final class ClassInstance implements Matchable<ClassInstance> {
 	}
 
 	public boolean isInterface() {
-		return (getAccess() & Opcodes.ACC_INTERFACE) != 0;
+		return (getAccess() & BytecodeOpcodes.ACC_INTERFACE) != 0;
 	}
 
 	public boolean isEnum() {
-		return (getAccess() & Opcodes.ACC_ENUM) != 0;
+		return (getAccess() & BytecodeOpcodes.ACC_ENUM) != 0;
 	}
 
 	public boolean isAnnotation() {
-		return (getAccess() & Opcodes.ACC_ANNOTATION) != 0;
+		return (getAccess() & BytecodeOpcodes.ACC_ANNOTATION) != 0;
 	}
 
 	public boolean isRecord() {
-		return (getAccess() & Opcodes.ACC_RECORD) != 0 || superClass != null && superClass.id.equals("Ljava/lang/Record;");
+		return (getAccess() & BytecodeOpcodes.ACC_RECORD) != 0 || superClass != null && superClass.id.equals("Ljava/lang/Record;");
 	}
 
 	public MethodInstance getMethod(String id) {
@@ -643,7 +642,7 @@ public final class ClassInstance implements Matchable<ClassInstance> {
 		// toInterface = true: https://docs.oracle.com/javase/specs/jvms/se8/html/jvms-5.html#jvms-5.4.3.4
 		// TODO: access check after resolution
 
-		assert asmNodes == null || isInterface() == toInterface;
+		assert bytecodeClasses == null || isInterface() == toInterface;
 
 		if (!toInterface) {
 			MethodInstance ret = resolveSignaturePolymorphicMethod(name);
@@ -671,7 +670,7 @@ public final class ClassInstance implements Matchable<ClassInstance> {
 				assert superClass.id.equals("Ljava/lang/Object;");
 
 				ret = superClass.getMethod(name, desc);
-				if (ret != null && (!ret.isReal() || (ret.access & (Opcodes.ACC_PUBLIC | Opcodes.ACC_STATIC)) == Opcodes.ACC_PUBLIC)) return ret;
+				if (ret != null && (!ret.isReal() || (ret.access & (BytecodeOpcodes.ACC_PUBLIC | BytecodeOpcodes.ACC_STATIC)) == BytecodeOpcodes.ACC_PUBLIC)) return ret;
 			}
 
 			return resolveInterfaceMethod(name, desc);
@@ -681,7 +680,7 @@ public final class ClassInstance implements Matchable<ClassInstance> {
 	private MethodInstance resolveSignaturePolymorphicMethod(String name) {
 		if (id.equals("Ljava/lang/invoke/MethodHandle;")) { // check for signature polymorphic method - jvms-2.9
 			MethodInstance ret = getMethod(name, "([Ljava/lang/Object;)Ljava/lang/Object;");
-			final int reqFlags = Opcodes.ACC_VARARGS | Opcodes.ACC_NATIVE;
+			final int reqFlags = BytecodeOpcodes.ACC_VARARGS | BytecodeOpcodes.ACC_NATIVE;
 
 			if (ret != null && (!ret.isReal() || (ret.access & reqFlags) == reqFlags)) {
 				return ret;
@@ -711,10 +710,10 @@ public final class ClassInstance implements Matchable<ClassInstance> {
 			MethodInstance ret = cls.getMethod(name, desc);
 
 			if (ret != null
-					&& (!ret.isReal() || (ret.access & (Opcodes.ACC_PRIVATE | Opcodes.ACC_STATIC)) == 0)) {
+					&& (!ret.isReal() || (ret.access & (BytecodeOpcodes.ACC_PRIVATE | BytecodeOpcodes.ACC_STATIC)) == 0)) {
 				matches.add(ret);
 
-				if (ret.isReal() && (ret.access & Opcodes.ACC_ABSTRACT) == 0) { // jvms prefers the closest non-abstract method
+				if (ret.isReal() && (ret.access & BytecodeOpcodes.ACC_ABSTRACT) == 0) { // jvms prefers the closest non-abstract method
 					foundNonAbstract = true;
 				}
 			}
@@ -733,7 +732,7 @@ public final class ClassInstance implements Matchable<ClassInstance> {
 			for (Iterator<MethodInstance> it = matches.iterator(); it.hasNext(); ) {
 				MethodInstance m = it.next();
 
-				if (!m.isReal() || (m.access & Opcodes.ACC_ABSTRACT) != 0) {
+				if (!m.isReal() || (m.access & BytecodeOpcodes.ACC_ABSTRACT) != 0) {
 					it.remove();
 				}
 			}
@@ -807,14 +806,14 @@ public final class ClassInstance implements Matchable<ClassInstance> {
 
 	public MethodInstance getMethod(int pos) {
 		if (pos < 0 || pos >= methods.length) throw new IndexOutOfBoundsException();
-		if (asmNodes == null) throw new UnsupportedOperationException();
+		if (bytecodeClasses == null) throw new UnsupportedOperationException();
 
 		return methods[pos];
 	}
 
 	public FieldInstance getField(int pos) {
 		if (pos < 0 || pos >= fields.length) throw new IndexOutOfBoundsException();
-		if (asmNodes == null) throw new UnsupportedOperationException();
+		if (bytecodeClasses == null) throw new UnsupportedOperationException();
 
 		return fields[pos];
 	}
@@ -1061,13 +1060,13 @@ public final class ClassInstance implements Matchable<ClassInstance> {
 		return objCls;
 	}
 
-	public void accept(ClassVisitor visitor, NameType nameType) {
-		ClassNode cn = getMergedAsmNode();
-		if (cn == null) throw new IllegalArgumentException("cls without asm node: "+this);
+	public void accept(BytecodeClassVisitor visitor, NameType nameType) {
+		BytecodeClass cn = getMergedBytecodeClass();
+		if (cn == null) throw new IllegalArgumentException("cls without backing bytecode class: "+this);
 
-		synchronized (Util.asmNodeSync) {
+		synchronized (Util.bytecodeClassSync) {
 			if (nameType != NameType.PLAIN) {
-				AsmClassRemapper.process(cn, new AsmRemapper(env, nameType), visitor);
+				BytecodeClassRemapper.process(cn, new BytecodeRemapper(env, nameType), visitor);
 			} else {
 				cn.accept(visitor);
 			}
@@ -1075,7 +1074,7 @@ public final class ClassInstance implements Matchable<ClassInstance> {
 	}
 
 	public byte[] serialize(NameType nameType) {
-		ClassWriter writer = new ClassWriter(0);
+		BytecodeClassWriter writer = new BytecodeClassWriter(0);
 		accept(writer, nameType);
 
 		return writer.toByteArray();
@@ -1168,8 +1167,8 @@ public final class ClassInstance implements Matchable<ClassInstance> {
 	final String id;
 	private final URI origin;
 	final ClassEnv env;
-	private ClassNode[] asmNodes;
-	private URI[] asmNodeOrigins;
+	private BytecodeClass[] bytecodeClasses;
+	private URI[] bytecodeClassOrigins;
 	final boolean nameObfuscated;
 	private final boolean input;
 	final ClassInstance elementClass; // 0-dim class TODO: improve handling of array classes (references etc.)

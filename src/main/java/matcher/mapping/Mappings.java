@@ -846,8 +846,8 @@ public class Mappings {
 
 		// check if each origin that supplies this method has a parent within the same origin
 
-		for (int i = 0; i < cls.getAsmNodes().length; i++) {
-			for (MethodNode m : cls.getAsmNodes()[i].methods) {
+		for (int i = 0; i < cls.getBytecodeClasses().length; i++) {
+			for (MethodNode m : cls.getBytecodeClasses()[i].methods) {
 				if (m.name.equals(method.getName())
 						&& m.desc.equals(method.getDesc())) {
 					if (!hasParentMethod(name, desc, method.getParents(), cls.getAsmNodeOrigin(i))) {
@@ -868,9 +868,9 @@ public class Mappings {
 		for (MethodInstance parent : parents) {
 			ClassInstance parentCls = parent.getCls();
 
-			for (int i = 0; i < parentCls.getAsmNodes().length; i++) {
+			for (int i = 0; i < parentCls.getBytecodeClasses().length; i++) {
 				if (parentCls.getAsmNodeOrigin(i).equals(reqOrigin)) {
-					for (MethodNode m : parentCls.getAsmNodes()[i].methods) {
+					for (MethodNode m : parentCls.getBytecodeClasses()[i].methods) {
 						if (m.name.equals(name)
 								&& m.desc.equals(desc)) {
 							return true;

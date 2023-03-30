@@ -17,12 +17,12 @@ import org.objectweb.asm.tree.ClassNode;
 
 import matcher.Util;
 
-public class AsmClassRemapper extends ClassRemapper {
-	public static void process(ClassNode source, AsmRemapper remapper, ClassVisitor sink) {
-		source.accept(new AsmClassRemapper(sink, remapper));
+public class BytecodeClassRemapper extends ClassRemapper {
+	public static void process(ClassNode source, BytecodeRemapper remapper, ClassVisitor sink) {
+		source.accept(new BytecodeClassRemapper(sink, remapper));
 	}
 
-	private AsmClassRemapper(ClassVisitor cv, AsmRemapper remapper) {
+	private BytecodeClassRemapper(ClassVisitor cv, BytecodeRemapper remapper) {
 		super(cv, remapper);
 
 		this.remapper = remapper;
@@ -44,7 +44,7 @@ public class AsmClassRemapper extends ClassRemapper {
 	}
 
 	private class AsmMethodRemapper extends MethodRemapper {
-		AsmMethodRemapper(MethodVisitor mv, AsmRemapper remapper) {
+		AsmMethodRemapper(MethodVisitor mv, BytecodeRemapper remapper) {
 			super(mv, remapper);
 
 			this.remapper = remapper;
@@ -295,14 +295,14 @@ public class AsmClassRemapper extends ClassRemapper {
 			if (methodName == null) throw new IllegalStateException("not visiting a method");
 		}
 
-		protected final AsmRemapper remapper;
+		protected final BytecodeRemapper remapper;
 
 		protected int insnIndex;
 		protected Map<Label, Integer> labels = new IdentityHashMap<>();
 		private int argsVisited;
 	}
 
-	protected final AsmRemapper remapper;
+	protected final BytecodeRemapper remapper;
 	protected String methodName;
 	protected String methodDesc;
 }

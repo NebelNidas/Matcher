@@ -9,8 +9,8 @@ import matcher.type.FieldInstance;
 import matcher.type.MethodInstance;
 import matcher.type.MethodVarInstance;
 
-public class AsmRemapper extends Remapper {
-	public AsmRemapper(ClassEnv env, NameType nameType) {
+public class BytecodeRemapper extends Remapper {
+	public BytecodeRemapper(ClassEnv env, NameType nameType) {
 		this.env = env;
 		this.nameType = nameType;
 	}

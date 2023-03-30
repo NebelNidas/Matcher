@@ -73,7 +73,7 @@ public class Cfr implements Decompiler {
 				throw new NoSuchFileException(path);
 			}
 
-			if (cls.getAsmNodes() == null) {
+			if (cls.getBytecodeClasses() == null) {
 				System.out.printf("getClassFileContent unknown cls: %s%n", clsName);
 				throw new NoSuchFileException(path);
 			}

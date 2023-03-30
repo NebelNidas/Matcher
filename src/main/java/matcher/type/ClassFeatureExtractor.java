@@ -22,7 +22,6 @@ import java.util.regex.Pattern;
 import org.objectweb.asm.Handle;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.tree.AbstractInsnNode;
-import org.objectweb.asm.tree.ClassNode;
 import org.objectweb.asm.tree.FieldInsnNode;
 import org.objectweb.asm.tree.InvokeDynamicInsnNode;
 import org.objectweb.asm.tree.MethodInsnNode;
@@ -30,6 +29,7 @@ import org.objectweb.asm.tree.TypeInsnNode;
 
 import matcher.NameType;
 import matcher.Util;
+import matcher.bcprovider.BytecodeClass;
 import matcher.type.Analysis.CommonClasses;
 
 public class ClassFeatureExtractor implements LocalClassEnv {
@@ -39,7 +39,7 @@ public class ClassFeatureExtractor implements LocalClassEnv {
 
 	public void processInputs(Collection<Path> inputs, Pattern nonObfuscatedClasses) {
 		Set<Path> uniqueInputs = new LinkedHashSet<>(inputs);
-		Predicate<ClassNode> obfuscatedCheck = cn -> isNameObfuscated(cn, nonObfuscatedClasses);
+		Predicate<BytecodeClass> obfuscatedCheck = cn -> isNameObfuscated(cn, nonObfuscatedClasses);
 
 		for (Path archive : uniqueInputs) {
 			inputFiles.add(new InputFile(archive));
@@ -86,25 +86,25 @@ public class ClassFeatureExtractor implements LocalClassEnv {
 		}
 	}
 
-	private static boolean isNameObfuscated(ClassNode cn, Pattern pattern) {
+	private static boolean isNameObfuscated(BytecodeClass cn, Pattern pattern) {
 		return pattern == null || !pattern.matcher(cn.name).matches();
 	}
 
-	private ClassInstance readClass(Path path, URI origin, Predicate<ClassNode> nameObfuscated) {
-		ClassNode cn = ClassEnvironment.readClass(path, false);
+	private ClassInstance readClass(Path path, URI origin, Predicate<BytecodeClass> nameObfuscated) {
+		BytecodeClass cn = ClassEnvironment.readClass(path, false);
 
 		return new ClassInstance(ClassInstance.getId(cn.name), origin, this, cn, nameObfuscated.test(cn));
 	}
 
 	private static void mergeClasses(ClassInstance from, ClassInstance to) {
-		assert from.getAsmNodes().length == 1;
+		assert from.getBytecodeClasses().length == 1;
 
-		to.addAsmNode(from.getAsmNodes()[0], from.getOrigin());
+		to.addBytecodeClass(from.getBytecodeClasses()[0], from.getOrigin());
 	}
 
 	public void process(Pattern nonObfuscatedMemberPattern) {
 		ClassInstance clo = getCreateClassInstance("Ljava/lang/Object;");
-		assert clo != null && clo.getAsmNodes() != null;
+		assert clo != null && clo.getBytecodeClasses() != null;
 
 		initStep++;
 		List<ClassInstance> initialClasses = new ArrayList<>(classes.values());
@@ -675,7 +675,7 @@ public class ClassFeatureExtractor implements LocalClassEnv {
 		Path file = classPathIndex.get(name);
 		if (file == null) return null;
 
-		ClassNode cn = ClassEnvironment.readClass(file, false);
+		BytecodeClass cn = ClassEnvironment.readClass(file, false);
 		ClassInstance cls = new ClassInstance(ClassInstance.getId(cn.name), ClassEnvironment.getContainingUri(file.toUri(), cn.name), this, cn);
 		if (!cls.getId().equals(id)) throw new RuntimeException("mismatched cls id "+id+" for "+file+", expected "+name);
 

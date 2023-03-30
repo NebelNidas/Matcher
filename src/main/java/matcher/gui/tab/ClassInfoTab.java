@@ -181,8 +181,8 @@ public class ClassInfoTab extends Tab implements IGuiComponent {
 	static String getInputPaths(ClassInstance cls, Predicate<ClassNode> filter) {
 		StringBuilder ret = new StringBuilder();
 
-		for (int i = 0; i < cls.getAsmNodes().length; i++) {
-			if (!filter.test(cls.getAsmNodes()[i])) continue;
+		for (int i = 0; i < cls.getBytecodeClasses().length; i++) {
+			if (!filter.test(cls.getBytecodeClasses()[i])) continue;
 			if (ret.length() > 0) ret.append(", ");
 
 			String path = cls.getAsmNodeOrigin(i).getPath();
