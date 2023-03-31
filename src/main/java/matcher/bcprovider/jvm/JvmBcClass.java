@@ -12,6 +12,7 @@ import org.objectweb.asm.tree.MethodNode;
 
 import matcher.bcprovider.BytecodeClass;
 import matcher.bcprovider.BytecodeClassRemapNameProvider;
+import matcher.bcprovider.BytecodeClassVisitor;
 import matcher.bcprovider.BytecodeField;
 import matcher.bcprovider.BytecodeMethod;
 
@@ -108,6 +109,15 @@ public class JvmBcClass implements BytecodeClass {
 	@Override
 	public JvmBcClass getRemappedCopy(BytecodeClassRemapNameProvider renameProvider) {
 		return JvmBcClassRemapper.process(this, renameProvider);
+	}
+
+	@Override
+	public void accept(BytecodeClassVisitor visitor) {
+		if (!(visitor instanceof JvmBcClassVisitor)) {
+			throw new UnsupportedOperationException("Currently not supported!");
+		}
+
+		asmNode.accept(((JvmBcClassVisitor) visitor).asAsmVisitor());
 	}
 
 	private final ClassNode asmNode;

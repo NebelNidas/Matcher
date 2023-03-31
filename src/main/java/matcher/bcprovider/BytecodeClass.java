@@ -25,4 +25,5 @@ public interface BytecodeClass {
 	byte[] serialize();
 	BytecodeClass getCopy();
 	BytecodeClass getRemappedCopy(BytecodeClassRemapNameProvider renameProvider);
+	void accept(BytecodeClassVisitor visitor);
 }

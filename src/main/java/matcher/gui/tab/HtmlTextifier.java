@@ -54,6 +54,9 @@ import org.objectweb.asm.util.TextifierSupport;
 import org.objectweb.asm.util.TraceSignatureVisitor;
 
 import matcher.NameType;
+import matcher.bcprovider.BytecodeClassVisitor;
+import matcher.bcprovider.jvm.JvmBcClassVisitor;
+import matcher.bcprovider.jvm.JvmBytecodeProvider;
 import matcher.srcprocess.HtmlUtil;
 import matcher.type.ClassInstance;
 import matcher.type.FieldInstance;
@@ -61,7 +64,7 @@ import matcher.type.MethodInstance;
 
 final class HtmlTextifier extends Textifier {
 	HtmlTextifier(ClassInstance cls, NameType nameType) {
-		super(Opcodes.ASM9);
+		super(JvmBytecodeProvider.ASM_VERSION);
 
 		this.cls = cls;
 		this.nameType = nameType;
@@ -1955,6 +1958,72 @@ final class HtmlTextifier extends Textifier {
 		}
 
 		return o;
+	}
+
+	public BytecodeClassVisitor asBytecodeClassVisitor() {
+		Textifier mainVisitor = this;
+
+		return new JvmBcClassVisitor() {
+			@Override
+			public void visit(int version, int access, String name, String signature, String superName, String[] interfaces) {
+				mainVisitor.visit(version, access, name, signature, superName, interfaces);
+			}
+
+			@Override
+			public void visitSource(String source, String debug) {
+				mainVisitor.visitSource(source, debug);
+			}
+
+			@Override
+			public void visitModule(String name, int access, String version) {
+				mainVisitor.visitModule(name, access, version);
+			}
+
+			@Override
+			public void visitNestHost(String nestHost) {
+				mainVisitor.visitNestHost(nestHost);
+			}
+
+			@Override
+			public void visitOuterClass(String owner, String name, String descriptor) {
+				mainVisitor.visitOuterClass(owner, name, descriptor);
+			}
+
+			@Override
+			public void visitNestMember(String nestMember) {
+				mainVisitor.visitNestMember(nestMember);
+			}
+
+			@Override
+			public void visitPermittedSubclass(String permittedSubclass) {
+				mainVisitor.visitPermittedSubclass(permittedSubclass);
+			}
+
+			@Override
+			public void visitInnerClass(String name, String outerName, String innerName, int access) {
+				mainVisitor.visitInnerClass(name, outerName, innerName, access);
+			}
+
+			@Override
+			public void visitRecordComponent(String name, String descriptor, String signature) {
+				mainVisitor.visitRecordComponent(name, descriptor, signature)
+			}
+
+			@Override
+			public void visitField(int access, String name, String descriptor, String signature, Object value) {
+				mainVisitor.visitField(access, name, descriptor, signature, value);
+			}
+
+			@Override
+			public void visitMethod(int access, String name, String descriptor, String signature, String[] exceptions) {
+				mainVisitor.visitMethod(access, name, descriptor, signature, exceptions);
+			}
+
+			@Override
+			public void visitEnd() {
+				mainVisitor.visitClassEnd();
+			}
+		};
 	}
 
 	/**

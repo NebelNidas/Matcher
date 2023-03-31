@@ -45,7 +45,7 @@ public class BytecodeTab extends WebViewTab {
 
 			try (PrintWriter pw = new PrintWriter(writer)) {
 				NameType nameType = gui.getNameType().withUnmatchedTmp(unmatchedTmp);
-				// cls.accept(new JvmBcClassTraceVisitor(null, new HtmlTextifier(cls, nameType), pw), nameType);
+				cls.getMergedBytecodeClass().accept(new HtmlTextifier(cls, nameType).asBytecodeClassVisitor());
 			}
 
 			double prevScroll = isRefresh ? getScrollTop() : 0;

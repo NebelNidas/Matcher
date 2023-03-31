@@ -8,7 +8,6 @@
 // import org.objectweb.asm.FieldVisitor;
 // import org.objectweb.asm.MethodVisitor;
 // import org.objectweb.asm.ModuleVisitor;
-// import org.objectweb.asm.Opcodes;
 // import org.objectweb.asm.RecordComponentVisitor;
 // import org.objectweb.asm.TypePath;
 // import org.objectweb.asm.util.Printer;
@@ -16,7 +15,7 @@
 
 // public class JvmBcClassTraceVisitor extends JvmBcClassVisitor {
 // 	public JvmBcClassTraceVisitor(ClassVisitor classVisitor, Printer printer, PrintWriter printWriter) {
-// 		super(Opcodes.ASM9, classVisitor);
+// 		super(JvmBytecodeProvider.ASM_VERSION, classVisitor);
 
 // 		this.traceClassVisitor = new TraceClassVisitor(classVisitor, printer, printWriter);
 // 	}
