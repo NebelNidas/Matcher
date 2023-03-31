@@ -29,7 +29,6 @@ import org.objectweb.asm.tree.JumpInsnNode;
 import org.objectweb.asm.tree.LdcInsnNode;
 import org.objectweb.asm.tree.LookupSwitchInsnNode;
 import org.objectweb.asm.tree.MethodInsnNode;
-import org.objectweb.asm.tree.MethodNode;
 import org.objectweb.asm.tree.MultiANewArrayInsnNode;
 import org.objectweb.asm.tree.TableSwitchInsnNode;
 import org.objectweb.asm.tree.TypeInsnNode;
@@ -38,6 +37,7 @@ import org.objectweb.asm.util.Textifier;
 import org.objectweb.asm.util.TraceMethodVisitor;
 
 import matcher.Util;
+import matcher.bcprovider.BytecodeMethod;
 import matcher.classifier.MatchingCache.CacheToken;
 import matcher.type.ClassEnvironment;
 import matcher.type.ClassInstance;
@@ -283,10 +283,10 @@ public class ClassifierUtil {
 	}
 
 	public static double compareInsns(MethodInstance a, MethodInstance b) {
-		if (a.getAsmNode() == null || b.getAsmNode() == null) return 1;
+		if (a.getBcMethod() == null || b.getBcMethod() == null) return 1;
 
-		InsnList ilA = a.getAsmNode().instructions;
-		InsnList ilB = b.getAsmNode().instructions;
+		InsnList ilA = a.getBcMethod().getInstructions();
+		InsnList ilB = b.getBcMethod().getInstructions();
 
 		return compareLists(ilA, ilB, InsnList::get, InsnList::size, (inA, inB) -> compareInsns(inA, inB, ilA, ilB, (list, item) -> list.indexOf(item), a, b, a.getEnv().getGlobal()));
 	}
@@ -549,15 +549,15 @@ public class ClassifierUtil {
 	}
 
 	public static int[] mapInsns(MethodInstance a, MethodInstance b) {
-		if (a.getAsmNode() == null || b.getAsmNode() == null) return null;
+		if (a.getBcMethod() == null || b.getBcMethod() == null) return null;
 
-		InsnList ilA = a.getAsmNode().instructions;
-		InsnList ilB = b.getAsmNode().instructions;
+		InsnList ilA = a.getBcMethod().getInstructions();
+		InsnList ilB = b.getBcMethod().getInstructions();
 
 		if (ilA.size() * ilB.size() < 1000) {
 			return mapInsns(ilA, ilB, a, b, a.getEnv().getGlobal());
 		} else {
-			return a.getEnv().getGlobal().getCache().compute(ilMapCacheToken, a, b, (mA, mB) -> mapInsns(mA.getAsmNode().instructions, mB.getAsmNode().instructions, mA, mB, mA.getEnv().getGlobal()));
+			return a.getEnv().getGlobal().getCache().compute(ilMapCacheToken, a, b, (mA, mB) -> mapInsns(mA.getBcMethod().getInstructions(), mB.getBcMethod().getInstructions(), mA, mB, mA.getEnv().getGlobal()));
 		}
 	}
 
@@ -773,8 +773,8 @@ public class ClassifierUtil {
 		}
 	}
 
-	public static void extractNumbers(MethodNode node, Set<Integer> ints, Set<Long> longs, Set<Float> floats, Set<Double> doubles) {
-		for (Iterator<AbstractInsnNode> it = node.instructions.iterator(); it.hasNext(); ) {
+	public static void extractNumbers(BytecodeMethod bcMethod, Set<Integer> ints, Set<Long> longs, Set<Float> floats, Set<Double> doubles) {
+		for (Iterator<AbstractInsnNode> it = bcMethod.getInstructions().iterator(); it.hasNext(); ) {
 			AbstractInsnNode aInsn = it.next();
 
 			if (aInsn instanceof LdcInsnNode) {

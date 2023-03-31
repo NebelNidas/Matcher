@@ -14,11 +14,11 @@ import javafx.scene.control.Label;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.Tab;
 import javafx.scene.layout.GridPane;
-import org.objectweb.asm.tree.MethodNode;
 
 import matcher.NameType;
 import matcher.Util;
 import matcher.Util.AFElementType;
+import matcher.bcprovider.BytecodeMethod;
 import matcher.gui.Gui;
 import matcher.gui.GuiConstants;
 import matcher.gui.IGuiComponent;
@@ -150,13 +150,13 @@ public class MethodInfoTab extends Tab implements IGuiComponent {
 
 			uidLabel.setText(method.getUid() >= 0 ? Integer.toString(method.getUid()) : "-");
 			nameObfLabel.setText(Boolean.toString(method.isNameObfuscated()));
-			inputLabel.setText(ClassInfoTab.getInputPaths(method.getCls(), node -> node.methods.stream().anyMatch(m -> m.name.equals(method.getName()) && m.desc.equals(method.getDesc()))));
+			inputLabel.setText(ClassInfoTab.getInputPaths(method.getCls(), node -> node.getMethods().stream().anyMatch(m -> m.getName().equals(method.getName()) && m.getDesc().equals(method.getDesc()))));
 			argLabel.setText(Arrays.stream(method.getArgs()).map(a -> getVarName(a, nameType)).collect(Collectors.joining("\n")));
 			retTypeLabel.setText(getName(method.getRetType(), nameType));
 			accessLabel.setText(Util.formatAccessFlags(method.getAccess(), AFElementType.Method));
 
-			MethodNode asmNode = method.getAsmNode();
-			sigLabel.setText(asmNode == null || asmNode.signature == null ? "-" : asmNode.signature);
+			BytecodeMethod bcMethod = method.getBcMethod();
+			sigLabel.setText(bcMethod == null || bcMethod.getSignature() == null ? "-" : bcMethod.getSignature());
 
 			typeLabel.setText(method.getType().name());
 

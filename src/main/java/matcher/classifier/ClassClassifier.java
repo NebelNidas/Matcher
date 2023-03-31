@@ -11,13 +11,13 @@ import java.util.Set;
 
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.tree.AbstractInsnNode;
-import org.objectweb.asm.tree.FieldNode;
 import org.objectweb.asm.tree.InsnList;
 import org.objectweb.asm.tree.MethodInsnNode;
-import org.objectweb.asm.tree.MethodNode;
 
 import matcher.Matcher;
 import matcher.Util;
+import matcher.bcprovider.BytecodeField;
+import matcher.bcprovider.BytecodeMethod;
 import matcher.type.ClassEnvironment;
 import matcher.type.ClassInstance;
 import matcher.type.FieldInstance;
@@ -232,14 +232,14 @@ public class ClassClassifier {
 							}
 						}
 
-						MethodNode asmNodeA = methodA.getAsmNode();
-						MethodNode asmNodeB = methodB.getAsmNode();
+						BytecodeMethod asmNodeA = methodA.getBcMethod();
+						BytecodeMethod asmNodeB = methodB.getBcMethod();
 						double score;
 
 						if (asmNodeA == null || asmNodeB == null) {
 							score = asmNodeA == null && asmNodeB == null ? 1 : 0;
 						} else {
-							score = ClassifierUtil.compareCounts(asmNodeA.instructions.size(), asmNodeB.instructions.size());
+							score = ClassifierUtil.compareCounts(asmNodeA.getInstructions().size(), asmNodeB.getInstructions().size());
 						}
 
 						if (score > bestScore) {
@@ -482,8 +482,8 @@ public class ClassClassifier {
 				int[] map = ClassifierUtil.mapInsns(src, dst);
 				if (map == null) continue;
 
-				InsnList ilA = src.getAsmNode().instructions;
-				InsnList ilB = dst.getAsmNode().instructions;
+				InsnList ilA = src.getBcMethod().getInstructions();
+				InsnList ilB = dst.getBcMethod().getInstructions();
 
 				for (int srcIdx = 0; srcIdx < map.length; srcIdx++) {
 					if (map[srcIdx] < 0) continue;
@@ -518,17 +518,17 @@ public class ClassClassifier {
 
 	private static void extractNumbers(ClassInstance cls, Set<Integer> ints, Set<Long> longs, Set<Float> floats, Set<Double> doubles) {
 		for (MethodInstance method : cls.getMethods()) {
-			MethodNode asmNode = method.getAsmNode();
-			if (asmNode == null) continue;
+			BytecodeMethod bcMethod = method.getBcMethod();
+			if (bcMethod == null) continue;
 
-			ClassifierUtil.extractNumbers(asmNode, ints, longs, floats, doubles);
+			ClassifierUtil.extractNumbers(bcMethod, ints, longs, floats, doubles);
 		}
 
 		for (FieldInstance field : cls.getFields()) {
-			FieldNode asmNode = field.getAsmNode();
-			if (asmNode == null) continue;
+			BytecodeField bcField = field.getBytecodeField();
+			if (bcField == null) continue;
 
-			ClassifierUtil.handleNumberValue(asmNode.value, ints, longs, floats, doubles);
+			ClassifierUtil.handleNumberValue(bcField.getValue(), ints, longs, floats, doubles);
 		}
 	}
 

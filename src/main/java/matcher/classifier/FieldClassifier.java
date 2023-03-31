@@ -69,8 +69,8 @@ public class FieldClassifier {
 			if (!checkAsmNodes(fieldA, fieldB)) return compareAsmNodes(fieldA, fieldB);
 
 			int mask = Opcodes.ACC_STATIC;
-			int resultA = fieldA.getAsmNode().access & mask;
-			int resultB = fieldB.getAsmNode().access & mask;
+			int resultA = fieldA.getBytecodeField().getAccess() & mask;
+			int resultB = fieldB.getBytecodeField().getAccess() & mask;
 
 			return 1 - Integer.bitCount(resultA ^ resultB);
 		}
@@ -82,8 +82,8 @@ public class FieldClassifier {
 			if (!checkAsmNodes(fieldA, fieldB)) return compareAsmNodes(fieldA, fieldB);
 
 			int mask = (Opcodes.ACC_PUBLIC | Opcodes.ACC_PROTECTED | Opcodes.ACC_PRIVATE) | Opcodes.ACC_FINAL | Opcodes.ACC_VOLATILE | Opcodes.ACC_TRANSIENT | Opcodes.ACC_SYNTHETIC;
-			int resultA = fieldA.getAsmNode().access & mask;
-			int resultB = fieldB.getAsmNode().access & mask;
+			int resultA = fieldA.getBytecodeField().getAccess() & mask;
+			int resultB = fieldB.getBytecodeField().getAccess() & mask;
 
 			return 1 - Integer.bitCount(resultA ^ resultB) / 6.;
 		}
@@ -141,8 +141,8 @@ public class FieldClassifier {
 		public double getScore(FieldInstance fieldA, FieldInstance fieldB, ClassEnvironment env) {
 			if (!checkAsmNodes(fieldA, fieldB)) return compareAsmNodes(fieldA, fieldB);
 
-			Object valA = fieldA.getAsmNode().value;
-			Object valB = fieldB.getAsmNode().value;
+			Object valA = fieldA.getBytecodeField().getValue();
+			Object valB = fieldB.getBytecodeField().getValue();
 
 			if (valA == null && valB == null) return 1;
 			if (valA == null || valB == null) return 0;
@@ -206,8 +206,8 @@ public class FieldClassifier {
 				int[] map = ClassifierUtil.mapInsns(src, dst);
 				if (map == null) continue;
 
-				InsnList ilA = src.getAsmNode().instructions;
-				InsnList ilB = dst.getAsmNode().instructions;
+				InsnList ilA = src.getBcMethod().getInstructions();
+				InsnList ilB = dst.getBcMethod().getInstructions();
 
 				for (int srcIdx = 0; srcIdx < map.length; srcIdx++) {
 					if (map[srcIdx] < 0) continue;
@@ -261,8 +261,8 @@ public class FieldClassifier {
 				int[] map = ClassifierUtil.mapInsns(src, dst);
 				if (map == null) continue;
 
-				InsnList ilA = src.getAsmNode().instructions;
-				InsnList ilB = dst.getAsmNode().instructions;
+				InsnList ilA = src.getBcMethod().getInstructions();
+				InsnList ilB = dst.getBcMethod().getInstructions();
 
 				for (int srcIdx = 0; srcIdx < map.length; srcIdx++) {
 					if (map[srcIdx] < 0) continue;
@@ -301,11 +301,11 @@ public class FieldClassifier {
 	}
 
 	private static boolean checkAsmNodes(FieldInstance a, FieldInstance b) {
-		return a.getAsmNode() != null && b.getAsmNode() != null;
+		return a.getBytecodeField() != null && b.getBytecodeField() != null;
 	}
 
 	private static double compareAsmNodes(FieldInstance a, FieldInstance b) {
-		return a.getAsmNode() == null && b.getAsmNode() == null ? 1 : 0;
+		return a.getBytecodeField() == null && b.getBytecodeField() == null ? 1 : 0;
 	}
 
 	public abstract static class AbstractClassifier implements IClassifier<FieldInstance> {

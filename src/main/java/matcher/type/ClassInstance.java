@@ -18,11 +18,8 @@ import matcher.NameType;
 import matcher.SimilarityChecker;
 import matcher.Util;
 import matcher.bcprovider.BytecodeClass;
-import matcher.bcprovider.BytecodeClassVisitor;
-import matcher.bcprovider.BytecodeClassWriter;
-import matcher.bcprovider.BytecodeOpcodes;
-import matcher.bcremap.BytecodeClassRemapper;
-import matcher.bcremap.BytecodeRemapper;
+import matcher.bcprovider.jvm.JvmBcOpcodes;
+import matcher.bcremap.ClassRemapNameProvider;
 import matcher.classifier.ClassifierUtil;
 import matcher.type.Signature.ClassSignature;
 
@@ -76,7 +73,7 @@ public final class ClassInstance implements Matchable<ClassInstance> {
 		this.id = id;
 		this.origin = origin;
 		this.env = env;
-		this.bytecodeClasses = bytecodeClass == null ? null : new BytecodeClass[] { bytecodeClass };
+		if (bytecodeClass != null) this.bytecodeClasses.add(bytecodeClass);
 		this.nameObfuscated = nameObfuscated;
 		this.input = input;
 		this.elementClass = elementClass;
@@ -276,7 +273,7 @@ public final class ClassInstance implements Matchable<ClassInstance> {
 		return env;
 	}
 
-	public BytecodeClass[] getBytecodeClasses() {
+	public List<BytecodeClass> getBytecodeClasses() {
 		return bytecodeClasses;
 	}
 
@@ -288,16 +285,15 @@ public final class ClassInstance implements Matchable<ClassInstance> {
 
 	public BytecodeClass getMergedBytecodeClass() {
 		if (bytecodeClasses == null) return null;
-		if (bytecodeClasses.length == 1) return bytecodeClasses[0];
+		if (bytecodeClasses.size() == 1) return bytecodeClasses.get(0);
 
-		return bytecodeClasses[0]; // TODO: actually merge
+		return bytecodeClasses.get(0); // TODO: actually merge
 	}
 
 	void addBytecodeClass(BytecodeClass node, URI origin) {
 		if (!input) throw new IllegalStateException("not mergeable");
 
-		bytecodeClasses = Arrays.copyOf(bytecodeClasses, bytecodeClasses.length + 1);
-		bytecodeClasses[bytecodeClasses.length - 1] = node;
+		bytecodeClasses.add(node);
 
 		if (bytecodeClassOrigins == null) {
 			bytecodeClassOrigins = new URI[2];
@@ -448,24 +444,24 @@ public final class ClassInstance implements Matchable<ClassInstance> {
 		int ret;
 
 		if (bytecodeClasses != null) {
-			ret = bytecodeClasses[0].access;
+			ret = bytecodeClasses.get(0).getAccess();
 
 			if (superClass != null && superClass.id.equals("Ljava/lang/Record;")) { // ACC_RECORD is added by ASM through Record component attribute presence, don't trust the flag to handle stripping of the attribute
-				ret |= BytecodeOpcodes.ACC_RECORD;
+				ret |= JvmBcOpcodes.ACC_RECORD;
 			}
 		} else {
-			ret = BytecodeOpcodes.ACC_PUBLIC;
+			ret = JvmBcOpcodes.ACC_PUBLIC;
 
 			if (!implementers.isEmpty()) {
-				ret |= BytecodeOpcodes.ACC_INTERFACE | BytecodeOpcodes.ACC_ABSTRACT;
+				ret |= JvmBcOpcodes.ACC_INTERFACE | JvmBcOpcodes.ACC_ABSTRACT;
 			} else if (superClass != null && superClass.id.equals("Ljava/lang/Enum;")) {
-				ret |= BytecodeOpcodes.ACC_ENUM;
-				if (childClasses.isEmpty()) ret |= BytecodeOpcodes.ACC_FINAL;
+				ret |= JvmBcOpcodes.ACC_ENUM;
+				if (childClasses.isEmpty()) ret |= JvmBcOpcodes.ACC_FINAL;
 			} else if (superClass != null && superClass.id.equals("Ljava/lang/Record;")) {
-				ret |= BytecodeOpcodes.ACC_RECORD;
-				if (childClasses.isEmpty()) ret |= BytecodeOpcodes.ACC_FINAL;
+				ret |= JvmBcOpcodes.ACC_RECORD;
+				if (childClasses.isEmpty()) ret |= JvmBcOpcodes.ACC_FINAL;
 			} else if (interfaces.size() == 1 && interfaces.iterator().next().id.equals("Ljava/lang/annotation/Annotation;")) {
-				ret |= BytecodeOpcodes.ACC_ANNOTATION | BytecodeOpcodes.ACC_INTERFACE | BytecodeOpcodes.ACC_ABSTRACT;
+				ret |= JvmBcOpcodes.ACC_ANNOTATION | JvmBcOpcodes.ACC_INTERFACE | JvmBcOpcodes.ACC_ABSTRACT;
 			}
 		}
 
@@ -473,19 +469,19 @@ public final class ClassInstance implements Matchable<ClassInstance> {
 	}
 
 	public boolean isInterface() {
-		return (getAccess() & BytecodeOpcodes.ACC_INTERFACE) != 0;
+		return (getAccess() & JvmBcOpcodes.ACC_INTERFACE) != 0;
 	}
 
 	public boolean isEnum() {
-		return (getAccess() & BytecodeOpcodes.ACC_ENUM) != 0;
+		return (getAccess() & JvmBcOpcodes.ACC_ENUM) != 0;
 	}
 
 	public boolean isAnnotation() {
-		return (getAccess() & BytecodeOpcodes.ACC_ANNOTATION) != 0;
+		return (getAccess() & JvmBcOpcodes.ACC_ANNOTATION) != 0;
 	}
 
 	public boolean isRecord() {
-		return (getAccess() & BytecodeOpcodes.ACC_RECORD) != 0 || superClass != null && superClass.id.equals("Ljava/lang/Record;");
+		return (getAccess() & JvmBcOpcodes.ACC_RECORD) != 0 || superClass != null && superClass.id.equals("Ljava/lang/Record;");
 	}
 
 	public MethodInstance getMethod(String id) {
@@ -670,7 +666,7 @@ public final class ClassInstance implements Matchable<ClassInstance> {
 				assert superClass.id.equals("Ljava/lang/Object;");
 
 				ret = superClass.getMethod(name, desc);
-				if (ret != null && (!ret.isReal() || (ret.access & (BytecodeOpcodes.ACC_PUBLIC | BytecodeOpcodes.ACC_STATIC)) == BytecodeOpcodes.ACC_PUBLIC)) return ret;
+				if (ret != null && (!ret.isReal() || (ret.access & (JvmBcOpcodes.ACC_PUBLIC | JvmBcOpcodes.ACC_STATIC)) == JvmBcOpcodes.ACC_PUBLIC)) return ret;
 			}
 
 			return resolveInterfaceMethod(name, desc);
@@ -680,7 +676,7 @@ public final class ClassInstance implements Matchable<ClassInstance> {
 	private MethodInstance resolveSignaturePolymorphicMethod(String name) {
 		if (id.equals("Ljava/lang/invoke/MethodHandle;")) { // check for signature polymorphic method - jvms-2.9
 			MethodInstance ret = getMethod(name, "([Ljava/lang/Object;)Ljava/lang/Object;");
-			final int reqFlags = BytecodeOpcodes.ACC_VARARGS | BytecodeOpcodes.ACC_NATIVE;
+			final int reqFlags = JvmBcOpcodes.ACC_VARARGS | JvmBcOpcodes.ACC_NATIVE;
 
 			if (ret != null && (!ret.isReal() || (ret.access & reqFlags) == reqFlags)) {
 				return ret;
@@ -710,10 +706,10 @@ public final class ClassInstance implements Matchable<ClassInstance> {
 			MethodInstance ret = cls.getMethod(name, desc);
 
 			if (ret != null
-					&& (!ret.isReal() || (ret.access & (BytecodeOpcodes.ACC_PRIVATE | BytecodeOpcodes.ACC_STATIC)) == 0)) {
+					&& (!ret.isReal() || (ret.access & (JvmBcOpcodes.ACC_PRIVATE | JvmBcOpcodes.ACC_STATIC)) == 0)) {
 				matches.add(ret);
 
-				if (ret.isReal() && (ret.access & BytecodeOpcodes.ACC_ABSTRACT) == 0) { // jvms prefers the closest non-abstract method
+				if (ret.isReal() && (ret.access & JvmBcOpcodes.ACC_ABSTRACT) == 0) { // jvms prefers the closest non-abstract method
 					foundNonAbstract = true;
 				}
 			}
@@ -732,7 +728,7 @@ public final class ClassInstance implements Matchable<ClassInstance> {
 			for (Iterator<MethodInstance> it = matches.iterator(); it.hasNext(); ) {
 				MethodInstance m = it.next();
 
-				if (!m.isReal() || (m.access & BytecodeOpcodes.ACC_ABSTRACT) != 0) {
+				if (!m.isReal() || (m.access & JvmBcOpcodes.ACC_ABSTRACT) != 0) {
 					it.remove();
 				}
 			}
@@ -1060,24 +1056,19 @@ public final class ClassInstance implements Matchable<ClassInstance> {
 		return objCls;
 	}
 
-	public void accept(BytecodeClassVisitor visitor, NameType nameType) {
-		BytecodeClass cn = getMergedBytecodeClass();
-		if (cn == null) throw new IllegalArgumentException("cls without backing bytecode class: "+this);
+	public byte[] serialize(NameType nameType) {
+		BytecodeClass bcClass = getMergedBytecodeClass();
+		if (bcClass == null) throw new IllegalArgumentException("cls without backing bytecode class: "+this);
 
 		synchronized (Util.bytecodeClassSync) {
-			if (nameType != NameType.PLAIN) {
-				BytecodeClassRemapper.process(cn, new BytecodeRemapper(env, nameType), visitor);
+			if (nameType == NameType.PLAIN) {
+				return bcClass.serialize();
 			} else {
-				cn.accept(visitor);
+				BytecodeClass bcClassCopy = bcClass.getCopy();
+				bcClass.getRemappedCopy(new ClassRemapNameProvider(env, nameType));
+				return bcClassCopy.serialize();
 			}
 		}
-	}
-
-	public byte[] serialize(NameType nameType) {
-		BytecodeClassWriter writer = new BytecodeClassWriter(0);
-		accept(writer, nameType);
-
-		return writer.toByteArray();
 	}
 
 	@Override
@@ -1167,7 +1158,7 @@ public final class ClassInstance implements Matchable<ClassInstance> {
 	final String id;
 	private final URI origin;
 	final ClassEnv env;
-	private BytecodeClass[] bytecodeClasses;
+	private final List<BytecodeClass> bytecodeClasses = new ArrayList<>(5);
 	private URI[] bytecodeClassOrigins;
 	final boolean nameObfuscated;
 	private final boolean input;

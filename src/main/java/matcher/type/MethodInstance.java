@@ -11,10 +11,10 @@ import org.objectweb.asm.Type;
 import org.objectweb.asm.tree.AbstractInsnNode;
 import org.objectweb.asm.tree.InsnList;
 import org.objectweb.asm.tree.LocalVariableNode;
-import org.objectweb.asm.tree.MethodNode;
 
 import matcher.NameType;
 import matcher.Util;
+import matcher.bcprovider.BytecodeMethod;
 import matcher.classifier.ClassifierUtil;
 import matcher.type.Signature.MethodSignature;
 
@@ -29,21 +29,21 @@ public final class MethodInstance extends MemberInstance<MethodInstance> {
 	/**
 	 * Create a known method.
 	 */
-	MethodInstance(ClassInstance cls, String origName, String desc, MethodNode asmNode, boolean nameObfuscated, int position) {
-		this(cls, origName, desc, asmNode, nameObfuscated, position, (asmNode.access & Opcodes.ACC_STATIC) != 0);
+	MethodInstance(ClassInstance cls, String origName, String desc, BytecodeMethod bcMethod, boolean nameObfuscated, int position) {
+		this(cls, origName, desc, bcMethod, nameObfuscated, position, (bcMethod.getAccess() & Opcodes.ACC_STATIC) != 0);
 	}
 
-	private MethodInstance(ClassInstance cls, String origName, String desc, MethodNode asmNode, boolean nameObfuscated, int position, boolean isStatic) {
+	private MethodInstance(ClassInstance cls, String origName, String desc, BytecodeMethod bcMethod, boolean nameObfuscated, int position, boolean isStatic) {
 		super(cls, getId(origName, desc), origName, nameObfuscated, position, isStatic);
 
 		try {
-			this.real = asmNode != null;
-			this.access = asmNode != null ? asmNode.access : approximateAccess(isStatic);
-			this.args = gatherArgs(this, desc, asmNode);
-			this.vars = cls.isInput() ? gatherVars(this, asmNode) : emptyVars;
+			this.real = bcMethod != null;
+			this.access = bcMethod != null ? bcMethod.getAccess() : approximateAccess(isStatic);
+			this.args = gatherArgs(this, desc, bcMethod);
+			this.vars = cls.isInput() ? gatherVars(this, bcMethod) : emptyVars;
 			this.retType = cls.getEnv().getCreateClassInstance(Type.getReturnType(desc).getDescriptor());
-			this.signature = asmNode == null || asmNode.signature == null || !cls.isInput() ? null : MethodSignature.parse(asmNode.signature, cls.getEnv());
-			this.asmNode = !cls.getEnv().isShared() ? asmNode : null;
+			this.signature = bcMethod == null || bcMethod.getSignature() == null || !cls.isInput() ? null : MethodSignature.parse(bcMethod.getSignature(), cls.getEnv());
+			this.bcMethod = !cls.getEnv().isShared() ? bcMethod : null;
 		} catch (InvalidSharedEnvQueryException e) {
 			throw e.checkOrigin(cls);
 		}
@@ -59,7 +59,7 @@ public final class MethodInstance extends MemberInstance<MethodInstance> {
 		return ret;
 	}
 
-	private static MethodVarInstance[] gatherArgs(MethodInstance method, String desc, MethodNode asmNode) {
+	private static MethodVarInstance[] gatherArgs(MethodInstance method, String desc, BytecodeMethod bcMethod) {
 		Type[] argTypes = Type.getArgumentTypes(desc);
 		if (argTypes.length == 0) return emptyVars;
 
@@ -68,9 +68,9 @@ public final class MethodInstance extends MemberInstance<MethodInstance> {
 		InsnList il;
 		AbstractInsnNode firstInsn;
 
-		if (asmNode != null) {
-			locals = asmNode.localVariables;
-			il = asmNode.instructions;
+		if (bcMethod != null) {
+			locals = bcMethod.getLocalVariables();
+			il = bcMethod.getInstructions();
 			firstInsn = il.getFirst();
 		} else {
 			locals = null;
@@ -120,17 +120,17 @@ public final class MethodInstance extends MemberInstance<MethodInstance> {
 		return args;
 	}
 
-	private static MethodVarInstance[] gatherVars(MethodInstance method, MethodNode asmNode) {
-		if (asmNode == null) return emptyVars;
-		if (asmNode.localVariables == null) return emptyVars; // TODO: generate?
-		if (asmNode.localVariables.isEmpty()) return emptyVars;
+	private static MethodVarInstance[] gatherVars(MethodInstance method, BytecodeMethod bcMethod) {
+		if (bcMethod == null) return emptyVars;
+		if (bcMethod.getLocalVariables() == null) return emptyVars; // TODO: generate?
+		if (bcMethod.getLocalVariables().isEmpty()) return emptyVars;
 
-		InsnList il = asmNode.instructions;
+		InsnList il = bcMethod.getInstructions();
 		AbstractInsnNode firstInsn = il.getFirst();
 		List<LocalVariableNode> vars = new ArrayList<>();
 
-		lvLoop: for (int i = 0; i < asmNode.localVariables.size(); i++) {
-			LocalVariableNode var = asmNode.localVariables.get(i);
+		lvLoop: for (int i = 0; i < bcMethod.getLocalVariables().size(); i++) {
+			LocalVariableNode var = bcMethod.getLocalVariables().get(i);
 
 			if (var.start == firstInsn) { // check if it's an arg
 				if (var.index == 0 && !method.isStatic) continue;
@@ -169,7 +169,7 @@ public final class MethodInstance extends MemberInstance<MethodInstance> {
 				if (start.getOpcode() >= 0) startOpIdx++;
 			}
 
-			ret[i] = new MethodVarInstance(method, false, i, var.index, asmNode.localVariables.indexOf(var),
+			ret[i] = new MethodVarInstance(method, false, i, var.index, bcMethod.getLocalVariables().indexOf(var),
 					method.getEnv().getCreateClassInstance(var.desc), startInsn, endInsn, startOpIdx,
 					var.name,
 					var.name == null || method.nameObfuscatedLocal || method.cls.nameObfuscated || !Util.isValidJavaIdentifier(var.name));
@@ -253,8 +253,8 @@ public final class MethodInstance extends MemberInstance<MethodInstance> {
 		return real;
 	}
 
-	public MethodNode getAsmNode() {
-		return asmNode;
+	public BytecodeMethod getBcMethod() {
+		return bcMethod;
 	}
 
 	public MethodVarInstance getArg(int index) {
@@ -488,7 +488,7 @@ public final class MethodInstance extends MemberInstance<MethodInstance> {
 	final ClassInstance retType;
 	MethodVarInstance[] vars;
 	final MethodSignature signature;
-	private final MethodNode asmNode;
+	private final BytecodeMethod bcMethod;
 
 	MethodType type = MethodType.UNKNOWN;
 

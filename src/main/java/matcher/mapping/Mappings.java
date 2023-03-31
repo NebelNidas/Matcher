@@ -12,8 +12,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
-import org.objectweb.asm.tree.MethodNode;
-
 import net.fabricmc.mappingio.FlatMappingVisitor;
 import net.fabricmc.mappingio.MappedElementKind;
 import net.fabricmc.mappingio.MappingReader;
@@ -25,6 +23,7 @@ import net.fabricmc.mappingio.format.MappingFormat;
 
 import matcher.NameType;
 import matcher.Util;
+import matcher.bcprovider.BytecodeMethod;
 import matcher.type.ClassEnv;
 import matcher.type.ClassInstance;
 import matcher.type.FieldInstance;
@@ -846,10 +845,10 @@ public class Mappings {
 
 		// check if each origin that supplies this method has a parent within the same origin
 
-		for (int i = 0; i < cls.getBytecodeClasses().length; i++) {
-			for (MethodNode m : cls.getBytecodeClasses()[i].methods) {
-				if (m.name.equals(method.getName())
-						&& m.desc.equals(method.getDesc())) {
+		for (int i = 0; i < cls.getBytecodeClasses().size(); i++) {
+			for (BytecodeMethod m : cls.getBytecodeClasses().get(i).getMethods()) {
+				if (m.getName().equals(method.getName())
+						&& m.getDesc().equals(method.getDesc())) {
 					if (!hasParentMethod(name, desc, method.getParents(), cls.getAsmNodeOrigin(i))) {
 						return true;
 					} else {
@@ -868,11 +867,11 @@ public class Mappings {
 		for (MethodInstance parent : parents) {
 			ClassInstance parentCls = parent.getCls();
 
-			for (int i = 0; i < parentCls.getBytecodeClasses().length; i++) {
+			for (int i = 0; i < parentCls.getBytecodeClasses().size(); i++) {
 				if (parentCls.getAsmNodeOrigin(i).equals(reqOrigin)) {
-					for (MethodNode m : parentCls.getBytecodeClasses()[i].methods) {
-						if (m.name.equals(name)
-								&& m.desc.equals(desc)) {
+					for (BytecodeMethod m : parentCls.getBytecodeClasses().get(i).getMethods()) {
+						if (m.getName().equals(name)
+								&& m.getDesc().equals(desc)) {
 							return true;
 						}
 					}

@@ -77,8 +77,8 @@ public class ClassFeatureExtractor implements LocalClassEnv {
 				if (!checkExisting || getLocalClsByName(name) == null && env.getSharedClassLocation(name) == null && env.getLocalClsByName(name) == null) {
 					classPathIndex.putIfAbsent(name, file);
 
-					/*ClassNode cn = readClass(file);
-					addSharedCls(new ClassInstance(ClassInstance.getId(cn.name), file.toUri(), cn));*/
+					/*BytecodeClass bcCls = readClass(file);
+					addSharedCls(new ClassInstance(ClassInstance.getId(bcCls.getName()), file.toUri(), bcCls));*/
 				}
 			});
 
@@ -87,19 +87,19 @@ public class ClassFeatureExtractor implements LocalClassEnv {
 	}
 
 	private static boolean isNameObfuscated(BytecodeClass cn, Pattern pattern) {
-		return pattern == null || !pattern.matcher(cn.name).matches();
+		return pattern == null || !pattern.matcher(cn.getName()).matches();
 	}
 
 	private ClassInstance readClass(Path path, URI origin, Predicate<BytecodeClass> nameObfuscated) {
-		BytecodeClass cn = ClassEnvironment.readClass(path, false);
+		BytecodeClass cls = ClassEnvironment.readClass(path, false);
 
-		return new ClassInstance(ClassInstance.getId(cn.name), origin, this, cn, nameObfuscated.test(cn));
+		return new ClassInstance(ClassInstance.getId(cls.getName()), origin, this, cls, nameObfuscated.test(cls));
 	}
 
 	private static void mergeClasses(ClassInstance from, ClassInstance to) {
-		assert from.getBytecodeClasses().length == 1;
+		assert from.getBytecodeClasses().size() == 1;
 
-		to.addBytecodeClass(from.getBytecodeClasses()[0], from.getOrigin());
+		to.addBytecodeClass(from.getBytecodeClasses().get(0), from.getOrigin());
 	}
 
 	public void process(Pattern nonObfuscatedMemberPattern) {
@@ -235,7 +235,7 @@ public class ClassFeatureExtractor implements LocalClassEnv {
 			return;
 		}
 
-		for (Iterator<AbstractInsnNode> it = method.getAsmNode().instructions.iterator(); it.hasNext(); ) {
+		for (Iterator<AbstractInsnNode> it = method.getBcMethod().getInstructions().iterator(); it.hasNext(); ) {
 			AbstractInsnNode ain = it.next();
 
 			switch (ain.getType()) {
@@ -477,7 +477,7 @@ public class ClassFeatureExtractor implements LocalClassEnv {
 		for (MethodInstance m : method.refsIn) {
 			boolean found = false;
 
-			for (Iterator<AbstractInsnNode> it = m.getAsmNode().instructions.iterator(); it.hasNext(); ) {
+			for (Iterator<AbstractInsnNode> it = m.getBcMethod().getInstructions().iterator(); it.hasNext(); ) {
 				AbstractInsnNode ain = it.next();
 
 				switch (ain.getType()) {
@@ -676,7 +676,7 @@ public class ClassFeatureExtractor implements LocalClassEnv {
 		if (file == null) return null;
 
 		BytecodeClass cn = ClassEnvironment.readClass(file, false);
-		ClassInstance cls = new ClassInstance(ClassInstance.getId(cn.name), ClassEnvironment.getContainingUri(file.toUri(), cn.name), this, cn);
+		ClassInstance cls = new ClassInstance(ClassInstance.getId(cn.getName()), ClassEnvironment.getContainingUri(file.toUri(), cn.getName()), this, cn);
 		if (!cls.getId().equals(id)) throw new RuntimeException("mismatched cls id "+id+" for "+file+", expected "+name);
 
 		ClassInstance prev = classes.putIfAbsent(cls.getId(), cls);

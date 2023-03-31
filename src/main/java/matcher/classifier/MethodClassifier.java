@@ -106,8 +106,8 @@ public class MethodClassifier {
 			if (!checkAsmNodes(methodA, methodB)) return compareAsmNodes(methodA, methodB);
 
 			int mask = Opcodes.ACC_STATIC | Opcodes.ACC_NATIVE | Opcodes.ACC_ABSTRACT;
-			int resultA = methodA.getAsmNode().access & mask;
-			int resultB = methodB.getAsmNode().access & mask;
+			int resultA = methodA.getBcMethod().getAccess() & mask;
+			int resultB = methodB.getBcMethod().getAccess() & mask;
 
 			return 1 - Integer.bitCount(resultA ^ resultB) / 3.;
 		}
@@ -119,8 +119,8 @@ public class MethodClassifier {
 			if (!checkAsmNodes(methodA, methodB)) return compareAsmNodes(methodA, methodB);
 
 			int mask = (Opcodes.ACC_PUBLIC | Opcodes.ACC_PROTECTED | Opcodes.ACC_PRIVATE) | Opcodes.ACC_FINAL | Opcodes.ACC_SYNCHRONIZED | Opcodes.ACC_BRIDGE | Opcodes.ACC_VARARGS | Opcodes.ACC_STRICT | Opcodes.ACC_SYNTHETIC;
-			int resultA = methodA.getAsmNode().access & mask;
-			int resultB = methodB.getAsmNode().access & mask;
+			int resultA = methodA.getBcMethod().getAccess() & mask;
+			int resultB = methodB.getBcMethod().getAccess() & mask;
 
 			return 1 - Integer.bitCount(resultA ^ resultB) / 8.;
 		}
@@ -179,9 +179,9 @@ public class MethodClassifier {
 			if (!checkAsmNodes(methodA, methodB)) return compareAsmNodes(methodA, methodB);
 
 			Set<String> stringsA = new HashSet<>();
-			ClassifierUtil.extractStrings(methodA.getAsmNode().instructions, stringsA);
+			ClassifierUtil.extractStrings(methodA.getBcMethod().getInstructions(), stringsA);
 			Set<String> stringsB = new HashSet<>();
-			ClassifierUtil.extractStrings(methodB.getAsmNode().instructions, stringsB);
+			ClassifierUtil.extractStrings(methodB.getBcMethod().getInstructions(), stringsB);
 
 			return ClassifierUtil.compareSets(stringsA, stringsB, false);
 		}
@@ -201,8 +201,8 @@ public class MethodClassifier {
 			Set<Double> doublesA = new HashSet<>();
 			Set<Double> doublesB = new HashSet<>();
 
-			ClassifierUtil.extractNumbers(methodA.getAsmNode(), intsA, longsA, floatsA, doublesA);
-			ClassifierUtil.extractNumbers(methodB.getAsmNode(), intsB, longsB, floatsB, doublesB);
+			ClassifierUtil.extractNumbers(methodA.getBcMethod(), intsA, longsA, floatsA, doublesA);
+			ClassifierUtil.extractNumbers(methodB.getBcMethod(), intsB, longsB, floatsB, doublesB);
 
 			return (ClassifierUtil.compareSets(intsA, intsB, false)
 					+ ClassifierUtil.compareSets(longsA, longsB, false)
@@ -295,8 +295,8 @@ public class MethodClassifier {
 				int[] map = ClassifierUtil.mapInsns(src, dst);
 				if (map == null) continue;
 
-				InsnList ilA = src.getAsmNode().instructions;
-				InsnList ilB = dst.getAsmNode().instructions;
+				InsnList ilA = src.getBcMethod().getInstructions();
+				InsnList ilB = dst.getBcMethod().getInstructions();
 
 				for (int srcIdx = 0; srcIdx < map.length; srcIdx++) {
 					if (map[srcIdx] < 0) continue;
@@ -357,11 +357,11 @@ public class MethodClassifier {
 	}
 
 	private static boolean checkAsmNodes(MethodInstance a, MethodInstance b) {
-		return a.getAsmNode() != null && b.getAsmNode() != null;
+		return a.getBcMethod() != null && b.getBcMethod() != null;
 	}
 
 	private static double compareAsmNodes(MethodInstance a, MethodInstance b) {
-		return a.getAsmNode() == null && b.getAsmNode() == null ? 1 : 0;
+		return a.getBcMethod() == null && b.getBcMethod() == null ? 1 : 0;
 	}
 
 	public abstract static class AbstractClassifier implements IClassifier<MethodInstance> {

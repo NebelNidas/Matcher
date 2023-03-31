@@ -53,8 +53,8 @@ public final class SimilarityChecker {
 	public static float compare(MethodInstance a, MethodInstance b) {
 		if (a.getMatch() != b) return 0;
 
-		if (a.getAsmNode() == null || b.getAsmNode() == null) {
-			return (a.getAsmNode() == null) == (b.getAsmNode() == null) ? 1 : 0;
+		if (a.getBcMethod() == null || b.getBcMethod() == null) {
+			return (a.getBcMethod() == null) == (b.getBcMethod() == null) ? 1 : 0;
 		}
 
 		float retTypeScore = ClassifierUtil.checkPotentialEquality(a.getRetType(), b.getRetType()) ? 1 : 0;
@@ -83,7 +83,7 @@ public final class SimilarityChecker {
 			if (insnMap[i] >= 0) contentScore++;
 		}
 
-		div = Math.max(insnMap.length, b.getAsmNode().instructions.size());
+		div = Math.max(insnMap.length, b.getBcMethod().getInstructions().size());
 		contentScore = div > 0 ? contentScore / div : 1;
 
 		return retTypeScore * METHOD_RETTYPE_WEIGHT + argTypeScore * METHOD_ARGS_WEIGHT + contentScore * METHOD_CONTENT_WEIGHT;

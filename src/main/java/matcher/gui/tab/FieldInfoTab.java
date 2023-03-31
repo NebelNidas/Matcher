@@ -11,11 +11,11 @@ import javafx.scene.control.Label;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.Tab;
 import javafx.scene.layout.GridPane;
-import org.objectweb.asm.tree.FieldNode;
 
 import matcher.NameType;
 import matcher.Util;
 import matcher.Util.AFElementType;
+import matcher.bcprovider.BytecodeField;
 import matcher.gui.Gui;
 import matcher.gui.GuiConstants;
 import matcher.gui.IGuiComponent;
@@ -133,12 +133,12 @@ public class FieldInfoTab extends Tab implements IGuiComponent {
 
 			uidLabel.setText(field.getUid() >= 0 ? Integer.toString(field.getUid()) : "-");
 			nameObfLabel.setText(Boolean.toString(field.isNameObfuscated()));
-			inputLabel.setText(ClassInfoTab.getInputPaths(field.getCls(), node -> node.fields.stream().anyMatch(m -> m.name.equals(field.getName()) && m.desc.equals(field.getDesc()))));
+			inputLabel.setText(ClassInfoTab.getInputPaths(field.getCls(), node -> node.getFields().stream().anyMatch(m -> m.getName().equals(field.getName()) && m.getDesc().equals(field.getDesc()))));
 			typeLabel.setText(getName(field.getType(), nameType));
 			accessLabel.setText(Util.formatAccessFlags(field.getAccess(), AFElementType.Method));
 
-			FieldNode asmNode = field.getAsmNode();
-			sigLabel.setText(asmNode == null || asmNode.signature == null ? "-" : asmNode.signature);
+			BytecodeField bcField = field.getBytecodeField();
+			sigLabel.setText(bcField == null || bcField.getSignature() == null ? "-" : bcField.getSignature());
 
 			parentLabel.setText(!field.getParents().isEmpty() ? formatClass(field.getParents(), nameType) : "-");
 			childLabel.setText(!field.isFinal() ? formatClass(field.getChildren(), nameType) : "-");

@@ -3,12 +3,12 @@ package matcher.type;
 import java.util.List;
 import java.util.Set;
 
-import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.tree.AbstractInsnNode;
-import org.objectweb.asm.tree.FieldNode;
 
 import matcher.NameType;
 import matcher.Util;
+import matcher.bcprovider.BytecodeField;
+import matcher.bcprovider.jvm.JvmBcOpcodes;
 import matcher.classifier.ClassifierUtil;
 import matcher.type.Signature.FieldSignature;
 
@@ -23,17 +23,17 @@ public final class FieldInstance extends MemberInstance<FieldInstance> {
 	/**
 	 * Create a known field.
 	 */
-	FieldInstance(ClassInstance cls, String origName, String desc, FieldNode asmNode, boolean nameObfuscated, int position) {
-		this(cls, origName, desc, asmNode, nameObfuscated, position, (asmNode.access & Opcodes.ACC_STATIC) != 0);
+	FieldInstance(ClassInstance cls, String origName, String desc, BytecodeField bcField, boolean nameObfuscated, int position) {
+		this(cls, origName, desc, bcField, nameObfuscated, position, (bcField.getAccess() & JvmBcOpcodes.ACC_STATIC) != 0);
 	}
 
-	private FieldInstance(ClassInstance cls, String origName, String desc, FieldNode asmNode, boolean nameObfuscated, int position, boolean isStatic) {
+	private FieldInstance(ClassInstance cls, String origName, String desc, BytecodeField bcField, boolean nameObfuscated, int position, boolean isStatic) {
 		super(cls, getId(origName, desc), origName, nameObfuscated, position, isStatic);
 
 		try {
 			this.type = cls.getEnv().getCreateClassInstance(desc);
-			this.asmNode = asmNode;
-			this.signature = asmNode == null || asmNode.signature == null || !cls.isInput() ? null : FieldSignature.parse(asmNode.signature, cls.getEnv());
+			this.bytecodeField = bcField;
+			this.signature = bcField == null || bcField.getSignature() == null || !cls.isInput() ? null : FieldSignature.parse(bcField.getSignature(), cls.getEnv());
 		} catch (InvalidSharedEnvQueryException e) {
 			throw e.checkOrigin(cls);
 		}
@@ -75,11 +75,11 @@ public final class FieldInstance extends MemberInstance<FieldInstance> {
 
 	@Override
 	public boolean isReal() {
-		return asmNode != null;
+		return bytecodeField != null;
 	}
 
-	public FieldNode getAsmNode() {
-		return asmNode;
+	public BytecodeField getBytecodeField() {
+		return bytecodeField;
 	}
 
 	public ClassInstance getType() {
@@ -88,15 +88,15 @@ public final class FieldInstance extends MemberInstance<FieldInstance> {
 
 	@Override
 	public int getAccess() {
-		if (asmNode == null) {
-			int ret = Opcodes.ACC_PUBLIC;
-			if (isStatic) ret |= Opcodes.ACC_STATIC;
-			if (isStatic && type == cls && cls.isEnum()) ret |= Opcodes.ACC_ENUM;
-			if (isStatic && cls.isInterface()) ret |= Opcodes.ACC_FINAL;
+		if (bytecodeField == null) {
+			int ret = JvmBcOpcodes.ACC_PUBLIC;
+			if (isStatic) ret |= JvmBcOpcodes.ACC_STATIC;
+			if (isStatic && type == cls && cls.isEnum()) ret |= JvmBcOpcodes.ACC_ENUM;
+			if (isStatic && cls.isInterface()) ret |= JvmBcOpcodes.ACC_FINAL;
 
 			return ret;
 		} else {
-			return asmNode.access;
+			return bytecodeField.getAccess();
 		}
 	}
 
@@ -169,7 +169,7 @@ public final class FieldInstance extends MemberInstance<FieldInstance> {
 		return name+";;"+desc;
 	}
 
-	final FieldNode asmNode;
+	final BytecodeField bytecodeField;
 	final ClassInstance type;
 	ClassInstance exactType;
 	private final FieldSignature signature;

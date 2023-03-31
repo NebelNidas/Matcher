@@ -1,10 +1,28 @@
 package matcher.bcprovider;
 
-import org.objectweb.asm.Opcodes;
-import org.objectweb.asm.tree.ClassNode;
+import java.util.List;
 
-public class BytecodeClass extends ClassNode {
-	public BytecodeClass() {
-		super(Opcodes.ASM9);
+import org.objectweb.asm.tree.InnerClassNode;
+
+import matcher.bcprovider.jvm.JvmBcClass;
+
+public interface BytecodeClass {
+	String getName();
+	List<BytecodeField> getFields();
+	List<BytecodeMethod> getMethods();
+
+	static BytecodeClass empty() {
+		return new JvmBcClass();
 	}
+
+	int getAccess();
+	String getOuterClass();
+	String getOuterMethod();
+	List<InnerClassNode> getInnerClasses();
+	List<String> getInterfaces();
+	String getSuperName();
+	String getSignature();
+	byte[] serialize();
+	BytecodeClass getCopy();
+	BytecodeClass getRemappedCopy(BytecodeClassRemapNameProvider renameProvider);
 }

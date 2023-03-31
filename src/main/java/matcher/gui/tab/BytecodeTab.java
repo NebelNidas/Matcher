@@ -4,7 +4,6 @@ import java.io.PrintWriter;
 import java.io.StringWriter;
 
 import matcher.NameType;
-import matcher.bcprovider.BytecodeClassTraceVisitor;
 import matcher.gui.Gui;
 import matcher.gui.ISelectionProvider;
 import matcher.srcprocess.HtmlUtil;
@@ -46,7 +45,7 @@ public class BytecodeTab extends WebViewTab {
 
 			try (PrintWriter pw = new PrintWriter(writer)) {
 				NameType nameType = gui.getNameType().withUnmatchedTmp(unmatchedTmp);
-				cls.accept(new BytecodeClassTraceVisitor(null, new HtmlTextifier(cls, nameType), pw), nameType);
+				// cls.accept(new JvmBcClassTraceVisitor(null, new HtmlTextifier(cls, nameType), pw), nameType);
 			}
 
 			double prevScroll = isRefresh ? getScrollTop() : 0;

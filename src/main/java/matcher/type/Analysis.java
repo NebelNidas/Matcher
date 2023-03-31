@@ -32,7 +32,6 @@ import org.objectweb.asm.tree.LineNumberNode;
 import org.objectweb.asm.tree.LocalVariableNode;
 import org.objectweb.asm.tree.LookupSwitchInsnNode;
 import org.objectweb.asm.tree.MethodInsnNode;
-import org.objectweb.asm.tree.MethodNode;
 import org.objectweb.asm.tree.MultiANewArrayInsnNode;
 import org.objectweb.asm.tree.TableSwitchInsnNode;
 import org.objectweb.asm.tree.TryCatchBlockNode;
@@ -50,17 +49,19 @@ import org.objectweb.asm.util.TraceMethodVisitor;
 
 import matcher.NameType;
 import matcher.Util;
+import matcher.bcprovider.BytecodeMethod;
+import matcher.bcprovider.jvm.JvmBcMethod;
 
 class Analysis {
 	static void analyzeMethod(MethodInstance method, CommonClasses common) {
-		MethodNode asmNode = method.getAsmNode();
-		if (asmNode == null || (asmNode.access & Opcodes.ACC_ABSTRACT) != 0 || asmNode.instructions.size() == 0) return;
+		BytecodeMethod asmNode = method.getBcMethod();
+		if (asmNode == null || (asmNode.getAccess() & Opcodes.ACC_ABSTRACT) != 0 || asmNode.getInstructions().size() == 0) return;
 
 		System.out.println(method.getDisplayName(NameType.MAPPED_PLAIN, true));
 		dump(asmNode);
 
 		StateRecorder rec = new StateRecorder(method, common);
-		InsnList il = asmNode.instructions;
+		InsnList il = asmNode.getInstructions();
 
 		Map<AbstractInsnNode, int[]> exitPoints = new IdentityHashMap<>();
 		exitPoints.put(null, new int[] { 0 });
@@ -406,7 +407,7 @@ class Analysis {
 					rec.push(ex.type, rec.getNextVarId(VarSource.IntException)); // same object, but new scope
 					LabelNode handler = null;
 
-					for (TryCatchBlockNode n : asmNode.tryCatchBlocks) {
+					for (TryCatchBlockNode n : asmNode.getTryCatchBlocks()) {
 						if (il.indexOf(n.start) <= idx && il.indexOf(n.end) > idx && (n.type == null || method.getEnv().getClsByName(n.type).isAssignableFrom(ex.type))) {
 							handler = n.handler;
 							break;
@@ -746,7 +747,7 @@ class Analysis {
 
 		rec.dump(il, System.out);
 
-		createLocalVariables(il, rec, entryPoints, exitPoints, asmNode.localVariables);
+		createLocalVariables(il, rec, entryPoints, exitPoints, asmNode.getLocalVariables());
 	}
 
 	private static void handleMethodInvocation(ClassEnv env, String owner, String name, String desc, boolean itf, boolean isStatic, StateRecorder rec) {
@@ -768,13 +769,13 @@ class Analysis {
 	}
 
 	private static boolean queueTryCatchBlocks(MethodInstance method, StateRecorder rec, Queue<QueueElement> queue, Set<QueueElement> queued) {
-		if (method.getAsmNode().tryCatchBlocks.isEmpty()) return false;
+		if (method.getBcMethod().getTryCatchBlocks().isEmpty()) return false;
 
-		InsnList il = method.getAsmNode().instructions;
+		InsnList il = method.getBcMethod().getInstructions();
 		Set<ExecState> states = new HashSet<>();
 		boolean ret = false;
 
-		for (TryCatchBlockNode n : method.getAsmNode().tryCatchBlocks) {
+		for (TryCatchBlockNode n : method.getBcMethod().getTryCatchBlocks()) {
 			ClassInstance type = n.type != null ? method.getEnv().getCreateClassInstance(ClassInstance.getId(n.type)) : method.getEnv().getCreateClassInstance("Ljava/lang/Throwable;");
 			ClassInstance[] stack = new ClassInstance[] { type };
 			int[] stackVarIds = new int[] { rec.getNextVarId(VarSource.ExtException) };
@@ -842,8 +843,8 @@ class Analysis {
 		final ExecState srcState;
 	}
 
-	private static BitSet getEntryPoints(MethodNode asmNode, Map<AbstractInsnNode, int[]> exitPoints) {
-		InsnList il = asmNode.instructions;
+	private static BitSet getEntryPoints(BytecodeMethod bcMethod, Map<AbstractInsnNode, int[]> exitPoints) {
+		InsnList il = bcMethod.getInstructions();
 		BitSet entryPoints = new BitSet(il.size());
 
 		for (int[] eps : exitPoints.values()) {
@@ -852,17 +853,17 @@ class Analysis {
 			}
 		}
 
-		for (TryCatchBlockNode n : asmNode.tryCatchBlocks) {
+		for (TryCatchBlockNode n : bcMethod.getTryCatchBlocks()) {
 			entryPoints.set(il.indexOf(n.handler));
 		}
 
 		return entryPoints;
 	}
 
-	private static void applyTryCatchExits(MethodNode asmNode, BitSet entryPoints, Map<AbstractInsnNode, int[]> exitPoints) {
-		InsnList il = asmNode.instructions;
+	private static void applyTryCatchExits(BytecodeMethod bcMethod, BitSet entryPoints, Map<AbstractInsnNode, int[]> exitPoints) {
+		InsnList il = bcMethod.getInstructions();
 
-		for (TryCatchBlockNode n : asmNode.tryCatchBlocks) {
+		for (TryCatchBlockNode n : bcMethod.getTryCatchBlocks()) {
 			boolean first = true;
 			int max = Math.min(il.indexOf(n.end), il.size() - 1);
 			entryPoints.set(max);
@@ -1328,11 +1329,11 @@ class Analysis {
 
 	private static class StateRecorder {
 		StateRecorder(MethodInstance method, CommonClasses common) {
-			MethodNode asmNode = method.getAsmNode();
+			BytecodeMethod asmNode = method.getBcMethod();
 
-			locals = new ClassInstance[asmNode.maxLocals];
+			locals = new ClassInstance[asmNode.getMaxLocals()];
 			localVarIds = new int[locals.length];
-			stack = new ClassInstance[asmNode.maxStack];
+			stack = new ClassInstance[asmNode.getMaxStack()];
 			stackVarIds = new int[stack.length];
 
 			if (!method.isStatic()) {
@@ -1346,7 +1347,7 @@ class Analysis {
 				if (arg.getType().getSlotSize() == 2) locals[localsSize++] = common.TOP;
 			}
 
-			this.states = new ExecState[asmNode.instructions.size()];
+			this.states = new ExecState[asmNode.getInstructions().size()];
 			this.common = common;
 
 			updateState();
@@ -1969,8 +1970,8 @@ class Analysis {
 		if (field.getType().isPrimitive()) return;
 
 		MethodInstance method = field.writeRefs.iterator().next();
-		MethodNode asmNode = method.getAsmNode();
-		InsnList il = asmNode.instructions;
+		BytecodeMethod bcMethod = method.getBcMethod();
+		InsnList il = bcMethod.getInstructions();
 		AbstractInsnNode fieldWrite = null;
 
 		//dump(method.asmNode);
@@ -1993,7 +1994,7 @@ class Analysis {
 		}
 
 		if (fieldWrite == null) {
-			dump(asmNode);
+			dump(bcMethod);
 			throw new IllegalStateException("can't find field write insn for "+field+" in "+method);
 		}
 
@@ -2002,8 +2003,8 @@ class Analysis {
 		Frame<SourceValue>[] frames;
 
 		try {
-			frames = analyzer.analyze(method.cls.getName(), asmNode);
-			if (frames.length != asmNode.instructions.size()) throw new RuntimeException("invalid frame count");
+			frames = analyzer.analyze(method.cls.getName(), ((JvmBcMethod) bcMethod).getAsmNode());
+			if (frames.length != bcMethod.getInstructions().size()) throw new RuntimeException("invalid frame count");
 		} catch (AnalyzerException e) {
 			throw new RuntimeException(e);
 		}
@@ -2376,9 +2377,9 @@ class Analysis {
 		}
 	}
 
-	private static void dump(MethodNode method) {
+	private static void dump(BytecodeMethod method) {
 		Textifier textifier = new Textifier();
-		method.accept(new TraceMethodVisitor(textifier));
+		((JvmBcMethod) method).getAsmNode().accept(new TraceMethodVisitor(textifier));
 
 		StringWriter writer = new StringWriter();
 

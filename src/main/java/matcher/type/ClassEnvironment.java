@@ -26,16 +26,16 @@ import java.util.concurrent.ExecutionException;
 import java.util.function.DoubleConsumer;
 import java.util.regex.Pattern;
 
-import org.objectweb.asm.tree.ClassNode;
-import org.objectweb.asm.tree.FieldNode;
 import org.objectweb.asm.tree.InnerClassNode;
-import org.objectweb.asm.tree.MethodNode;
 
 import matcher.NameType;
 import matcher.Util;
 import matcher.bcprovider.BytecodeClass;
-import matcher.bcprovider.BytecodeClassReader;
-import matcher.bcprovider.BytecodeOpcodes;
+import matcher.bcprovider.BytecodeField;
+import matcher.bcprovider.BytecodeMethod;
+import matcher.bcprovider.jvm.JvmBcClassReader;
+import matcher.bcprovider.jvm.JvmBcOpcodes;
+import matcher.bcprovider.jvm.JvmBcClassReader.ParsingOption;
 import matcher.classifier.ClassifierUtil;
 import matcher.classifier.MatchingCache;
 import matcher.config.ProjectConfig;
@@ -104,7 +104,7 @@ public final class ClassEnvironment implements ClassEnv {
 					classPathIndex.putIfAbsent(name, file);
 
 					/*ClassNode cn = readClass(file);
-					addSharedCls(new ClassInstance(ClassInstance.getId(cn.name), file.toUri(), cn));*/
+					addSharedCls(new ClassInstance(ClassInstance.getId(cn.getName()), file.toUri(), cn));*/
 				}
 			});
 
@@ -378,7 +378,7 @@ public final class ClassEnvironment implements ClassEnv {
 
 			if (file != null) {
 				BytecodeClass cn = readClass(file, true);
-				ClassInstance cls = new ClassInstance(ClassInstance.getId(cn.name), getContainingUri(file.toUri(), cn.name), this, cn);
+				ClassInstance cls = new ClassInstance(ClassInstance.getId(cn.getName()), getContainingUri(file.toUri(), cn.getName()), this, cn);
 				if (!cls.getId().equals(id)) throw new RuntimeException("mismatched cls id "+id+" for "+file+", expected "+name);
 
 				ClassInstance ret = addSharedCls(cls);
@@ -468,11 +468,8 @@ public final class ClassEnvironment implements ClassEnv {
 
 	static BytecodeClass readClass(Path path, boolean skipCode) {
 		try {
-			BytecodeClassReader reader = new BytecodeClassReader(Files.readAllBytes(path));
-			BytecodeClass cn = new BytecodeClass();
-			reader.accept(cn, BytecodeClassReader.EXPAND_FRAMES | (skipCode ? BytecodeClassReader.SKIP_CODE : 0));
-
-			return cn;
+			JvmBcClassReader reader = new JvmBcClassReader(Files.readAllBytes(path));
+			return reader.read(ParsingOption.EXPAND_FRAMES | (skipCode ? ParsingOption.SKIP_CODE : 0));
 		} catch (IOException e) {
 			throw new UncheckedIOException(e);
 		}
@@ -487,52 +484,52 @@ public final class ClassEnvironment implements ClassEnv {
 
 		Set<String> strings = cls.strings;
 
-		for (ClassNode cn : cls.getBytecodeClasses()) {
-			if (cls.isInput() && cls.getSignature() == null && cn.signature != null) {
-				cls.setSignature(ClassSignature.parse(cn.signature, cls.getEnv()));
+		for (BytecodeClass cn : cls.getBytecodeClasses()) {
+			if (cls.isInput() && cls.getSignature() == null && cn.getSignature() != null) {
+				cls.setSignature(ClassSignature.parse(cn.getSignature(), cls.getEnv()));
 			}
 
-			boolean isEnum = (cn.access & BytecodeOpcodes.ACC_ENUM) != 0;
+			boolean isEnum = (cn.getAccess() & JvmBcOpcodes.ACC_ENUM) != 0;
 
-			for (int i = 0; i < cn.methods.size(); i++) {
-				MethodNode mn = cn.methods.get(i);
+			for (int i = 0; i < cn.getMethods().size(); i++) {
+				BytecodeMethod mn = cn.getMethods().get(i);
 
-				if (cls.getMethod(mn.name, mn.desc) == null) {
+				if (cls.getMethod(mn.getName(), mn.getDesc()) == null) {
 					boolean nameObfuscated = cls.isInput()
-							&& !mn.name.equals("<clinit>")
-							&& !mn.name.equals("<init>")
-							&& (!mn.name.equals("main") || !mn.desc.equals("([Ljava/lang/String;)V") || mn.access != (BytecodeOpcodes.ACC_PUBLIC | BytecodeOpcodes.ACC_STATIC))
-							&& (!isEnum || !isStandardEnumMethod(cn.name, mn))
-							&& (nonObfuscatedMemberPattern == null || !nonObfuscatedMemberPattern.matcher(cn.name+"/"+mn.name+mn.desc).matches());
+							&& !mn.getName().equals("<clinit>")
+							&& !mn.getName().equals("<init>")
+							&& (!mn.getName().equals("main") || !mn.getDesc().equals("([Ljava/lang/String;)V") || mn.getAccess() != (JvmBcOpcodes.ACC_PUBLIC | JvmBcOpcodes.ACC_STATIC))
+							&& (!isEnum || !isStandardEnumMethod(cn.getName(), mn))
+							&& (nonObfuscatedMemberPattern == null || !nonObfuscatedMemberPattern.matcher(cn.getName()+"/"+mn.getName()+mn.getDesc()).matches());
 
-					cls.addMethod(new MethodInstance(cls, mn.name, mn.desc, mn, nameObfuscated, i));
+					cls.addMethod(new MethodInstance(cls, mn.getName(), mn.getDesc(), mn, nameObfuscated, i));
 
-					ClassifierUtil.extractStrings(mn.instructions, strings);
+					ClassifierUtil.extractStrings(mn.getInstructions(), strings);
 				}
 			}
 
-			for (int i = 0; i < cn.fields.size(); i++) {
-				FieldNode fn = cn.fields.get(i);
+			for (int i = 0; i < cn.getFields().size(); i++) {
+				BytecodeField fn = cn.getFields().get(i);
 
-				if (cls.getField(fn.name, fn.desc) == null) {
+				if (cls.getField(fn.getName(), fn.getDesc()) == null) {
 					boolean nameObfuscated = cls.isInput()
-							&& (nonObfuscatedMemberPattern == null || !nonObfuscatedMemberPattern.matcher(cn.name+"/"+fn.name+";;"+fn.desc).matches());
+							&& (nonObfuscatedMemberPattern == null || !nonObfuscatedMemberPattern.matcher(cn.getName()+"/"+fn.getName()+";;"+fn.getDesc()).matches());
 
-					cls.addField(new FieldInstance(cls, fn.name, fn.desc, fn, nameObfuscated, i));
+					cls.addField(new FieldInstance(cls, fn.getName(), fn.getDesc(), fn, nameObfuscated, i));
 
-					if (fn.value instanceof String) {
-						strings.add((String) fn.value);
+					if (fn.getValue() instanceof String) {
+						strings.add((String) fn.getValue());
 					}
 				}
 			}
 
 			if (cls.getOuterClass() == null) detectOuterClass(cls, cn);
 
-			if (cn.superName != null && cls.getSuperClass() == null) {
-				addSuperClass(cls, cn.superName);
+			if (cn.getSuperName() != null && cls.getSuperClass() == null) {
+				addSuperClass(cls, cn.getSuperName());
 			}
 
-			for (String iface : cn.interfaces) {
+			for (String iface : cn.getInterfaces()) {
 				ClassInstance ifCls = cls.getEnv().getCreateClassInstance(ClassInstance.getId(iface));
 
 				if (cls.interfaces.add(ifCls)) ifCls.implementers.add(cls);
@@ -540,22 +537,22 @@ public final class ClassEnvironment implements ClassEnv {
 		}
 	}
 
-	private static boolean isStandardEnumMethod(String clsName, MethodNode m) {
-		final int reqFlags = BytecodeOpcodes.ACC_STATIC | BytecodeOpcodes.ACC_PUBLIC;
-		if ((m.access & reqFlags) != reqFlags) return false;
+	private static boolean isStandardEnumMethod(String clsName, BytecodeMethod m) {
+		final int reqFlags = JvmBcOpcodes.ACC_STATIC | JvmBcOpcodes.ACC_PUBLIC;
+		if ((m.getAccess() & reqFlags) != reqFlags) return false;
 
-		return m.name.equals("values") && m.desc.startsWith("()[L") && m.desc.startsWith(clsName, 4) && m.desc.length() == clsName.length() + 5
-				|| m.name.equals("valueOf") && m.desc.startsWith("(Ljava/lang/String;)L") && m.desc.startsWith(clsName, 21) && m.desc.length() == clsName.length() + 22;
+		return m.getName().equals("values") && m.getDesc().startsWith("()[L") && m.getDesc().startsWith(clsName, 4) && m.getDesc().length() == clsName.length() + 5
+				|| m.getName().equals("valueOf") && m.getDesc().startsWith("(Ljava/lang/String;)L") && m.getDesc().startsWith(clsName, 21) && m.getDesc().length() == clsName.length() + 22;
 	}
 
-	private static void detectOuterClass(ClassInstance cls, ClassNode cn) {
-		if (cn.outerClass != null) {
-			addOuterClass(cls, cn.outerClass, true);
-		} else if (cn.outerMethod != null) {
+	private static void detectOuterClass(ClassInstance cls, BytecodeClass cn) {
+		if (cn.getOuterClass() != null) {
+			addOuterClass(cls, cn.getOuterClass(), true);
+		} else if (cn.getOuterMethod() != null) {
 			throw new UnsupportedOperationException();
 		} else { // determine outer class by outer$inner name pattern
-			for (InnerClassNode icn : cn.innerClasses) {
-				if (icn.name.equals(cn.name)) {
+			for (InnerClassNode icn : cn.getInnerClasses()) {
+				if (icn.name.equals(cn.getName())) {
 					if (icn.outerName == null) { // this attribute isn't guaranteed to be provided
 						break;
 					} else {
@@ -567,8 +564,8 @@ public final class ClassEnvironment implements ClassEnv {
 
 			int pos;
 
-			if ((pos = cn.name.lastIndexOf('$')) > 0 && pos < cn.name.length() - 1) {
-				addOuterClass(cls, cn.name.substring(0, pos), false);
+			if ((pos = cn.getName().lastIndexOf('$')) > 0 && pos < cn.getName().length() - 1) {
+				addOuterClass(cls, cn.getName().substring(0, pos), false);
 			}
 		}
 	}

@@ -13,11 +13,11 @@ import javafx.scene.control.Label;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.Tab;
 import javafx.scene.layout.GridPane;
-import org.objectweb.asm.tree.ClassNode;
 
 import matcher.NameType;
 import matcher.Util;
 import matcher.Util.AFElementType;
+import matcher.bcprovider.BytecodeClass;
 import matcher.gui.Gui;
 import matcher.gui.GuiConstants;
 import matcher.gui.IGuiComponent;
@@ -137,7 +137,7 @@ public class ClassInfoTab extends Tab implements IGuiComponent {
 
 			uidLabel.setText(cls.getUid() >= 0 ? Integer.toString(cls.getUid()) : "-");
 			nameObfLabel.setText(Boolean.toString(cls.isNameObfuscated()));
-			inputLabel.setText(getInputPaths(cls, node -> true));
+			inputLabel.setText(getInputPaths(cls, bcCls -> true));
 			accessLabel.setText(Util.formatAccessFlags(cls.getAccess(), AFElementType.Class));
 
 			if (cls.getSignature() == null) {
@@ -178,11 +178,11 @@ public class ClassInfoTab extends Tab implements IGuiComponent {
 		}
 	}
 
-	static String getInputPaths(ClassInstance cls, Predicate<ClassNode> filter) {
+	static String getInputPaths(ClassInstance cls, Predicate<BytecodeClass> filter) {
 		StringBuilder ret = new StringBuilder();
 
-		for (int i = 0; i < cls.getBytecodeClasses().length; i++) {
-			if (!filter.test(cls.getBytecodeClasses()[i])) continue;
+		for (int i = 0; i < cls.getBytecodeClasses().size(); i++) {
+			if (!filter.test(cls.getBytecodeClasses().get(i))) continue;
 			if (ret.length() > 0) ret.append(", ");
 
 			String path = cls.getAsmNodeOrigin(i).getPath();

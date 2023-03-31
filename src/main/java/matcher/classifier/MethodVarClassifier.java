@@ -74,8 +74,8 @@ public class MethodVarClassifier {
 			int[] map = ClassifierUtil.mapInsns(argA.getMethod(), argB.getMethod());
 			if (map == null) return 1;
 
-			InsnList ilA = argA.getMethod().getAsmNode().instructions;
-			InsnList ilB = argB.getMethod().getAsmNode().instructions;
+			InsnList ilA = argA.getMethod().getBcMethod().getInstructions();
+			InsnList ilB = argB.getMethod().getBcMethod().getInstructions();
 			int matched = 0;
 			int mismatched = 0;
 
