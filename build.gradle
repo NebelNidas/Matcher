@@ -62,8 +62,9 @@ dependencies {
 	implementation "org.ow2.asm:asm-commons:${asm_version}"
 	implementation "org.ow2.asm:asm-tree:${asm_version}"
 	implementation "org.ow2.asm:asm-util:${asm_version}"
-	implementation "org.apache.logging.log4j:log4j-api:${log4j_version}"
-	runtimeOnly "org.apache.logging.log4j:log4j-core:${log4j_version}"
+	implementation "org.slf4j:slf4j-api:${slf4j_version}"
+	runtimeOnly "org.tinylog:tinylog-impl:${tinylog_version}"
+	runtimeOnly "org.tinylog:slf4j-tinylog:${tinylog_version}"
 
 	// JavaFX for all platforms (needed for cross-platform fat jar)
 	runtimeOnly "org.openjfx:javafx-base:${javafx_version}:win"
