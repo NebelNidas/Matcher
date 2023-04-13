@@ -42,7 +42,7 @@ public abstract class Job<T> implements Runnable {
 
 	public Job(JobCategory category, String idAppendix) {
 		this.category = category;
-		this.id = category.getId() + idAppendix == null ? "" : ":" + idAppendix;
+		this.id = category.getId() + (idAppendix == null ? "" : ":" + idAppendix);
 
 		changeDefaultSettings(settings);
 	}
