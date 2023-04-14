@@ -53,68 +53,64 @@ public class FileMenu extends Menu {
 
 		this.gui = gui;
 
-		init();
-	}
+		newProject = new MenuItem("New project");
+		getItems().add(newProject);
+		newProject.setOnAction(event -> newProject());
 
-	private void init() {
-		MenuItem menuItem = new MenuItem("New project");
-		getItems().add(menuItem);
-		menuItem.setOnAction(event -> newProject());
-
-		menuItem = new MenuItem("Load project");
-		getItems().add(menuItem);
-		menuItem.setOnAction(event -> loadProject());
+		loadProject = new MenuItem("Load project");
+		getItems().add(loadProject);
+		loadProject.setOnAction(event -> loadProject());
 
 		getItems().add(new SeparatorMenuItem());
 
-		menuItem = new MenuItem("Load mappings");
-		getItems().add(menuItem);
-		menuItem.setOnAction(event -> loadMappings(null));
+		loadMappings = new MenuItem("Load mappings");
+		getItems().add(loadMappings);
+		loadMappings.setOnAction(event -> loadMappings(null));
 
-		menuItem = new MenuItem("Load mappings (Enigma)");
-		getItems().add(menuItem);
-		menuItem.setOnAction(event -> loadMappings(MappingFormat.ENIGMA));
+		loadMappingsEnigmaDir = new MenuItem("Load mappings (Enigma)");
+		getItems().add(loadMappingsEnigmaDir);
+		loadMappingsEnigmaDir.setOnAction(event -> loadMappings(MappingFormat.ENIGMA));
 
-		menuItem = new MenuItem("Load mappings (MCP dir)");
-		getItems().add(menuItem);
-		menuItem.setOnAction(event -> loadMappings(MappingFormat.MCP));
+		loadMappingsMcpDir = new MenuItem("Load mappings (MCP dir)");
+		getItems().add(loadMappingsMcpDir);
+		loadMappingsMcpDir.setOnAction(event -> loadMappings(MappingFormat.MCP));
 
-		menuItem = new MenuItem("Save mappings");
-		getItems().add(menuItem);
-		menuItem.setOnAction(event -> saveMappings(null));
+		saveMappings = new MenuItem("Save mappings");
+		getItems().add(saveMappings);
+		saveMappings.setOnAction(event -> saveMappings(null));
 
-		menuItem = new MenuItem("Save mappings (Enigma)");
-		getItems().add(menuItem);
-		menuItem.setOnAction(event -> saveMappings(MappingFormat.ENIGMA));
+		saveMappingsEnigmaDir = new MenuItem("Save mappings (Enigma)");
+		getItems().add(saveMappingsEnigmaDir);
+		saveMappingsEnigmaDir.setOnAction(event -> saveMappings(MappingFormat.ENIGMA));
 
-		menuItem = new MenuItem("Clear mappings");
-		getItems().add(menuItem);
-		menuItem.setOnAction(event -> {
+		clearMappings = new MenuItem("Clear mappings");
+		getItems().add(clearMappings);
+		clearMappings.setOnAction(event -> {
 			Mappings.clear(gui.getMatcher().getEnv());
 			gui.onMappingChange();
 		});
 
 		getItems().add(new SeparatorMenuItem());
 
-		menuItem = new MenuItem("Load matches");
-		getItems().add(menuItem);
-		menuItem.setOnAction(event -> loadMatches());
+		loadMatches = new MenuItem("Load matches");
+		getItems().add(loadMatches);
+		loadMatches.setOnAction(event -> loadMatches());
 
-		menuItem = new MenuItem("Save matches");
-		getItems().add(menuItem);
-		menuItem.setOnAction(event -> saveMatches());
-
-		getItems().add(new SeparatorMenuItem());
-
-		menuItem = new MenuItem("Preferences");
-		getItems().add(menuItem);
-		menuItem.setOnAction(event -> openPreferences());
+		saveMatches = new MenuItem("Save matches");
+		getItems().add(saveMatches);
+		saveMatches.setOnAction(event -> saveMatches());
 
 		getItems().add(new SeparatorMenuItem());
 
-		menuItem = new MenuItem("Exit");
-		getItems().add(menuItem);
-		menuItem.setOnAction(event -> Platform.exit());
+		preferences = new MenuItem("Preferences");
+		getItems().add(preferences);
+		preferences.setOnAction(event -> openPreferences());
+
+		getItems().add(new SeparatorMenuItem());
+
+		exit = new MenuItem("Exit");
+		getItems().add(exit);
+		exit.setOnAction(event -> Platform.exit());
 	}
 
 	private void newProject() {
@@ -411,5 +407,30 @@ public class FileMenu extends Menu {
 		dialog.showAndWait();
 	}
 
+	public void updateMenus(boolean empty, boolean initializing) {
+		newProject.setDisable(initializing);
+		loadProject.setDisable(initializing);
+		loadMappings.setDisable(empty || initializing);
+		loadMappingsEnigmaDir.setDisable(empty || initializing);
+		loadMappingsMcpDir.setDisable(empty || initializing);
+		saveMappings.setDisable(empty || initializing);
+		saveMappingsEnigmaDir.setDisable(empty || initializing);
+		clearMappings.setDisable(empty || initializing);
+		loadMatches.setDisable(empty || initializing);
+		saveMatches.setDisable(empty || initializing);
+	}
+
 	private final Gui gui;
+	private final MenuItem newProject;
+	private final MenuItem loadProject;
+	private final MenuItem loadMappings;
+	private final MenuItem loadMappingsEnigmaDir;
+	private final MenuItem loadMappingsMcpDir;
+	private final MenuItem saveMappings;
+	private final MenuItem saveMappingsEnigmaDir;
+	private final MenuItem clearMappings;
+	private final MenuItem loadMatches;
+	private final MenuItem saveMatches;
+	private final MenuItem preferences;
+	private final MenuItem exit;
 }

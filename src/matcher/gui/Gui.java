@@ -265,6 +265,7 @@ public class Gui extends Application {
 
 			@Override
 			protected Void execute(DoubleConsumer progressReceiver) {
+				menu.updateMenus(false, true);
 				matcher.init(newConfig);
 				return null;
 			}
@@ -299,6 +300,7 @@ public class Gui extends Application {
 			}
 
 			onProjectChange();
+			menu.updateMenus(false, false);
 		}));
 		job.run();
 	}
