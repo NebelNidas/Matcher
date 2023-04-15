@@ -1,14 +1,14 @@
 package matcher.bcremap;
 
 import matcher.NameType;
-import matcher.bcprovider.BytecodeClassRemapNameProvider;
+import matcher.bcprovider.BcClassRemapNameProvider;
 import matcher.type.ClassEnv;
 import matcher.type.ClassInstance;
 import matcher.type.FieldInstance;
 import matcher.type.MethodInstance;
 import matcher.type.MethodVarInstance;
 
-public class ClassRemapNameProvider implements BytecodeClassRemapNameProvider {
+public class ClassRemapNameProvider implements BcClassRemapNameProvider {
 	public ClassRemapNameProvider(ClassEnv env, NameType nameType) {
 		this.env = env;
 		this.nameType = nameType;

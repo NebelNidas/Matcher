@@ -20,24 +20,25 @@ import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.tree.AbstractInsnNode;
-import org.objectweb.asm.tree.FieldInsnNode;
 import org.objectweb.asm.tree.IincInsnNode;
-import org.objectweb.asm.tree.InsnList;
-import org.objectweb.asm.tree.IntInsnNode;
-import org.objectweb.asm.tree.InvokeDynamicInsnNode;
-import org.objectweb.asm.tree.JumpInsnNode;
-import org.objectweb.asm.tree.LdcInsnNode;
 import org.objectweb.asm.tree.LookupSwitchInsnNode;
-import org.objectweb.asm.tree.MethodInsnNode;
 import org.objectweb.asm.tree.MultiANewArrayInsnNode;
 import org.objectweb.asm.tree.TableSwitchInsnNode;
-import org.objectweb.asm.tree.TypeInsnNode;
 import org.objectweb.asm.tree.VarInsnNode;
 import org.objectweb.asm.util.Textifier;
 import org.objectweb.asm.util.TraceMethodVisitor;
 
 import matcher.Util;
-import matcher.bcprovider.BytecodeMethod;
+import matcher.bcprovider.BcInstruction;
+import matcher.bcprovider.BcMethod;
+import matcher.bcprovider.SharedBcInstructions;
+import matcher.bcprovider.instructions.BcFieldInstruction;
+import matcher.bcprovider.instructions.BcIntInstruction;
+import matcher.bcprovider.instructions.BcInvokeDynamicInstruction;
+import matcher.bcprovider.instructions.BcInvokeMethodInstruction;
+import matcher.bcprovider.instructions.BcJumpInstruction;
+import matcher.bcprovider.instructions.BcLoadConstantInstruction;
+import matcher.bcprovider.instructions.BcTypeInstruction;
 import matcher.classifier.MatchingCache.CacheToken;
 import matcher.type.ClassEnvironment;
 import matcher.type.ClassInstance;
@@ -279,34 +280,34 @@ public class ClassifierUtil {
 	}
 
 	public static double compareClassLists(List<ClassInstance> listA, List<ClassInstance> listB) {
-		return compareLists(listA, listB, List::get, List::size, (a, b) -> ClassifierUtil.checkPotentialEquality(a, b) ? COMPARED_SIMILAR : COMPARED_DISTINCT);
+		return compareLists(listA, listB, (a, b) -> ClassifierUtil.checkPotentialEquality(a, b) ? COMPARED_SIMILAR : COMPARED_DISTINCT);
 	}
 
 	public static double compareInsns(MethodInstance a, MethodInstance b) {
 		if (a.getBcMethod() == null || b.getBcMethod() == null) return 1;
 
-		InsnList ilA = a.getBcMethod().getInstructions();
-		InsnList ilB = b.getBcMethod().getInstructions();
+		List<BcInstruction> ilA = a.getBcMethod().getInstructions();
+		List<BcInstruction> ilB = b.getBcMethod().getInstructions();
 
-		return compareLists(ilA, ilB, InsnList::get, InsnList::size, (inA, inB) -> compareInsns(inA, inB, ilA, ilB, (list, item) -> list.indexOf(item), a, b, a.getEnv().getGlobal()));
+		return compareLists(ilA, ilB, (inA, inB) -> compareInsns(inA, inB, ilA, ilB, (list, item) -> list.indexOf(item), a, b, a.getEnv().getGlobal()));
 	}
 
-	public static double compareInsns(List<AbstractInsnNode> listA, List<AbstractInsnNode> listB, ClassEnvironment env) {
-		return compareLists(listA, listB, List::get, List::size, (inA, inB) -> compareInsns(inA, inB, listA, listB, (list, item) -> list.indexOf(item), null, null, env));
+	public static double compareInsns(List<BcInstruction> listA, List<BcInstruction> listB, ClassEnvironment env) {
+		return compareLists(listA, listB, (inA, inB) -> compareInsns(inA, inB, listA, listB, (list, item) -> list.indexOf(item), null, null, env));
 	}
 
-	private static <T> int compareInsns(AbstractInsnNode insnA, AbstractInsnNode insnB, T listA, T listB, ToIntBiFunction<T, AbstractInsnNode> posProvider,
+	private static <T> int compareInsns(BcInstruction insnA, BcInstruction insnB, List<T> listA, List<T> listB, ToIntBiFunction<List<T>, BcInstruction> posProvider,
 			MethodInstance mthA, MethodInstance mthB, ClassEnvironment env) {
 		if (insnA.getOpcode() != insnB.getOpcode()) return COMPARED_DISTINCT;
 
-		switch (insnA.getType()) {
-		case AbstractInsnNode.INT_INSN: {
-			IntInsnNode a = (IntInsnNode) insnA;
-			IntInsnNode b = (IntInsnNode) insnB;
+		switch (insnA.getInstructionType()) {
+		case SharedBcInstructions.INT: {
+			BcIntInstruction a = (BcIntInstruction) insnA;
+			BcIntInstruction b = (BcIntInstruction) insnB;
 
-			return a.operand == b.operand ? COMPARED_SIMILAR : COMPARED_DISTINCT;
+			return a.getOperand() == b.getOperand() ? COMPARED_SIMILAR : COMPARED_DISTINCT;
 		}
-		case AbstractInsnNode.VAR_INSN: {
+		case SharedBcInstructions.LOCAL_VARIABLE: {
 			VarInsnNode a = (VarInsnNode) insnA;
 			VarInsnNode b = (VarInsnNode) insnB;
 
@@ -325,45 +326,47 @@ public class ClassifierUtil {
 
 			break;
 		}
-		case AbstractInsnNode.TYPE_INSN: {
-			TypeInsnNode a = (TypeInsnNode) insnA;
-			TypeInsnNode b = (TypeInsnNode) insnB;
-			ClassInstance clsA = env.getClsByNameA(a.desc);
-			ClassInstance clsB = env.getClsByNameB(b.desc);
+		case SharedBcInstructions.TYPE: {
+			BcTypeInstruction a = (BcTypeInstruction) insnA;
+			BcTypeInstruction b = (BcTypeInstruction) insnB;
+			ClassInstance clsA = env.getClsByNameA(a.getType());
+			ClassInstance clsB = env.getClsByNameB(b.getType());
 
 			return checkPotentialEqualityNullable(clsA, clsB) ? COMPARED_SIMILAR : COMPARED_DISTINCT;
 		}
-		case AbstractInsnNode.FIELD_INSN: {
-			FieldInsnNode a = (FieldInsnNode) insnA;
-			FieldInsnNode b = (FieldInsnNode) insnB;
-			ClassInstance clsA = env.getClsByNameA(a.owner);
-			ClassInstance clsB = env.getClsByNameB(b.owner);
+		case SharedBcInstructions.FIELD: {
+			BcFieldInstruction a = (BcFieldInstruction) insnA;
+			BcFieldInstruction b = (BcFieldInstruction) insnB;
+			ClassInstance clsA = env.getClsByNameA(a.getOwner());
+			ClassInstance clsB = env.getClsByNameB(b.getOwner());
 
 			if (clsA == null && clsB == null) return COMPARED_SIMILAR;
 			if (clsA == null || clsB == null) return COMPARED_DISTINCT;
 
-			FieldInstance fieldA = clsA.resolveField(a.name, a.desc);
-			FieldInstance fieldB = clsB.resolveField(b.name, b.desc);
+			FieldInstance fieldA = clsA.resolveField(a.getName(), a.getDescriptor());
+			FieldInstance fieldB = clsB.resolveField(b.getName(), b.getDescriptor());
 
 			return checkPotentialEqualityNullable(fieldA, fieldB) ? COMPARED_SIMILAR : COMPARED_DISTINCT;
 		}
-		case AbstractInsnNode.METHOD_INSN: {
-			MethodInsnNode a = (MethodInsnNode) insnA;
-			MethodInsnNode b = (MethodInsnNode) insnB;
+		case SharedBcInstructions.INVOKE_METHOD: {
+			BcInvokeMethodInstruction a = (BcInvokeMethodInstruction) insnA;
+			BcInvokeMethodInstruction b = (BcInvokeMethodInstruction) insnB;
 
-			return compareMethods(a.owner, a.name, a.desc, Util.isCallToInterface(a),
-					b.owner, b.name, b.desc, Util.isCallToInterface(b),
+			return compareMethods(a.getOwner(), a.getName(), a.getDescriptor(), Util.isCallToInterface(a),
+					b.getOwner(), b.getName(), b.getDescriptor(), Util.isCallToInterface(b),
 					env) ? COMPARED_SIMILAR : COMPARED_DISTINCT;
 		}
-		case AbstractInsnNode.INVOKE_DYNAMIC_INSN: {
-			InvokeDynamicInsnNode a = (InvokeDynamicInsnNode) insnA;
-			InvokeDynamicInsnNode b = (InvokeDynamicInsnNode) insnB;
+		case SharedBcInstructions.INVOKE_DYNAMIC: {
+			BcInvokeDynamicInstruction a = (BcInvokeDynamicInstruction) insnA;
+			BcInvokeDynamicInstruction b = (BcInvokeDynamicInstruction) insnB;
+			Handle bsmA = a.getBootstrapMethodHandle();
+			Handle bsmB = b.getBootstrapMethodHandle();
 
-			if (!a.bsm.equals(b.bsm)) return COMPARED_DISTINCT;
+			if (!bsmA.equals(bsmB)) return COMPARED_DISTINCT;
 
-			if (Util.isJavaLambdaMetafactory(a.bsm)) {
-				Handle implA = (Handle) a.bsmArgs[1];
-				Handle implB = (Handle) b.bsmArgs[1];
+			if (Util.isJavaLambdaMetafactory(bsmA)) {
+				Handle implA = (Handle) a.getBootstrapMethodArgs().get(1);
+				Handle implB = (Handle) b.getBootstrapMethodArgs().get(1);
 
 				if (implA.getTag() != implB.getTag()) return COMPARED_DISTINCT;
 
@@ -379,37 +382,37 @@ public class ClassifierUtil {
 				default:
 					System.out.println("unexpected impl tag: "+implA.getTag());
 				}
-			} else if (!Util.isIrrelevantBsm(a.bsm)) {
-				System.out.printf("unknown invokedynamic bsm: %s/%s%s (tag=%d iif=%b)%n", a.bsm.getOwner(), a.bsm.getName(), a.bsm.getDesc(), a.bsm.getTag(), a.bsm.isInterface());
+			} else if (!Util.isIrrelevantBsm(bsmA)) {
+				System.out.printf("unknown invokedynamic bsm: %s/%s%s (tag=%d iif=%b)%n", bsmA.getOwner(), bsmA.getName(), bsmA.getDesc(), bsmA.getTag(), bsmA.isInterface());
 			}
 
 			// TODO: implement
 			break;
 		}
-		case AbstractInsnNode.JUMP_INSN: {
-			JumpInsnNode a = (JumpInsnNode) insnA;
-			JumpInsnNode b = (JumpInsnNode) insnB;
+		case SharedBcInstructions.JUMP: {
+			BcJumpInstruction a = (BcJumpInstruction) insnA;
+			BcJumpInstruction b = (BcJumpInstruction) insnB;
 
 			// check if the 2 jumps have the same direction
-			int dirA = Integer.signum(posProvider.applyAsInt(listA, a.label) - posProvider.applyAsInt(listA, a));
-			int dirB = Integer.signum(posProvider.applyAsInt(listB, b.label) - posProvider.applyAsInt(listB, b));
+			int dirA = Integer.signum(posProvider.applyAsInt(listA, a.getLabel()) - posProvider.applyAsInt(listA, a));
+			int dirB = Integer.signum(posProvider.applyAsInt(listB, b.getLabel()) - posProvider.applyAsInt(listB, b));
 
 			return dirA == dirB ? COMPARED_SIMILAR : COMPARED_DISTINCT;
 		}
-		case AbstractInsnNode.LABEL: {
+		case SharedBcInstructions.LABEL: {
 			// TODO: implement
 			break;
 		}
-		case AbstractInsnNode.LDC_INSN: {
-			LdcInsnNode a = (LdcInsnNode) insnA;
-			LdcInsnNode b = (LdcInsnNode) insnB;
-			Class<?> typeClsA = a.cst.getClass();
+		case SharedBcInstructions.LOAD_CONSTANT: {
+			BcLoadConstantInstruction a = (BcLoadConstantInstruction) insnA;
+			BcLoadConstantInstruction b = (BcLoadConstantInstruction) insnB;
+			Class<?> typeClsA = a.getConstant().getClass();
 
-			if (typeClsA != b.cst.getClass()) return COMPARED_DISTINCT;
+			if (typeClsA != b.getConstant().getClass()) return COMPARED_DISTINCT;
 
 			if (typeClsA == Type.class) {
-				Type typeA = (Type) a.cst;
-				Type typeB = (Type) b.cst;
+				Type typeA = (Type) a.getConstant();
+				Type typeB = (Type) b.getConstant();
 
 				if (typeA.getSort() != typeB.getSort()) return COMPARED_DISTINCT;
 
@@ -422,7 +425,7 @@ public class ClassifierUtil {
 					break;
 				}
 			} else {
-				return a.cst.equals(b.cst) ? COMPARED_SIMILAR : COMPARED_DISTINCT;
+				return a.getConstant().equals(b.getConstant()) ? COMPARED_SIMILAR : COMPARED_DISTINCT;
 			}
 
 			break;
@@ -500,9 +503,9 @@ public class ClassifierUtil {
 		return checkPotentialEquality(methodA, methodB);
 	}
 
-	private static <T, U> double compareLists(T listA, T listB, ListElementRetriever<T, U> elementRetriever, ListSizeRetriever<T> sizeRetriever, ElementComparator<U> elementComparator) {
-		final int sizeA = sizeRetriever.apply(listA);
-		final int sizeB = sizeRetriever.apply(listB);
+	private static <T> double compareLists(List<T> listA, List<T> listB, ElementComparator<T> elementComparator) {
+		final int sizeA = listA.size();
+		final int sizeB = listB.size();
 
 		if (sizeA == 0 && sizeB == 0) return 1;
 		if (sizeA == 0 || sizeB == 0) return 0;
@@ -511,7 +514,7 @@ public class ClassifierUtil {
 			boolean match = true;
 
 			for (int i = 0; i < sizeA; i++) {
-				if (elementComparator.compare(elementRetriever.apply(listA, i), elementRetriever.apply(listB, i)) != COMPARED_SIMILAR) {
+				if (elementComparator.compare(listA.get(i), listB.get(i)) != COMPARED_SIMILAR) {
 					match = false;
 					break;
 				}
@@ -532,7 +535,7 @@ public class ClassifierUtil {
 			v1[0] = (i + 1) * COMPARED_DISTINCT;
 
 			for (int j = 0; j < sizeB; j++) {
-				int cost = elementComparator.compare(elementRetriever.apply(listA, i), elementRetriever.apply(listB, j));
+				int cost = elementComparator.compare(listA.get(i), listB.get(i));
 				v1[j + 1] = Math.min(Math.min(v1[j] + COMPARED_DISTINCT, v0[j + 1] + COMPARED_DISTINCT), v0[j] + cost);
 			}
 
@@ -551,8 +554,8 @@ public class ClassifierUtil {
 	public static int[] mapInsns(MethodInstance a, MethodInstance b) {
 		if (a.getBcMethod() == null || b.getBcMethod() == null) return null;
 
-		InsnList ilA = a.getBcMethod().getInstructions();
-		InsnList ilB = b.getBcMethod().getInstructions();
+		List<BcInstruction> ilA = a.getBcMethod().getInstructions();
+		List<BcInstruction> ilB = b.getBcMethod().getInstructions();
 
 		if (ilA.size() * ilB.size() < 1000) {
 			return mapInsns(ilA, ilB, a, b, a.getEnv().getGlobal());
@@ -561,13 +564,13 @@ public class ClassifierUtil {
 		}
 	}
 
-	public static int[] mapInsns(InsnList listA, InsnList listB, MethodInstance mthA, MethodInstance mthB, ClassEnvironment env) {
-		return mapLists(listA, listB, InsnList::get, InsnList::size, (inA, inB) -> compareInsns(inA, inB, listA, listB, (list, item) -> list.indexOf(item), mthA, mthB, env));
+	public static int[] mapInsns(List<BcInstruction> listA, List<BcInstruction> listB, MethodInstance mthA, MethodInstance mthB, ClassEnvironment env) {
+		return mapLists(listA, listB, (inA, inB) -> compareInsns(inA, inB, listA, listB, (list, item) -> list.indexOf(item), mthA, mthB, env));
 	}
 
-	private static <T, U> int[] mapLists(T listA, T listB, ListElementRetriever<T, U> elementRetriever, ListSizeRetriever<T> sizeRetriever, ElementComparator<U> elementComparator) {
-		final int sizeA = sizeRetriever.apply(listA);
-		final int sizeB = sizeRetriever.apply(listB);
+	private static <T> int[] mapLists(List<T> listA, List<T> listB, ElementComparator<T> elementComparator) {
+		final int sizeA = listA.size();
+		final int sizeB = listB.size();
 
 		if (sizeA == 0 && sizeB == 0) return new int[0];
 
@@ -583,7 +586,7 @@ public class ClassifierUtil {
 			boolean match = true;
 
 			for (int i = 0; i < sizeA; i++) {
-				if (elementComparator.compare(elementRetriever.apply(listA, i), elementRetriever.apply(listB, i)) != COMPARED_SIMILAR) {
+				if (elementComparator.compare(listA.get(i), listB.get(i)) != COMPARED_SIMILAR) {
 					match = false;
 					break;
 				}
@@ -612,7 +615,7 @@ public class ClassifierUtil {
 
 		for (int j = 1; j <= sizeB; j++) {
 			for (int i = 1; i <= sizeA; i++) {
-				int cost = elementComparator.compare(elementRetriever.apply(listA, i - 1), elementRetriever.apply(listB, j - 1));
+				int cost = elementComparator.compare(listA.get(i-1), listB.get(j-1));
 
 				v[i + j * size] = Math.min(Math.min(v[i - 1 + j * size] + COMPARED_DISTINCT,
 						v[i + (j - 1) * size] + COMPARED_DISTINCT),
@@ -695,14 +698,6 @@ public class ClassifierUtil {
 		}
 	}
 
-	private interface ListElementRetriever<T, U> {
-		U apply(T list, int pos);
-	}
-
-	private interface ListSizeRetriever<T> {
-		int apply(T list);
-	}
-
 	public static <T extends Matchable<T>> List<RankResult<T>> rank(T src, T[] dsts, Collection<IClassifier<T>> classifiers, BiPredicate<T, T> potentialEqualityCheck, ClassEnvironment env, double maxMismatch) {
 		List<RankResult<T>> ret = new ArrayList<>(dsts.length);
 
@@ -751,40 +746,30 @@ public class ClassifierUtil {
 		return new RankResult<>(dst, score, results);
 	}
 
-	public static void extractStrings(InsnList il, Set<String> out) {
+	public static void extractStrings(Collection<BcInstruction> il, Set<String> out) {
 		extractStrings(il.iterator(), out);
 	}
 
-	public static void extractStrings(Collection<AbstractInsnNode> il, Set<String> out) {
-		extractStrings(il.iterator(), out);
-	}
-
-	private static void extractStrings(Iterator<AbstractInsnNode> it, Set<String> out) {
+	private static void extractStrings(Iterator<BcInstruction> it, Set<String> out) {
 		while (it.hasNext()) {
-			AbstractInsnNode aInsn = it.next();
+			BcInstruction insn = it.next();
 
-			if (aInsn instanceof LdcInsnNode) {
-				LdcInsnNode insn = (LdcInsnNode) aInsn;
-
-				if (insn.cst instanceof String) {
-					out.add((String) insn.cst);
+			if (insn instanceof BcLoadConstantInstruction ldcInsn) {
+				if (ldcInsn.getConstant() instanceof String) {
+					out.add((String) ldcInsn.getConstant());
 				}
 			}
 		}
 	}
 
-	public static void extractNumbers(BytecodeMethod bcMethod, Set<Integer> ints, Set<Long> longs, Set<Float> floats, Set<Double> doubles) {
-		for (Iterator<AbstractInsnNode> it = bcMethod.getInstructions().iterator(); it.hasNext(); ) {
-			AbstractInsnNode aInsn = it.next();
+	public static void extractNumbers(BcMethod bcMethod, Set<Integer> ints, Set<Long> longs, Set<Float> floats, Set<Double> doubles) {
+		for (Iterator<BcInstruction> it = bcMethod.getInstructions().iterator(); it.hasNext(); ) {
+			BcInstruction insn = it.next();
 
-			if (aInsn instanceof LdcInsnNode) {
-				LdcInsnNode insn = (LdcInsnNode) aInsn;
-
-				handleNumberValue(insn.cst, ints, longs, floats, doubles);
-			} else if (aInsn instanceof IntInsnNode) {
-				IntInsnNode insn = (IntInsnNode) aInsn;
-
-				ints.add(insn.operand);
+			if (insn instanceof BcLoadConstantInstruction ldcInsn) {
+				handleNumberValue(ldcInsn.getConstant(), ints, longs, floats, doubles);
+			} else if (insn instanceof BcIntInstruction intInsn) {
+				ints.add(intInsn.getOperand());
 			}
 		}
 	}

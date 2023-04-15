@@ -6,6 +6,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
 
+import org.jetbrains.annotations.Nullable;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.tree.AbstractInsnNode;
@@ -14,7 +15,7 @@ import org.objectweb.asm.tree.LocalVariableNode;
 
 import matcher.NameType;
 import matcher.Util;
-import matcher.bcprovider.BytecodeMethod;
+import matcher.bcprovider.BcMethod;
 import matcher.classifier.ClassifierUtil;
 import matcher.type.Signature.MethodSignature;
 
@@ -29,11 +30,11 @@ public final class MethodInstance extends MemberInstance<MethodInstance> {
 	/**
 	 * Create a known method.
 	 */
-	MethodInstance(ClassInstance cls, String origName, String desc, BytecodeMethod bcMethod, boolean nameObfuscated, int position) {
+	MethodInstance(ClassInstance cls, String origName, String desc, BcMethod bcMethod, boolean nameObfuscated, int position) {
 		this(cls, origName, desc, bcMethod, nameObfuscated, position, (bcMethod.getAccess() & Opcodes.ACC_STATIC) != 0);
 	}
 
-	private MethodInstance(ClassInstance cls, String origName, String desc, BytecodeMethod bcMethod, boolean nameObfuscated, int position, boolean isStatic) {
+	private MethodInstance(ClassInstance cls, String origName, String desc, BcMethod bcMethod, boolean nameObfuscated, int position, boolean isStatic) {
 		super(cls, getId(origName, desc), origName, nameObfuscated, position, isStatic);
 
 		try {
@@ -59,7 +60,7 @@ public final class MethodInstance extends MemberInstance<MethodInstance> {
 		return ret;
 	}
 
-	private static MethodVarInstance[] gatherArgs(MethodInstance method, String desc, BytecodeMethod bcMethod) {
+	private static MethodVarInstance[] gatherArgs(MethodInstance method, String desc, BcMethod bcMethod) {
 		Type[] argTypes = Type.getArgumentTypes(desc);
 		if (argTypes.length == 0) return emptyVars;
 
@@ -120,7 +121,7 @@ public final class MethodInstance extends MemberInstance<MethodInstance> {
 		return args;
 	}
 
-	private static MethodVarInstance[] gatherVars(MethodInstance method, BytecodeMethod bcMethod) {
+	private static MethodVarInstance[] gatherVars(MethodInstance method, BcMethod bcMethod) {
 		if (bcMethod == null) return emptyVars;
 		if (bcMethod.getLocalVariables() == null) return emptyVars; // TODO: generate?
 		if (bcMethod.getLocalVariables().isEmpty()) return emptyVars;
@@ -253,7 +254,8 @@ public final class MethodInstance extends MemberInstance<MethodInstance> {
 		return real;
 	}
 
-	public BytecodeMethod getBcMethod() {
+	@Nullable
+	public BcMethod getBcMethod() {
 		return bcMethod;
 	}
 
@@ -488,7 +490,7 @@ public final class MethodInstance extends MemberInstance<MethodInstance> {
 	final ClassInstance retType;
 	MethodVarInstance[] vars;
 	final MethodSignature signature;
-	private final BytecodeMethod bcMethod;
+	private final BcMethod bcMethod;
 
 	MethodType type = MethodType.UNKNOWN;
 

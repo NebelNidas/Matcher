@@ -1,8 +1,5 @@
 package matcher.gui.tab;
 
-import java.io.PrintWriter;
-import java.io.StringWriter;
-
 import matcher.NameType;
 import matcher.gui.Gui;
 import matcher.gui.ISelectionProvider;
@@ -41,16 +38,13 @@ public class BytecodeTab extends WebViewTab {
 		if (cls == null) {
 			displayText("no class selected");
 		} else {
-			StringWriter writer = new StringWriter();
-
-			try (PrintWriter pw = new PrintWriter(writer)) {
-				NameType nameType = gui.getNameType().withUnmatchedTmp(unmatchedTmp);
-				cls.getMergedBytecodeClass().accept(new HtmlTextifier(cls, nameType).asBytecodeClassVisitor());
-			}
+			String bytecodeHtml;
+			NameType nameType = gui.getNameType().withUnmatchedTmp(unmatchedTmp);
+			bytecodeHtml = new BytecodeToHtmlConverter(cls, nameType).convert();
 
 			double prevScroll = isRefresh ? getScrollTop() : 0;
 
-			displayHtml(writer.toString());
+			displayHtml(bytecodeHtml);
 
 			if (isRefresh && prevScroll > 0) {
 				setScrollTop(prevScroll);

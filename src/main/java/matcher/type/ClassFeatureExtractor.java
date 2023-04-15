@@ -21,15 +21,13 @@ import java.util.regex.Pattern;
 
 import org.objectweb.asm.Handle;
 import org.objectweb.asm.Opcodes;
-import org.objectweb.asm.tree.AbstractInsnNode;
-import org.objectweb.asm.tree.FieldInsnNode;
-import org.objectweb.asm.tree.InvokeDynamicInsnNode;
-import org.objectweb.asm.tree.MethodInsnNode;
-import org.objectweb.asm.tree.TypeInsnNode;
 
 import matcher.NameType;
 import matcher.Util;
-import matcher.bcprovider.BytecodeClass;
+import matcher.bcprovider.BcClass;
+import matcher.bcprovider.BcInstruction;
+import matcher.bcprovider.SharedBcInstructions;
+import matcher.bcprovider.instructions.BcInvokeMethodInstruction;
 import matcher.type.Analysis.CommonClasses;
 
 public class ClassFeatureExtractor implements LocalClassEnv {
@@ -39,7 +37,7 @@ public class ClassFeatureExtractor implements LocalClassEnv {
 
 	public void processInputs(Collection<Path> inputs, Pattern nonObfuscatedClasses) {
 		Set<Path> uniqueInputs = new LinkedHashSet<>(inputs);
-		Predicate<BytecodeClass> obfuscatedCheck = cn -> isNameObfuscated(cn, nonObfuscatedClasses);
+		Predicate<BcClass> obfuscatedCheck = cn -> isNameObfuscated(cn, nonObfuscatedClasses);
 
 		for (Path archive : uniqueInputs) {
 			inputFiles.add(new InputFile(archive));
@@ -86,14 +84,14 @@ public class ClassFeatureExtractor implements LocalClassEnv {
 		}
 	}
 
-	private static boolean isNameObfuscated(BytecodeClass cn, Pattern pattern) {
-		return pattern == null || !pattern.matcher(cn.getName()).matches();
+	private static boolean isNameObfuscated(BcClass cn, Pattern pattern) {
+		return pattern == null || !pattern.matcher(cn.getInternalName()).matches();
 	}
 
-	private ClassInstance readClass(Path path, URI origin, Predicate<BytecodeClass> nameObfuscated) {
-		BytecodeClass cls = ClassEnvironment.readClass(path, false);
+	private ClassInstance readClass(Path path, URI origin, Predicate<BcClass> nameObfuscated) {
+		BcClass cls = ClassEnvironment.readClass(path, false);
 
-		return new ClassInstance(ClassInstance.getId(cls.getName()), origin, this, cls, nameObfuscated.test(cls));
+		return new ClassInstance(ClassInstance.getId(cls.getInternalName()), origin, this, cls, nameObfuscated.test(cls));
 	}
 
 	private static void mergeClasses(ClassInstance from, ClassInstance to) {
@@ -235,28 +233,28 @@ public class ClassFeatureExtractor implements LocalClassEnv {
 			return;
 		}
 
-		for (Iterator<AbstractInsnNode> it = method.getBcMethod().getInstructions().iterator(); it.hasNext(); ) {
-			AbstractInsnNode ain = it.next();
+		for (Iterator<BcInstruction> it = method.getBcMethod().getInstructions().iterator(); it.hasNext(); ) {
+			BcInstruction insn = it.next();
 
-			switch (ain.getType()) {
-			case AbstractInsnNode.METHOD_INSN: {
-				MethodInsnNode in = (MethodInsnNode) ain;
+			switch (insn.getInstructionType()) {
+			case SharedBcInstructions.INVOKE_METHOD: {
+				BcInvokeMethodInstruction mthInsn = (BcInvokeMethodInstruction) insn;
 				handleMethodInvocation(method,
-						in.owner, in.name, in.desc,
-						Util.isCallToInterface(in), ain.getOpcode() == Opcodes.INVOKESTATIC);
+						mthInsn.getOwner(), mthInsn.getName(), mthInsn.getDescriptor(),
+						Util.isCallToInterface(mthInsn), mthInsn.getOpcode() == Opcodes.INVOKESTATIC);
 				break;
 			}
 			case AbstractInsnNode.FIELD_INSN: {
-				FieldInsnNode in = (FieldInsnNode) ain;
+				FieldInsnNode in = (FieldInsnNode) insn;
 				ClassInstance owner = getCreateClassInstance(ClassInstance.getId(in.owner));
 				FieldInstance dst = owner.resolveField(in.name, in.desc);
 
 				if (dst == null) { // unknown field, create a synthetic one
-					dst = new FieldInstance(owner, in.name, in.desc, ain.getOpcode() == Opcodes.GETSTATIC || ain.getOpcode() == Opcodes.PUTSTATIC);
+					dst = new FieldInstance(owner, in.name, in.desc, insn.getOpcode() == Opcodes.GETSTATIC || insn.getOpcode() == Opcodes.PUTSTATIC);
 					owner.addField(dst);
 				}
 
-				if (ain.getOpcode() == Opcodes.GETSTATIC || ain.getOpcode() == Opcodes.GETFIELD) {
+				if (insn.getOpcode() == Opcodes.GETSTATIC || insn.getOpcode() == Opcodes.GETFIELD) {
 					dst.readRefs.add(method);
 					method.fieldReadRefs.add(dst);
 				} else {
@@ -270,7 +268,7 @@ public class ClassFeatureExtractor implements LocalClassEnv {
 				break;
 			}
 			case AbstractInsnNode.TYPE_INSN: {
-				TypeInsnNode tin = (TypeInsnNode) ain;
+				TypeInsnNode tin = (TypeInsnNode) insn;
 				ClassInstance dst = getCreateClassInstance(ClassInstance.getId(tin.desc));
 
 				dst.methodTypeRefs.add(method);
@@ -279,7 +277,7 @@ public class ClassFeatureExtractor implements LocalClassEnv {
 				break;
 			}
 			case AbstractInsnNode.INVOKE_DYNAMIC_INSN: {
-				InvokeDynamicInsnNode in = (InvokeDynamicInsnNode) ain;
+				InvokeDynamicInsnNode in = (InvokeDynamicInsnNode) insn;
 				Handle impl = Util.getTargetHandle(in.bsm, in.bsmArgs);
 				if (impl == null) break;
 
@@ -675,8 +673,8 @@ public class ClassFeatureExtractor implements LocalClassEnv {
 		Path file = classPathIndex.get(name);
 		if (file == null) return null;
 
-		BytecodeClass cn = ClassEnvironment.readClass(file, false);
-		ClassInstance cls = new ClassInstance(ClassInstance.getId(cn.getName()), ClassEnvironment.getContainingUri(file.toUri(), cn.getName()), this, cn);
+		BcClass cn = ClassEnvironment.readClass(file, false);
+		ClassInstance cls = new ClassInstance(ClassInstance.getId(cn.getInternalName()), ClassEnvironment.getContainingUri(file.toUri(), cn.getInternalName()), this, cn);
 		if (!cls.getId().equals(id)) throw new RuntimeException("mismatched cls id "+id+" for "+file+", expected "+name);
 
 		ClassInstance prev = classes.putIfAbsent(cls.getId(), cls);

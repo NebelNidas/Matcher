@@ -7,8 +7,8 @@ import org.objectweb.asm.tree.AbstractInsnNode;
 
 import matcher.NameType;
 import matcher.Util;
-import matcher.bcprovider.BytecodeField;
-import matcher.bcprovider.jvm.JvmBcOpcodes;
+import matcher.bcprovider.BcField;
+import matcher.bcprovider.impl.jvm.JvmBcOpcodes;
 import matcher.classifier.ClassifierUtil;
 import matcher.type.Signature.FieldSignature;
 
@@ -23,11 +23,11 @@ public final class FieldInstance extends MemberInstance<FieldInstance> {
 	/**
 	 * Create a known field.
 	 */
-	FieldInstance(ClassInstance cls, String origName, String desc, BytecodeField bcField, boolean nameObfuscated, int position) {
+	FieldInstance(ClassInstance cls, String origName, String desc, BcField bcField, boolean nameObfuscated, int position) {
 		this(cls, origName, desc, bcField, nameObfuscated, position, (bcField.getAccess() & JvmBcOpcodes.ACC_STATIC) != 0);
 	}
 
-	private FieldInstance(ClassInstance cls, String origName, String desc, BytecodeField bcField, boolean nameObfuscated, int position, boolean isStatic) {
+	private FieldInstance(ClassInstance cls, String origName, String desc, BcField bcField, boolean nameObfuscated, int position, boolean isStatic) {
 		super(cls, getId(origName, desc), origName, nameObfuscated, position, isStatic);
 
 		try {
@@ -78,7 +78,7 @@ public final class FieldInstance extends MemberInstance<FieldInstance> {
 		return bytecodeField != null;
 	}
 
-	public BytecodeField getBytecodeField() {
+	public BcField getBytecodeField() {
 		return bytecodeField;
 	}
 
@@ -169,7 +169,7 @@ public final class FieldInstance extends MemberInstance<FieldInstance> {
 		return name+";;"+desc;
 	}
 
-	final BytecodeField bytecodeField;
+	final BcField bytecodeField;
 	final ClassInstance type;
 	ClassInstance exactType;
 	private final FieldSignature signature;

@@ -14,6 +14,7 @@ repositories {
 		name "Fabric"
 		url 'https://maven.fabricmc.net/'
 	}
+	google()
 }
 
 archivesBaseName = 'matcher'
@@ -62,6 +63,7 @@ dependencies {
 	implementation "org.ow2.asm:asm-commons:${asm_version}"
 	implementation "org.ow2.asm:asm-tree:${asm_version}"
 	implementation "org.ow2.asm:asm-util:${asm_version}"
+	implementation "com.android.tools.smali:smali-dexlib2:${dexlib2_version}"
 
 	// JavaFX for all platforms (needed for cross-platform fat jar)
 	runtimeOnly "org.openjfx:javafx-base:${javafx_version}:win"

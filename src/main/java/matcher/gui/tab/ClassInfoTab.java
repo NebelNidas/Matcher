@@ -17,7 +17,7 @@ import javafx.scene.layout.GridPane;
 import matcher.NameType;
 import matcher.Util;
 import matcher.Util.AFElementType;
-import matcher.bcprovider.BytecodeClass;
+import matcher.bcprovider.BcClass;
 import matcher.gui.Gui;
 import matcher.gui.GuiConstants;
 import matcher.gui.IGuiComponent;
@@ -178,7 +178,7 @@ public class ClassInfoTab extends Tab implements IGuiComponent {
 		}
 	}
 
-	static String getInputPaths(ClassInstance cls, Predicate<BytecodeClass> filter) {
+	static String getInputPaths(ClassInstance cls, Predicate<BcClass> filter) {
 		StringBuilder ret = new StringBuilder();
 
 		for (int i = 0; i < cls.getBytecodeClasses().size(); i++) {

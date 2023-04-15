@@ -15,7 +15,7 @@ import javafx.scene.layout.GridPane;
 import matcher.NameType;
 import matcher.Util;
 import matcher.Util.AFElementType;
-import matcher.bcprovider.BytecodeField;
+import matcher.bcprovider.BcField;
 import matcher.gui.Gui;
 import matcher.gui.GuiConstants;
 import matcher.gui.IGuiComponent;
@@ -133,11 +133,11 @@ public class FieldInfoTab extends Tab implements IGuiComponent {
 
 			uidLabel.setText(field.getUid() >= 0 ? Integer.toString(field.getUid()) : "-");
 			nameObfLabel.setText(Boolean.toString(field.isNameObfuscated()));
-			inputLabel.setText(ClassInfoTab.getInputPaths(field.getCls(), node -> node.getFields().stream().anyMatch(m -> m.getName().equals(field.getName()) && m.getDesc().equals(field.getDesc()))));
+			inputLabel.setText(ClassInfoTab.getInputPaths(field.getCls(), node -> node.getFields().stream().anyMatch(m -> m.getName().equals(field.getName()) && m.getDescriptor().equals(field.getDesc()))));
 			typeLabel.setText(getName(field.getType(), nameType));
 			accessLabel.setText(Util.formatAccessFlags(field.getAccess(), AFElementType.Method));
 
-			BytecodeField bcField = field.getBytecodeField();
+			BcField bcField = field.getBytecodeField();
 			sigLabel.setText(bcField == null || bcField.getSignature() == null ? "-" : bcField.getSignature());
 
 			parentLabel.setText(!field.getParents().isEmpty() ? formatClass(field.getParents(), nameType) : "-");

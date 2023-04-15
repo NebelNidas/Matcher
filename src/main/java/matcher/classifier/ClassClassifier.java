@@ -9,15 +9,14 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import org.objectweb.asm.Opcodes;
-import org.objectweb.asm.tree.AbstractInsnNode;
-import org.objectweb.asm.tree.InsnList;
-import org.objectweb.asm.tree.MethodInsnNode;
-
 import matcher.Matcher;
 import matcher.Util;
-import matcher.bcprovider.BytecodeField;
-import matcher.bcprovider.BytecodeMethod;
+import matcher.bcprovider.BcField;
+import matcher.bcprovider.BcInstruction;
+import matcher.bcprovider.BcMethod;
+import matcher.bcprovider.SharedBcAccessFlags;
+import matcher.bcprovider.SharedBcInstructions;
+import matcher.bcprovider.instructions.BcInvokeMethodInstruction;
 import matcher.type.ClassEnvironment;
 import matcher.type.ClassInstance;
 import matcher.type.FieldInstance;
@@ -81,7 +80,14 @@ public class ClassClassifier {
 	private static AbstractClassifier classTypeCheck = new AbstractClassifier("class type check") {
 		@Override
 		public double getScore(ClassInstance clsA, ClassInstance clsB, ClassEnvironment env) {
-			int mask = Opcodes.ACC_ENUM | Opcodes.ACC_INTERFACE | Opcodes.ACC_ANNOTATION | Opcodes.ACC_RECORD | Opcodes.ACC_ABSTRACT;
+			int mask;
+
+			mask = SharedBcAccessFlags.INTERFACE
+					| SharedBcAccessFlags.ABSTRACT
+					| SharedBcAccessFlags.ANNOTATION
+					| SharedBcAccessFlags.ENUM
+					| SharedBcAccessFlags.RECORD;
+
 			int resultA = clsA.getAccess() & mask;
 			int resultB = clsB.getAccess() & mask;
 
@@ -232,8 +238,8 @@ public class ClassClassifier {
 							}
 						}
 
-						BytecodeMethod asmNodeA = methodA.getBcMethod();
-						BytecodeMethod asmNodeB = methodB.getBcMethod();
+						BcMethod asmNodeA = methodA.getBcMethod();
+						BcMethod asmNodeB = methodB.getBcMethod();
 						double score;
 
 						if (asmNodeA == null || asmNodeB == null) {
@@ -482,23 +488,23 @@ public class ClassClassifier {
 				int[] map = ClassifierUtil.mapInsns(src, dst);
 				if (map == null) continue;
 
-				InsnList ilA = src.getBcMethod().getInstructions();
-				InsnList ilB = dst.getBcMethod().getInstructions();
+				List<BcInstruction> ilA = src.getBcMethod().getInstructions();
+				List<BcInstruction> ilB = dst.getBcMethod().getInstructions();
 
 				for (int srcIdx = 0; srcIdx < map.length; srcIdx++) {
 					if (map[srcIdx] < 0) continue;
 
-					AbstractInsnNode in = ilA.get(srcIdx);
-					if (in.getType() != AbstractInsnNode.METHOD_INSN) continue;
+					BcInstruction insn = ilA.get(srcIdx);
+					if (insn.getInstructionType() != SharedBcInstructions.INVOKE_METHOD) continue;
 
-					MethodInsnNode min = (MethodInsnNode) in;
-					ClassInstance owner = env.getClsByNameA(min.owner);
+					BcInvokeMethodInstruction invokeInsn = (BcInvokeMethodInstruction) insn;
+					ClassInstance owner = env.getClsByNameA(invokeInsn.getOwner());
 
 					if (owner != clsA) continue;
 
-					in = ilB.get(map[srcIdx]);
-					min = (MethodInsnNode) in;
-					owner = env.getClsByNameB(min.owner);
+					insn = ilB.get(map[srcIdx]);
+					invokeInsn = (BcInvokeMethodInstruction) insn;
+					owner = env.getClsByNameB(invokeInsn.getOwner());
 
 					if (owner != clsB) {
 						mismatched++;
@@ -518,14 +524,14 @@ public class ClassClassifier {
 
 	private static void extractNumbers(ClassInstance cls, Set<Integer> ints, Set<Long> longs, Set<Float> floats, Set<Double> doubles) {
 		for (MethodInstance method : cls.getMethods()) {
-			BytecodeMethod bcMethod = method.getBcMethod();
+			BcMethod bcMethod = method.getBcMethod();
 			if (bcMethod == null) continue;
 
 			ClassifierUtil.extractNumbers(bcMethod, ints, longs, floats, doubles);
 		}
 
 		for (FieldInstance field : cls.getFields()) {
-			BytecodeField bcField = field.getBytecodeField();
+			BcField bcField = field.getBytecodeField();
 			if (bcField == null) continue;
 
 			ClassifierUtil.handleNumberValue(bcField.getValue(), ints, longs, floats, doubles);

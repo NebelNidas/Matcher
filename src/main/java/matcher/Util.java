@@ -28,6 +28,9 @@ import org.objectweb.asm.Handle;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.tree.MethodInsnNode;
 
+import matcher.bcprovider.SharedBcOpcodes;
+import matcher.bcprovider.instructions.BcInvokeMethodInstruction;
+
 public class Util {
 	public static <T> Set<T> newIdentityHashSet() {
 		return Collections.newSetFromMap(new IdentityHashMap<>()); //new IdentityHashSet<>();
@@ -135,10 +138,10 @@ public class Util {
 		}
 	}
 
-	public static boolean isCallToInterface(MethodInsnNode insn) {
-		assert insn.itf || insn.getOpcode() != Opcodes.INVOKEINTERFACE;
+	public static boolean isCallToInterface(BcInvokeMethodInstruction insn) {
+		assert insn.isOwnerInterface() || insn.getOpcode() != SharedBcOpcodes.INVOKEINTERFACE.getJvmIndex();
 
-		return insn.itf;
+		return insn.isOwnerInterface();
 		/*return insn.getOpcode() == Opcodes.INVOKEINTERFACE
 				|| (insn.getOpcode() == Opcodes.INVOKESPECIAL || insn.getOpcode() == Opcodes.INVOKESTATIC) && insn.itf;*/
 	}

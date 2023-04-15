@@ -23,7 +23,7 @@ import net.fabricmc.mappingio.format.MappingFormat;
 
 import matcher.NameType;
 import matcher.Util;
-import matcher.bcprovider.BytecodeMethod;
+import matcher.bcprovider.BcMethod;
 import matcher.type.ClassEnv;
 import matcher.type.ClassInstance;
 import matcher.type.FieldInstance;
@@ -846,9 +846,9 @@ public class Mappings {
 		// check if each origin that supplies this method has a parent within the same origin
 
 		for (int i = 0; i < cls.getBytecodeClasses().size(); i++) {
-			for (BytecodeMethod m : cls.getBytecodeClasses().get(i).getMethods()) {
+			for (BcMethod m : cls.getBytecodeClasses().get(i).getMethods()) {
 				if (m.getName().equals(method.getName())
-						&& m.getDesc().equals(method.getDesc())) {
+						&& m.getDescriptor().equals(method.getDesc())) {
 					if (!hasParentMethod(name, desc, method.getParents(), cls.getAsmNodeOrigin(i))) {
 						return true;
 					} else {
@@ -869,9 +869,9 @@ public class Mappings {
 
 			for (int i = 0; i < parentCls.getBytecodeClasses().size(); i++) {
 				if (parentCls.getAsmNodeOrigin(i).equals(reqOrigin)) {
-					for (BytecodeMethod m : parentCls.getBytecodeClasses().get(i).getMethods()) {
+					for (BcMethod m : parentCls.getBytecodeClasses().get(i).getMethods()) {
 						if (m.getName().equals(name)
-								&& m.getDesc().equals(desc)) {
+								&& m.getDescriptor().equals(desc)) {
 							return true;
 						}
 					}

@@ -17,8 +17,8 @@ import java.util.Set;
 import matcher.NameType;
 import matcher.SimilarityChecker;
 import matcher.Util;
-import matcher.bcprovider.BytecodeClass;
-import matcher.bcprovider.jvm.JvmBcOpcodes;
+import matcher.bcprovider.BcClass;
+import matcher.bcprovider.impl.jvm.JvmBcOpcodes;
 import matcher.bcremap.ClassRemapNameProvider;
 import matcher.classifier.ClassifierUtil;
 import matcher.type.Signature.ClassSignature;
@@ -36,7 +36,7 @@ public final class ClassInstance implements Matchable<ClassInstance> {
 	/**
 	 * Create a known class (class path).
 	 */
-	public ClassInstance(String id, URI origin, ClassEnv env, BytecodeClass bytecodeClass) {
+	public ClassInstance(String id, URI origin, ClassEnv env, BcClass bytecodeClass) {
 		this(id, origin, env, bytecodeClass, false, false, null);
 
 		assert id.indexOf('[') == -1 : id;
@@ -58,7 +58,7 @@ public final class ClassInstance implements Matchable<ClassInstance> {
 	/**
 	 * Create a non-array class.
 	 */
-	ClassInstance(String id, URI origin, ClassEnv env, BytecodeClass bytecodeClass, boolean nameObfuscated) {
+	ClassInstance(String id, URI origin, ClassEnv env, BcClass bytecodeClass, boolean nameObfuscated) {
 		this(id, origin, env, bytecodeClass, nameObfuscated, true, null);
 
 		assert id.startsWith("L") : id;
@@ -66,7 +66,7 @@ public final class ClassInstance implements Matchable<ClassInstance> {
 		assert bytecodeClass != null;
 	}
 
-	private ClassInstance(String id, URI origin, ClassEnv env, BytecodeClass bytecodeClass, boolean nameObfuscated, boolean input, ClassInstance elementClass) {
+	private ClassInstance(String id, URI origin, ClassEnv env, BcClass bytecodeClass, boolean nameObfuscated, boolean input, ClassInstance elementClass) {
 		if (id.isEmpty()) throw new IllegalArgumentException("empty id");
 		if (env == null) throw new NullPointerException("null env");
 
@@ -273,7 +273,7 @@ public final class ClassInstance implements Matchable<ClassInstance> {
 		return env;
 	}
 
-	public List<BytecodeClass> getBytecodeClasses() {
+	public List<BcClass> getBytecodeClasses() {
 		return bytecodeClasses;
 	}
 
@@ -283,14 +283,14 @@ public final class ClassInstance implements Matchable<ClassInstance> {
 		return index == 0 ? origin : bytecodeClassOrigins[index];
 	}
 
-	public BytecodeClass getMergedBytecodeClass() {
+	public BcClass getMergedBytecodeClass() {
 		if (bytecodeClasses == null) return null;
 		if (bytecodeClasses.size() == 1) return bytecodeClasses.get(0);
 
 		return bytecodeClasses.get(0); // TODO: actually merge
 	}
 
-	void addBytecodeClass(BytecodeClass node, URI origin) {
+	void addBytecodeClass(BcClass node, URI origin) {
 		if (!input) throw new IllegalStateException("not mergeable");
 
 		bytecodeClasses.add(node);
@@ -1057,14 +1057,14 @@ public final class ClassInstance implements Matchable<ClassInstance> {
 	}
 
 	public byte[] serialize(NameType nameType) {
-		BytecodeClass bcClass = getMergedBytecodeClass();
+		BcClass bcClass = getMergedBytecodeClass();
 		if (bcClass == null) throw new IllegalArgumentException("cls without backing bytecode class: "+this);
 
 		synchronized (Util.bytecodeClassSync) {
 			if (nameType == NameType.PLAIN) {
 				return bcClass.serialize();
 			} else {
-				BytecodeClass bcClassCopy = bcClass.getCopy();
+				BcClass bcClassCopy = bcClass.getCopy();
 				bcClass.getRemappedCopy(new ClassRemapNameProvider(env, nameType));
 				return bcClassCopy.serialize();
 			}
@@ -1158,7 +1158,7 @@ public final class ClassInstance implements Matchable<ClassInstance> {
 	final String id;
 	private final URI origin;
 	final ClassEnv env;
-	private final List<BytecodeClass> bytecodeClasses = new ArrayList<>(5);
+	private final List<BcClass> bytecodeClasses = new ArrayList<>(5);
 	private URI[] bytecodeClassOrigins;
 	final boolean nameObfuscated;
 	private final boolean input;

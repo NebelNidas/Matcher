@@ -49,19 +49,33 @@ import org.objectweb.asm.util.TraceMethodVisitor;
 
 import matcher.NameType;
 import matcher.Util;
-import matcher.bcprovider.BytecodeMethod;
-import matcher.bcprovider.jvm.JvmBcMethod;
+import matcher.bcprovider.BcInstruction;
+import matcher.bcprovider.BcMethod;
+import matcher.bcprovider.BcOpcode;
+import matcher.bcprovider.SharedBcAccessFlags;
+import matcher.bcprovider.SharedBcInstructions;
+import matcher.bcprovider.SharedBcOpcodes;
+import matcher.bcprovider.SharedBcPrimitiveTypes;
+import matcher.bcprovider.impl.jvm.JvmBcMethod;
+import matcher.bcprovider.instructions.BcFieldInstruction;
+import matcher.bcprovider.instructions.BcIncrementIntegerInstruction;
+import matcher.bcprovider.instructions.BcIntInstruction;
+import matcher.bcprovider.instructions.BcInvokeMethodInstruction;
+import matcher.bcprovider.instructions.BcJumpInstruction;
+import matcher.bcprovider.instructions.BcLoadConstantInstruction;
+import matcher.bcprovider.instructions.BcLocalVariableInstruction;
+import matcher.bcprovider.instructions.BcTypeInstruction;
 
 class Analysis {
 	static void analyzeMethod(MethodInstance method, CommonClasses common) {
-		BytecodeMethod asmNode = method.getBcMethod();
-		if (asmNode == null || (asmNode.getAccess() & Opcodes.ACC_ABSTRACT) != 0 || asmNode.getInstructions().size() == 0) return;
+		BcMethod bcMethod = method.getBcMethod();
+		if (bcMethod == null || (bcMethod.getAccess() & SharedBcAccessFlags.ABSTRACT) != 0 || bcMethod.getInstructions().size() == 0) return;
 
 		System.out.println(method.getDisplayName(NameType.MAPPED_PLAIN, true));
-		dump(asmNode);
+		dump(bcMethod);
 
 		StateRecorder rec = new StateRecorder(method, common);
-		InsnList il = asmNode.getInstructions();
+		List<BcInstruction> il = bcMethod.getInstructions();
 
 		Map<AbstractInsnNode, int[]> exitPoints = new IdentityHashMap<>();
 		exitPoints.put(null, new int[] { 0 });
@@ -81,10 +95,10 @@ class Analysis {
 			insnLoop: for (int idx = element.dstIndex; idx < il.size(); idx++) {
 				assert rec.idx == idx;
 
-				AbstractInsnNode ain = il.get(idx);
-				int inType = ain.getType();
+				BcInstruction ain = il.get(idx);
+				int insnType = ain.getInstructionType();
 
-				if (inType == AbstractInsnNode.LABEL || inType == AbstractInsnNode.FRAME || inType == AbstractInsnNode.LINE) {
+				if (insnType == AbstractInsnNode.LABEL || insnType == AbstractInsnNode.FRAME || insnType == AbstractInsnNode.LINE) {
 					if (!rec.next()) break;
 					continue;
 				}
@@ -407,7 +421,7 @@ class Analysis {
 					rec.push(ex.type, rec.getNextVarId(VarSource.IntException)); // same object, but new scope
 					LabelNode handler = null;
 
-					for (TryCatchBlockNode n : asmNode.getTryCatchBlocks()) {
+					for (TryCatchBlockNode n : bcMethod.getTryCatchBlocks()) {
 						if (il.indexOf(n.start) <= idx && il.indexOf(n.end) > idx && (n.type == null || method.getEnv().getClsByName(n.type).isAssignableFrom(ex.type))) {
 							handler = n.handler;
 							break;
@@ -740,14 +754,14 @@ class Analysis {
 
 		rec.dump(il, System.out);
 
-		BitSet entryPoints = getEntryPoints(asmNode, exitPoints);
-		applyTryCatchExits(asmNode, entryPoints, exitPoints);
+		BitSet entryPoints = getEntryPoints(bcMethod, exitPoints);
+		applyTryCatchExits(bcMethod, entryPoints, exitPoints);
 		addDirectExits(il, entryPoints, exitPoints);
 		purgeLocals(il, rec, entryPoints, exitPoints);
 
 		rec.dump(il, System.out);
 
-		createLocalVariables(il, rec, entryPoints, exitPoints, asmNode.getLocalVariables());
+		createLocalVariables(il, rec, entryPoints, exitPoints, bcMethod.getLocalVariables());
 	}
 
 	private static void handleMethodInvocation(ClassEnv env, String owner, String name, String desc, boolean itf, boolean isStatic, StateRecorder rec) {
@@ -843,7 +857,7 @@ class Analysis {
 		final ExecState srcState;
 	}
 
-	private static BitSet getEntryPoints(BytecodeMethod bcMethod, Map<AbstractInsnNode, int[]> exitPoints) {
+	private static BitSet getEntryPoints(BcMethod bcMethod, Map<AbstractInsnNode, int[]> exitPoints) {
 		InsnList il = bcMethod.getInstructions();
 		BitSet entryPoints = new BitSet(il.size());
 
@@ -860,7 +874,7 @@ class Analysis {
 		return entryPoints;
 	}
 
-	private static void applyTryCatchExits(BytecodeMethod bcMethod, BitSet entryPoints, Map<AbstractInsnNode, int[]> exitPoints) {
+	private static void applyTryCatchExits(BcMethod bcMethod, BitSet entryPoints, Map<AbstractInsnNode, int[]> exitPoints) {
 		InsnList il = bcMethod.getInstructions();
 
 		for (TryCatchBlockNode n : bcMethod.getTryCatchBlocks()) {
@@ -1329,7 +1343,7 @@ class Analysis {
 
 	private static class StateRecorder {
 		StateRecorder(MethodInstance method, CommonClasses common) {
-			BytecodeMethod asmNode = method.getBcMethod();
+			BcMethod asmNode = method.getBcMethod();
 
 			locals = new ClassInstance[asmNode.getMaxLocals()];
 			localVarIds = new int[locals.length];
@@ -1718,7 +1732,7 @@ class Analysis {
 			return ++nextVarId;
 		}
 
-		public void dump(InsnList il, PrintStream ps) {
+		public void dump(List<BcInstruction> il, PrintStream ps) {
 			for (int i = 0; i < states.length; i++) {
 				ExecState state = states[i];
 
@@ -1735,76 +1749,81 @@ class Analysis {
 
 				ps.print(" ");
 
-				AbstractInsnNode ain = il.get(i);
-				int op = ain.getOpcode();
+				BcInstruction insn = il.get(i);
+				BcOpcode op = insn.getOpcode();
 
-				if (op != -1) {
-					ps.print(Printer.OPCODES[ain.getOpcode()]);
+				if (op != null) {
+					ps.print(insn.getOpcode().getName());
 				}
 
-				switch (ain.getType()) {
-				case AbstractInsnNode.INSN:
+				switch (insn.getInstructionType()) {
+				case SharedBcInstructions.NOP:
 					break;
-				case AbstractInsnNode.INT_INSN:
+				case SharedBcInstructions.INT:
 					ps.print(' ');
+					BcIntInstruction intInsn = (BcIntInstruction) insn;
 
-					if (op == Opcodes.BIPUSH || op == Opcodes.SIPUSH) {
-						ps.print(((IntInsnNode) ain).operand);
+					if (op == SharedBcOpcodes.BIPUSH || op == SharedBcOpcodes.SIPUSH) {
+						ps.print(intInsn.getOperand());
+					} else if (op == SharedBcOpcodes.NEWARRAY) {
+						ps.print(SharedBcPrimitiveTypes.getByIndex(intInsn.getOperand()));
 					} else {
-						ps.print(Printer.TYPES[((IntInsnNode) ain).operand]);
+						throw new UnsupportedOperationException();
 					}
 
 					break;
-				case AbstractInsnNode.VAR_INSN:
+				case SharedBcInstructions.LOCAL_VARIABLE:
 					ps.print(' ');
-					ps.print(((VarInsnNode) ain).var);
+					ps.print(((BcLocalVariableInstruction) insn).getVarIndex());
 					break;
-				case AbstractInsnNode.TYPE_INSN:
+				case SharedBcInstructions.TYPE:
 					ps.print(' ');
-					ps.print(((TypeInsnNode) ain).desc);
+					ps.print(((BcTypeInstruction) insn).getType());
 					break;
-				case AbstractInsnNode.FIELD_INSN: {
-					FieldInsnNode in = (FieldInsnNode) ain;
+				case SharedBcInstructions.FIELD: {
+					BcFieldInstruction fldInsn = (BcFieldInstruction) insn;
 					ps.print(' ');
-					ps.print(in.owner);
+					ps.print(fldInsn.getOwner());
 					ps.print('/');
-					ps.print(in.name);
+					ps.print(fldInsn.getName());
 					ps.print(' ');
-					ps.print(in.desc);
+					ps.print(fldInsn.getDescriptor());
 					break;
 				}
-				case AbstractInsnNode.METHOD_INSN: {
-					MethodInsnNode in = (MethodInsnNode) ain;
+				case SharedBcInstructions.INVOKE_METHOD: {
+					BcInvokeMethodInstruction mthInsn = (BcInvokeMethodInstruction) insn;
 					ps.print(' ');
-					ps.print(in.owner);
+					ps.print(mthInsn.getOwner());
 					ps.print('/');
-					ps.print(in.name);
-					ps.print(in.desc);
+					ps.print(mthInsn.getName());
+					ps.print(mthInsn.getDescriptor());
 					ps.print(" itf=");
-					ps.print(in.itf);
+					ps.print(mthInsn.isOwnerInterface());
 					break;
 				}
-				case AbstractInsnNode.INVOKE_DYNAMIC_INSN: {
-					InvokeDynamicInsnNode in = (InvokeDynamicInsnNode) ain;
+				case SharedBcInstructions.INVOKE_DYNAMIC: {
+					BcInvokeMethodInstruction idInsn = (BcInvokeMethodInstruction) insn;
 					// TODO: implement
 					break;
 				}
-				case AbstractInsnNode.JUMP_INSN:
+				case SharedBcInstructions.JUMP:
 					ps.print(' ');
-					ps.print(il.indexOf(((JumpInsnNode) ain).label));
+					ps.print(il.indexOf(((BcJumpInstruction) insn).getLabel()));
 					break;
-				case AbstractInsnNode.LDC_INSN:
+				case SharedBcInstructions.LOAD_CONSTANT:
 					ps.print(' ');
-					ps.print(((LdcInsnNode) ain).cst);
+					ps.print(((BcLoadConstantInstruction) insn).getConstant());
 					break;
-				case AbstractInsnNode.IINC_INSN:
+				case SharedBcInstructions.INCREMENT_INTEGER:
+					BcIncrementIntegerInstruction iincInsn = (BcIncrementIntegerInstruction) insn;
+
 					ps.print(' ');
-					ps.print(((IincInsnNode) ain).var);
+					ps.print(iincInsn.getIntegerIndex());
 					ps.print(' ');
-					ps.print(((IincInsnNode) ain).incr);
+					ps.print(iincInsn.getIncrement());
 					break;
 				case AbstractInsnNode.TABLESWITCH_INSN: {
-					TableSwitchInsnNode in = (TableSwitchInsnNode) ain;
+					TableSwitchInsnNode in = (TableSwitchInsnNode) insn;
 					ps.print(" min=");
 					ps.print(in.min);
 					ps.print(" max=");
@@ -1820,7 +1839,7 @@ class Analysis {
 					break;
 				}
 				case AbstractInsnNode.LOOKUPSWITCH_INSN: {
-					LookupSwitchInsnNode in = (LookupSwitchInsnNode) ain;
+					LookupSwitchInsnNode in = (LookupSwitchInsnNode) insn;
 					ps.print(" def=");
 					ps.print(il.indexOf(in.dflt));
 
@@ -1834,7 +1853,7 @@ class Analysis {
 					break;
 				}
 				case AbstractInsnNode.MULTIANEWARRAY_INSN: {
-					MultiANewArrayInsnNode in = (MultiANewArrayInsnNode) ain;
+					MultiANewArrayInsnNode in = (MultiANewArrayInsnNode) insn;
 					ps.print(' ');
 					ps.print(in.desc);
 					ps.print(" dims=");
@@ -1850,10 +1869,10 @@ class Analysis {
 					break;
 				case AbstractInsnNode.LINE:
 					ps.print("LINE ");
-					ps.print(((LineNumberNode) ain).line);
+					ps.print(((LineNumberNode) insn).line);
 					break;
 				default:
-					throw new UnsupportedOperationException("unknown insn: "+ain);
+					throw new UnsupportedOperationException("unknown insn: "+insn);
 				}
 
 				ps.println();
@@ -1970,24 +1989,26 @@ class Analysis {
 		if (field.getType().isPrimitive()) return;
 
 		MethodInstance method = field.writeRefs.iterator().next();
-		BytecodeMethod bcMethod = method.getBcMethod();
-		InsnList il = bcMethod.getInstructions();
-		AbstractInsnNode fieldWrite = null;
+		BcMethod bcMethod = method.getBcMethod();
+		List<BcInstruction> il = bcMethod.getInstructions();
+		BcInstruction fieldWrite = null;
 
 		//dump(method.asmNode);
 		//System.out.println("\n------------------------\n");
 
-		for (Iterator<AbstractInsnNode> it = il.iterator(); it.hasNext(); ) {
-			AbstractInsnNode aInsn = it.next();
+		for (Iterator<BcInstruction> it = il.iterator(); it.hasNext(); ) {
+			BcInstruction insn = it.next();
 
-			if (aInsn.getOpcode() == Opcodes.PUTFIELD || aInsn.getOpcode() == Opcodes.PUTSTATIC) {
-				FieldInsnNode in = (FieldInsnNode) aInsn;
+			if (insn.getOpcode() == SharedBcOpcodes.PUTFIELD.getJvmIndex() || insn.getOpcode() == SharedBcOpcodes.PUTSTATIC.getJvmIndex()) {
+				BcFieldInstruction fieldInsn = (BcFieldInstruction) insn;
 				ClassInstance cls;
 
-				if (in.name.equals(field.origName)
-						&& in.desc.equals(field.getDesc())
-						&& (in.owner.equals(field.cls.getName()) || (cls = context.getLocalClsByName(in.owner)) != null && cls.resolveField(in.name, in.desc) == field)) {
-					fieldWrite = in;
+				if (fieldInsn.getName().equals(field.origName)
+						&& fieldInsn.getDescriptor().equals(field.getDesc())
+						&& (fieldInsn.getOwner().equals(field.cls.getName())
+								|| (cls = context.getLocalClsByName(fieldInsn.getOwner())) != null
+								&& cls.resolveField(fieldInsn.getName(), fieldInsn.getDescriptor()) == field)) {
+					fieldWrite = fieldInsn;
 					break;
 				}
 			}
@@ -2014,7 +2035,7 @@ class Analysis {
 
 		tracedPositions.set(il.indexOf(fieldWrite));
 		positionsToTrace.add(fieldWrite);
-		AbstractInsnNode in;
+		BcInstruction in;
 
 		while ((in = positionsToTrace.poll()) != null) {
 			int pos = il.indexOf(in);
@@ -2045,22 +2066,22 @@ class Analysis {
 					tracedPositions.set(pos2);
 					positionsToTrace.add(in2);
 				}
-			} else if (in.getOpcode() == Opcodes.NEW) { // ensure we track the constructor call when running across a NEW insn
-				TypeInsnNode tin = (TypeInsnNode) in;
+			} else if (in.getOpcode() == SharedBcOpcodes.NEW.getJvmIndex()) { // ensure we track the constructor call when running across a NEW insn
+				TypeInsnNode typeInsn = (TypeInsnNode) in;
 
-				for (Iterator<AbstractInsnNode> it = il.iterator(pos + 1); it.hasNext(); ) {
-					AbstractInsnNode ain = it.next();
+				for (Iterator<BcInstruction> it = il.iterator(pos + 1); it.hasNext(); ) {
+					BcInstruction innerInsn = it.next();
 
-					if (ain.getOpcode() == Opcodes.INVOKESPECIAL) {
-						MethodInsnNode in2 = (MethodInsnNode) ain;
+					if (innerInsn.getOpcode() == SharedBcOpcodes.INVOKESPECIAL.getJvmIndex()) {
+						BcInvokeMethodInstruction mthInsn = (BcInvokeMethodInstruction) innerInsn;
 
-						if (in2.name.equals("<init>")
-								&& in2.owner.equals(tin.desc)) {
-							int pos2 = il.indexOf(in2);
+						if (mthInsn.getName().equals("<init>")
+								&& mthInsn.getOwner().equals(typeInsn.desc)) {
+							int pos2 = il.indexOf(mthInsn);
 
 							if (!tracedPositions.get(pos2)) {
 								tracedPositions.set(pos2);
-								positionsToTrace.add(in2);
+								positionsToTrace.add(mthInsn);
 							}
 
 							break;
@@ -2377,7 +2398,7 @@ class Analysis {
 		}
 	}
 
-	private static void dump(BytecodeMethod method) {
+	private static void dump(BcMethod method) {
 		Textifier textifier = new Textifier();
 		((JvmBcMethod) method).getAsmNode().accept(new TraceMethodVisitor(textifier));
 
