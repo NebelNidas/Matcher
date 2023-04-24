@@ -15,21 +15,17 @@ import java.util.ServiceLoader;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import matcher.cli.MatcherCli;
+import matcher.gui.cli.GuiPluginCliParameterProvider;
+
 public class PluginLoader {
 	public static void run(String[] args) {
 		List<Path> pluginPaths = new ArrayList<>();
 		pluginPaths.add(Paths.get("plugins"));
 
-		for (int i = 0; i < args.length; i++) {
-			switch (args[i]) {
-			case "--additional-plugins":
-				while (i+1 < args.length && !args[i+1].startsWith("--")) {
-					pluginPaths.add(Path.of(args[++i]));
-				}
-
-				break;
-			}
-		}
+		MatcherCli cli = new MatcherCli(true);
+		cli.registerParameterProvider(new GuiPluginCliParameterProvider(pluginPaths));
+		cli.processArgs(args);
 
 		List<URL> urls = new ArrayList<>();
 
