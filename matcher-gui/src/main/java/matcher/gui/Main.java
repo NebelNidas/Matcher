@@ -7,7 +7,7 @@ import matcher.gui.plugin.PluginLoader;
 
 public class Main {
 	public static void main(String[] args) {
-		Config.init(args);
+		Config.init();
 		PluginLoader.run(args);
 		Application.launch(MatcherGui.class, args);
 	}

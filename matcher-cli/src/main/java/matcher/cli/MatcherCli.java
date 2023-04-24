@@ -8,9 +8,9 @@ import org.slf4j.LoggerFactory;
 import com.beust.jcommander.JCommander;
 
 public class MatcherCli {
-	public static final Logger LOGGER = LoggerFactory.getLogger("Matcher CLI");
-	private final List<CliParameterProvider> paramProviders = new ArrayList<>(5);
-	private final List<CliCommandProvider> commandProviders = new ArrayList<>(5);
+	public MatcherCli(boolean acceptUnknownOptions) {
+		this.acceptUnknownOptions = acceptUnknownOptions;
+	}
 
 	public void registerParameterProvider(CliParameterProvider paramProvider) {
 		paramProviders.add(paramProvider);
@@ -32,6 +32,7 @@ public class MatcherCli {
 		}
 
 		JCommander jCommander = jcBuilder.build();
+		jCommander.setAcceptUnknownOptions(acceptUnknownOptions);
 		jCommander.parse(args);
 
 		for (CliParameterProvider paramProvider : paramProviders) {
@@ -45,4 +46,9 @@ public class MatcherCli {
 			}
 		}
 	}
+
+	public static final Logger LOGGER = LoggerFactory.getLogger("Matcher CLI");
+	private final List<CliParameterProvider> paramProviders = new ArrayList<>(5);
+	private final List<CliCommandProvider> commandProviders = new ArrayList<>(5);
+	private final boolean acceptUnknownOptions;
 }
