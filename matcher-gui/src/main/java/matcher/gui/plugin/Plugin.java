@@ -1,4 +1,4 @@
-package matcher;
+package matcher.gui.plugin;
 
 public interface Plugin {
 	String getName();
