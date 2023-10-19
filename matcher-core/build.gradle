@@ -19,10 +19,5 @@ tasks.withType(JavaCompile).configureEach {
 }
 
 dependencies {
-	api "org.slf4j:slf4j-api:${slf4j_version}"
-	api "org.ow2.asm:asm:${asm_version}"
-	api "org.ow2.asm:asm-commons:${asm_version}"
-	api "org.ow2.asm:asm-tree:${asm_version}"
-	api "org.ow2.asm:asm-util:${asm_version}"
-	api "net.fabricmc:mapping-io:${mappingio_version}"
+	api project(':matcher-ir')
 }

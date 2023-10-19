@@ -11,6 +11,7 @@ pluginManagement {
 
 rootProject.name = 'matcher'
 
+include 'matcher-ir'
 include 'matcher-core'
 include 'matcher-cli'
 include 'matcher-gui'

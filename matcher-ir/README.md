@@ -1,0 +1,11 @@
+# Matcher-IR
+- **`Instance`**: Represents a concrete element implementation. You generally don't construct these manually. Possible element types are:
+ - `ClassInstance`
+ - `FieldInstance`
+ - `MethodInstance`
+ - `MethodArgInstance`
+ - `MethodVarInstance`
+- **`ClassEnv`**: Provider of `Instance`s, loaded and constructed from e.g. a JAR file.
+- **`Identity`**: Identifies a semantically identical `Instance`s across `ClassEnv`s. These may even have disjointed hierarchies (a `MethodInstance` could change the parent `ClassIdentity` between `ClassEnv`s). Useful for applications like Matcher.
+- Everything is lazy by default. Don't do any work if not explicitly requested by the user. Solved partly by using Streams.
+- Everything is immutable.
