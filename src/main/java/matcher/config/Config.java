@@ -9,6 +9,8 @@ import java.util.function.Function;
 import java.util.prefs.BackingStoreException;
 import java.util.prefs.Preferences;
 
+import matcher.Matcher;
+
 public class Config {
 	public static void init(String[] args) {
 		Preferences prefs = Preferences.userRoot(); // in ~/.java/.userPrefs
@@ -34,7 +36,7 @@ public class Config {
 				Theme theme = Theme.getById(themeId);
 
 				if (theme == null) {
-					System.err.println("Startup arg '--theme' couldn't be applied, as there exists no theme with ID " + themeId + "!");
+					Matcher.LOGGER.error("Startup arg '--theme' couldn't be applied, as there exists no theme with ID {}", themeId);
 				} else {
 					setTheme(theme);
 				}

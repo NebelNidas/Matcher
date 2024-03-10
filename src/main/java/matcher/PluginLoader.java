@@ -51,7 +51,7 @@ class PluginLoader {
 				} else if (path.getFileName().toString().toLowerCase(Locale.ENGLISH).endsWith(".jar")) {
 					urls.add(path.toUri().toURL());
 				} else {
-					System.err.println("No plugin(s) found at " + path.toFile().getCanonicalPath());
+					Matcher.LOGGER.info("No plugin(s) found at {}", path.toFile().getCanonicalPath());
 				}
 			} catch (IOException e) {
 				throw new UncheckedIOException(e);
