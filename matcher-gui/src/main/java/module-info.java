@@ -20,4 +20,6 @@ module matcher.gui {
 	exports matcher.gui.ui;
 	exports matcher.gui.ui.menu;
 	exports matcher.gui.ui.tab;
+
+	opens matcher.gui.cli to jcommander;
 }
