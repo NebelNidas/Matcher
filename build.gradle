@@ -6,6 +6,7 @@ plugins {
 	id 'org.openjfx.javafxplugin'
 	id 'com.github.johnrengelman.shadow'
 	id 'org.gradlex.extra-java-module-info'
+	id 'eclipse'
 }
 
 repositories {
