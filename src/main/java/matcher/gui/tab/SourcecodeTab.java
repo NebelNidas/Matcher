@@ -3,10 +3,12 @@ package matcher.gui.tab;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.util.Set;
+import java.util.concurrent.Future;
 
 import matcher.NameType;
 import matcher.gui.Gui;
 import matcher.gui.ISelectionProvider;
+import matcher.srcprocess.Decompiler;
 import matcher.srcprocess.HtmlUtil;
 import matcher.srcprocess.SrcDecorator;
 import matcher.srcprocess.SrcDecorator.SrcParseException;
@@ -32,7 +34,7 @@ public class SourcecodeTab extends WebViewTab {
 		this.tabSelected = tabSelected;
 		if (!tabSelected) return;
 
-		if (updateNeeded > 0) update();
+		if (updateNeeded != UPDATE_NONE) update();
 
 		if (selectedMember instanceof MethodInstance) {
 			onMethodSelect((MethodInstance) selectedMember);
@@ -44,14 +46,14 @@ public class SourcecodeTab extends WebViewTab {
 	@Override
 	public void onClassSelect(ClassInstance cls) {
 		selectedClass = cls;
-		if (updateNeeded == 0) updateNeeded = 1;
+		if (updateNeeded == UPDATE_NONE) updateNeeded = UPDATE_RESET;
 		if (tabSelected) update();
 	}
 
 	@Override
 	public void onMatchChange(Set<MatchType> types) {
 		selectedClass = selectionProvider.getSelectedClass();
-		updateNeeded = 2;
+		updateNeeded = UPDATE_REFRESH;
 
 		if (tabSelected && selectedClass != null) {
 			update();
@@ -67,8 +69,8 @@ public class SourcecodeTab extends WebViewTab {
 			update();
 		} else if (selectedClass != null
 				&& (cause == ViewChangeCause.NAME_TYPE_CHANGED
-						|| cause == ViewChangeCause.DECOMPILER_CHANGED)) {
-			updateNeeded = 2;
+				|| cause == ViewChangeCause.DECOMPILER_CHANGED)) {
+			updateNeeded = UPDATE_REFRESH;
 			if (tabSelected) update();
 		}
 	}
@@ -78,6 +80,11 @@ public class SourcecodeTab extends WebViewTab {
 
 		final int cDecompId = ++decompId;
 
+		if (pendingUpdateTask != null) {
+			pendingUpdateTask.cancel(true);
+			pendingUpdateTask = null;
+		}
+
 		if (selectedClass == null) {
 			displayText("no class selected");
 			return;
@@ -86,38 +93,45 @@ public class SourcecodeTab extends WebViewTab {
 		displayText("decompiling...");
 
 		NameType nameType = gui.getNameType().withUnmatchedTmp(unmatchedTmp);
+		Decompiler decompiler = gui.getDecompiler().get();
 
 		//Gui.runAsyncTask(() -> gui.getEnv().decompile(selectedClass, true))
-		Gui.runAsyncTask(() -> SrcDecorator.decorate(gui.getEnv().decompile(gui.getDecompiler().get(), selectedClass, nameType), selectedClass, nameType))
-				.whenComplete((res, exc) -> {
-					if (cDecompId == decompId) {
-						if (exc != null) {
-							exc.printStackTrace();
+		pendingUpdateTask = Gui.runAsyncTask(() -> SrcDecorator.decorate(gui.getEnv().decompile(decompiler, selectedClass, nameType), selectedClass, nameType))
+				.whenComplete((res, exc) -> applyDecompilerResult(res, exc, cDecompId));
+	}
 
-							StringWriter sw = new StringWriter();
-							exc.printStackTrace(new PrintWriter(sw));
+	private void applyDecompilerResult(String res, Throwable exc, int cDecompId) {
+		if (cDecompId != decompId) {
+			if (exc != null) {
+				exc.printStackTrace();
+			}
 
-							if (exc instanceof SrcParseException) {
-								SrcParseException parseExc = (SrcParseException) exc;
-								displayText("parse error: "+parseExc.problems+"\ndecompiled source:\n"+parseExc.source);
-							} else {
-								displayText("decompile error: "+sw.toString());
-							}
-						} else {
-							double prevScroll = updateNeeded == 2 ? getScrollTop() : 0;
+			return;
+		}
 
-							displayHtml(res);
+		if (exc != null) {
+			exc.printStackTrace();
 
-							if (updateNeeded == 2 && prevScroll > 0) {
-								setScrollTop(prevScroll);
-							}
-						}
-					} else if (exc != null) {
-						exc.printStackTrace();
-					}
+			StringWriter sw = new StringWriter();
+			exc.printStackTrace(new PrintWriter(sw));
 
-					updateNeeded = 0;
-				});
+			if (exc instanceof SrcParseException) {
+				SrcParseException parseExc = (SrcParseException) exc;
+				displayText("parse error: "+parseExc.problems+"\ndecompiled source:\n"+parseExc.source);
+			} else {
+				displayText("decompile error: "+sw.toString());
+			}
+		} else {
+			double prevScroll = updateNeeded == UPDATE_REFRESH ? getScrollTop() : 0;
+
+			displayHtml(res);
+
+			if (updateNeeded == UPDATE_REFRESH && prevScroll > 0) {
+				setScrollTop(prevScroll);
+			}
+		}
+
+		updateNeeded = UPDATE_NONE;
 	}
 
 	@Override
@@ -138,13 +152,18 @@ public class SourcecodeTab extends WebViewTab {
 		}
 	}
 
+	private static final int UPDATE_NONE = 0;
+	private static final int UPDATE_RESET = 1;
+	private static final int UPDATE_REFRESH = 2; // tries to keep scroll position
+
 	private final Gui gui;
 	private final ISelectionProvider selectionProvider;
 	private final boolean unmatchedTmp;
 
 	private int decompId;
-	private int updateNeeded;
+	private int updateNeeded = UPDATE_NONE;
 	private boolean tabSelected;
 	private ClassInstance selectedClass;
 	private MemberInstance<?> selectedMember;
+	private Future<?> pendingUpdateTask;
 }
