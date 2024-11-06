@@ -233,8 +233,11 @@ public class Util {
 	}
 
 	public static boolean isIrrelevantBsm(Handle bsm) {
-		return bsm.getOwner().equals("java/lang/invoke/StringConcatFactory")
-				|| bsm.getOwner().equals("java/lang/runtime/ObjectMethods");
+		String owner = bsm.getOwner();
+
+		return owner.equals("java/lang/invoke/StringConcatFactory")
+				|| owner.equals("java/lang/runtime/ObjectMethods")
+				|| owner.equals("java/lang/runtime/SwitchBootstraps");
 	}
 
 	public static boolean isValidJavaIdentifier(String s) {
