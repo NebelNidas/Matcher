@@ -1,8 +1,8 @@
 /*
- * Most of this file is copied from DefaultPrettyPrinterVisitor (commit 19e0559),
+ * Most of this file is copied from DefaultPrettyPrinterVisitor (commit 85bb189),
  * tweaked to output HTML instead of plain text. Original license:
  *
- * Copyright (C) 2011, 2013-2021 The JavaParser Team.
+ * Copyright (C) 2011, 2013-2024 The JavaParser Team.
  *
  * This file is part of JavaParser.
  *
@@ -120,7 +120,6 @@ import com.github.javaparser.ast.type.PrimitiveType;
 import com.github.javaparser.ast.type.ReferenceType;
 import com.github.javaparser.ast.type.Type;
 import com.github.javaparser.ast.type.TypeParameter;
-import com.github.javaparser.ast.type.UnknownType;
 import com.github.javaparser.ast.type.VarType;
 import com.github.javaparser.ast.type.VoidType;
 import com.github.javaparser.ast.type.WildcardType;
@@ -1168,7 +1167,7 @@ public class HtmlPrinter extends DefaultPrettyPrinterVisitor {
 			printer.print("...");
 		}
 
-		if (!(n.getType() instanceof UnknownType)) {
+		if (!(n.getType().isUnknownType())) {
 			printer.print(" ");
 		}
 
@@ -1268,6 +1267,16 @@ public class HtmlPrinter extends DefaultPrettyPrinterVisitor {
 				if (i.hasNext()) {
 					printer.print(", ");
 				}
+			}
+
+			// `case null, default -> ...` added in JEP 441
+			if (n.getLabels().isNonEmpty() && n.isDefault()) {
+				printer.print(", <span class=\"keyword\">default</span>");
+			}
+
+			if (n.getGuard().isPresent()) {
+				printer.print(" <span class=\"keyword\">when</span> ");
+				n.getGuard().get().accept(this, arg);
 			}
 
 			printer.print(separator);

@@ -30,7 +30,7 @@ public class Vineflower implements Decompiler {
 		Map<String, Object> properties = new HashMap<>(IFernflowerPreferences.DEFAULTS);
 		properties.put(IFernflowerPreferences.REMOVE_BRIDGE, "0");
 		properties.put(IFernflowerPreferences.REMOVE_SYNTHETIC, "0");
-		properties.put(IFernflowerPreferences.INDENT_STRING, "\n");
+		properties.put(IFernflowerPreferences.INDENT_STRING, "\t");
 		properties.put(IFernflowerPreferences.THREADS, String.valueOf(Math.max(1, Runtime.getRuntime().availableProcessors() - 2)));
 		properties.put(IFernflowerPreferences.LOG_LEVEL, IFernflowerLogger.Severity.WARN.name());
 
