@@ -4,21 +4,24 @@ plugins {
 	id 'maven-publish'
 	id "checkstyle"
 	id 'org.openjfx.javafxplugin'
-	id 'com.github.johnrengelman.shadow'
 	id 'org.gradlex.extra-java-module-info'
+	id 'com.gradleup.shadow'
 	id 'eclipse'
 }
 
 repositories {
 	mavenCentral()
 	maven {
-		name "Fabric"
-		url 'https://maven.fabricmc.net/'
+		name = "Fabric"
+		url = 'https://maven.fabricmc.net/'
 	}
 }
 
-archivesBaseName = 'matcher'
 group = 'net.fabricmc'
+
+base {
+	archivesName = 'matcher'
+}
 
 def ENV = System.getenv()
 
@@ -68,8 +71,10 @@ dependencies {
 	implementation "org.bitbucket.mstrobel:procyon-compilertools:${procyon_version}"
 	implementation ("io.github.skylot:jadx-core:${jadx_version}") {
 		exclude group: 'com.android.tools.build', module: 'aapt2-proto'
+		exclude group: 'com.google.protobuf', module: 'protobuf-java'
 	}
 	implementation ("io.github.skylot:jadx-java-input:${jadx_version}") {
+		exclude group: 'com.android.tools.build', module: 'aapt2-proto'
 		exclude group: 'io.github.skylot', module: 'raung-disasm'
 	}
 	runtimeOnly "org.tinylog:tinylog-impl:${tinylog_version}"
@@ -107,7 +112,6 @@ extraJavaModuleInfo {
 
 	// JADX
 	automaticModule("io.github.skylot:jadx-core", "jadx.core")
-	automaticModule("io.github.skylot:jadx-plugins-api", "jadx.plugins.api")
 	automaticModule("io.github.skylot:jadx-java-input", "jadx.plugins.java_input")
 }
 
