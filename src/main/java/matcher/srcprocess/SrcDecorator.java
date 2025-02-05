@@ -8,6 +8,7 @@ import java.util.stream.Collectors;
 
 import com.github.javaparser.JavaParser;
 import com.github.javaparser.JavaToken;
+import com.github.javaparser.JavaToken.Kind;
 import com.github.javaparser.ParseResult;
 import com.github.javaparser.ParserConfiguration;
 import com.github.javaparser.ParserConfiguration.LanguageLevel;
@@ -15,7 +16,6 @@ import com.github.javaparser.Position;
 import com.github.javaparser.Problem;
 import com.github.javaparser.Range;
 import com.github.javaparser.TokenRange;
-import com.github.javaparser.JavaToken.Kind;
 import com.github.javaparser.ast.CompilationUnit;
 import com.github.javaparser.ast.Node;
 import com.github.javaparser.ast.body.ClassOrInterfaceDeclaration;
