@@ -24,10 +24,10 @@ import com.github.javaparser.ast.type.PrimitiveType;
 import com.github.javaparser.ast.type.Type;
 import com.github.javaparser.ast.type.VoidType;
 
-import matcher.type.ClassInstance;
-import matcher.type.FieldInstance;
 import matcher.NameType;
 import matcher.type.ClassEnv;
+import matcher.type.ClassInstance;
+import matcher.type.FieldInstance;
 import matcher.type.Matchable;
 import matcher.type.MethodInstance;
 

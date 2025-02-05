@@ -10,7 +10,7 @@ tab_width = 4
 
 [*.{gradle,java}]
 ij_continuation_indent_size = 8
-ij_java_imports_layout = $*,|,java.**,|,javax.**,|,*,|,net.fabricmc.**
+ij_java_imports_layout = $*,|,java.**,|,javax.**,|,*,|,net.fabricmc.**,|,matcher.**
 ij_java_class_count_to_use_import_on_demand = 999
 
 [*.{yml,yaml}]
