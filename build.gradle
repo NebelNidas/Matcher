@@ -186,11 +186,11 @@ publishing {
 	repositories {
 		if (ENV.MAVEN_URL) {
 			repositories.maven {
-				name "fabric"
-				url ENV.MAVEN_URL
+				name = "fabric"
+				url = ENV.MAVEN_URL
 				credentials {
-					username ENV.MAVEN_USERNAME
-					password ENV.MAVEN_PASSWORD
+					username = ENV.MAVEN_USERNAME
+					password = ENV.MAVEN_PASSWORD
 				}
 			}
 		}
