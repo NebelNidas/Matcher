@@ -72,7 +72,7 @@ javafx {
 	// Don't include native binaries via the plugin,
 	// since it will only include those for the current OS.
 	// The full set of native libraries gets shadowed a few lines beneath.
-	configuration = 'compileOnly'
+	// configuration = 'compileOnly'
 }
 
 def platforms = [

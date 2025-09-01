@@ -63,7 +63,7 @@ public class MatchingMenu extends Menu {
 
 	public void autoMatchAll() {
 		var job = new AutoMatchAllJob(gui.getMatcher());
-		job.addCompletionListener((result, error) -> {
+		job.addFinishListener((result, error) -> {
 			if (result.isPresent()) {
 				Platform.runLater(() -> gui.onMatchChange(result.get()));
 			}
@@ -73,7 +73,7 @@ public class MatchingMenu extends Menu {
 
 	public void autoMatchClasses() {
 		var job = new AutoMatchClassesJob(gui.getMatcher(), Matcher.defaultAutoMatchLevel);
-		job.addCompletionListener((matchedAny, error) -> {
+		job.addFinishListener((matchedAny, error) -> {
 			if (matchedAny.orElse(false)) {
 				Platform.runLater(() -> gui.onMatchChange(EnumSet.allOf(MatchType.class)));
 			}
@@ -83,7 +83,7 @@ public class MatchingMenu extends Menu {
 
 	public void autoMatchMethods() {
 		var job = new AutoMatchMethodsJob(gui.getMatcher(), Matcher.defaultAutoMatchLevel);
-		job.addCompletionListener((matchedAny, error) -> {
+		job.addFinishListener((matchedAny, error) -> {
 			if (matchedAny.orElse(false)) {
 				Platform.runLater(() -> gui.onMatchChange(EnumSet.of(MatchType.Method)));
 			}
@@ -93,7 +93,7 @@ public class MatchingMenu extends Menu {
 
 	public void autoMatchFields() {
 		var job = new AutoMatchFieldsJob(gui.getMatcher(), Matcher.defaultAutoMatchLevel);
-		job.addCompletionListener((matchedAny, error) -> {
+		job.addFinishListener((matchedAny, error) -> {
 			if (matchedAny.orElse(false)) {
 				Platform.runLater(() -> gui.onMatchChange(EnumSet.of(MatchType.Field)));
 			}
@@ -103,7 +103,7 @@ public class MatchingMenu extends Menu {
 
 	public void autoMatchArgs() {
 		var job = new AutoMatchLocalsJob(gui.getMatcher(), Matcher.defaultAutoMatchLevel, true);
-		job.addCompletionListener((matchedAny, error) -> {
+		job.addFinishListener((matchedAny, error) -> {
 			if (matchedAny.orElse(false)) {
 				Platform.runLater(() -> gui.onMatchChange(EnumSet.of(MatchType.MethodVar)));
 			}
@@ -113,7 +113,7 @@ public class MatchingMenu extends Menu {
 
 	public void autoMatchVars() {
 		var job = new AutoMatchLocalsJob(gui.getMatcher(), Matcher.defaultAutoMatchLevel, false);
-		job.addCompletionListener((matchedAny, error) -> {
+		job.addFinishListener((matchedAny, error) -> {
 			if (matchedAny.orElse(false)) {
 				Platform.runLater(() -> gui.onMatchChange(EnumSet.of(MatchType.MethodVar)));
 			}

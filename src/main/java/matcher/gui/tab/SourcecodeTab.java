@@ -107,7 +107,7 @@ public class SourcecodeTab extends WebViewTab {
 				return SrcDecorator.decorate(gui.getEnv().decompile(decompiler, selectedClass, nameType), selectedClass, nameType);
 			}
 		};
-		decompileJob.addCompletionListener((code, error) -> Platform.runLater(() -> {
+		decompileJob.addFinishListener((code, error) -> Platform.runLater(() -> {
 			if (cDecompId != decompId) {
 				return;
 			}
@@ -137,7 +137,7 @@ public class SourcecodeTab extends WebViewTab {
 
 			updateNeeded = UPDATE_NONE;
 		}));
-		decompileJob.run();
+		//decompileJob.run();
 	}
 
 	@Override

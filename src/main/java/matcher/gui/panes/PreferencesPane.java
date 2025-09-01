@@ -40,15 +40,15 @@ public class PreferencesPane extends VBox {
 
 		alignedMaxSliderValue = Math.max(sliderLabelStep, alignedMaxSliderValue);
 
-		Text text = new Text("Main worker threads (only applies after the current workers are finished):");
+		Text text = new Text("Amount of threads used for matching (applies once the current matching subtask is finished):");
 		text.setWrappingWidth(getWidth());
 		getChildren().add(text);
 
-		mainWorkersSlider = newSlider(minSliderValue, alignedMaxSliderValue, sliderLabelStep, Matcher.threadPool.getParallelism());
+		mainWorkersSlider = newSlider(minSliderValue, alignedMaxSliderValue, sliderLabelStep, Matcher.matchingThreadPool.getParallelism());
 		mainWorkersSlider.valueProperty().addListener((newValue) -> showWarningIfNecessary());
 		getChildren().add(mainWorkersSlider);
 
-		text = new Text("Job executor threads:");
+		text = new Text("Amount of threads used for job execution:");
 		text.setWrappingWidth(getWidth());
 		getChildren().add(text);
 
@@ -111,11 +111,11 @@ public class PreferencesPane extends VBox {
 
 		warningText.setText(warning.toString());
 
-		if (!warningText.isVisible() && warning.length() > 0) {
+		if (!warningText.isVisible() && !warning.isEmpty()) {
 			warningText.setVisible(true);
 			requestLayout();
 			requestParentLayout();
-		} else if (warningText.isVisible() && warning.length() == 0) {
+		} else if (warningText.isVisible() && warning.isEmpty()) {
 			warningText.setVisible(false);
 			requestLayout();
 			requestParentLayout();
@@ -123,11 +123,11 @@ public class PreferencesPane extends VBox {
 	}
 
 	private void save() {
-		int oldThreadPoolSize = Matcher.threadPool.getParallelism();
+		int oldThreadPoolSize = Matcher.matchingThreadPool.getParallelism();
 		int newThreadPoolSize = (int) mainWorkersSlider.getValue();
 
 		if (newThreadPoolSize != oldThreadPoolSize) {
-			Matcher.threadPool = (ForkJoinPool) Executors.newWorkStealingPool(newThreadPoolSize);
+			Matcher.matchingThreadPool = (ForkJoinPool) Executors.newWorkStealingPool(newThreadPoolSize);
 		}
 
 		JobManager.get().setMaxJobExecutorThreads((int) jobExecutorsSlider.getValue());

@@ -43,7 +43,7 @@ public class UidMenu extends Menu {
 		getItems().add(new SeparatorMenuItem());
 
 		var importJob = new ImportMatchesJob(gui.getMatcher());
-		importJob.addCompletionListener((importedAny, error) -> {
+		importJob.addFinishListener((importedAny, error) -> {
 			if (importedAny.isPresent()) {
 				Platform.runLater(() -> gui.onMatchChange(EnumSet.allOf(MatchType.class)));
 			}

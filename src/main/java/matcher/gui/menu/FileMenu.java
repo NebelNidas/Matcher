@@ -130,7 +130,7 @@ public class FileMenu extends Menu {
 				return null;
 			}
 		};
-		job.addCompletionListener((result, error) -> Platform.runLater(() -> gui.onProjectChange()));
+		job.addFinishListener((result, error) -> Platform.runLater(() -> gui.onProjectChange()));
 		job.run();
 	}
 

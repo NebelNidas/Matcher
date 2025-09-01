@@ -99,7 +99,7 @@ public class Matcher {
 			}
 		};
 
-		job.addCompletionListener((result, error) -> {
+		job.addFinishListener((result, error) -> {
 			if (error.isPresent()) {
 				reset();
 				throw new RuntimeException(error.get());
@@ -514,7 +514,7 @@ public class Matcher {
 		int updateRate = Math.max(1, workSet.size() / 200);
 
 		try {
-			List<Future<Void>> futures = threadPool.invokeAll(workSet.stream().<Callable<Void>>map(workItem -> () -> {
+			List<Future<Void>> futures = matchingThreadPool.invokeAll(workSet.stream().<Callable<Void>>map(workItem -> () -> {
 				worker.accept(workItem);
 
 				int cItemsDone = itemsDone.incrementAndGet();
@@ -702,7 +702,7 @@ public class Matcher {
 	}
 
 	public static final Logger LOGGER = LoggerFactory.getLogger("Matcher");
-	public static volatile ForkJoinPool threadPool = (ForkJoinPool) Executors.newWorkStealingPool(4);
+	public static volatile ForkJoinPool matchingThreadPool = (ForkJoinPool) Executors.newWorkStealingPool(Math.max(1, Runtime.getRuntime().availableProcessors() - 2));
 	public volatile boolean debugMode;
 
 	private final ClassEnvironment env;

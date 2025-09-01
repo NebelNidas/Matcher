@@ -20,6 +20,7 @@ import javafx.scene.control.SkinBase;
 import javafx.scene.control.Tooltip;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.VBox;
+import job4j.BuiltinJobCancellationReasons;
 import job4j.Job;
 import job4j.JobManager;
 import job4j.JobState;
@@ -143,7 +144,7 @@ public class JobProgressView extends Control {
 				cancelButton.setOnAction(event -> {
 					if (this.job != null) {
 						cancelButton.setDisable(true);
-						this.job.cancel();
+						this.job.cancel(BuiltinJobCancellationReasons.USER_REQUEST);
 					}
 				});
 
@@ -228,7 +229,7 @@ public class JobProgressView extends Control {
 				} else if (job != null) {
 					job.addCancelListener(() -> Platform.runLater(() -> update(job)));
 					job.addProgressListener((progress) -> Platform.runLater(() -> update(job)));
-					job.addCompletionListener((result, error) -> Platform.runLater(() -> update(job)));
+					job.addFinishListener((result, error) -> Platform.runLater(() -> update(job)));
 
 					update(job);
 					getStyleClass().setAll("task-list-cell");

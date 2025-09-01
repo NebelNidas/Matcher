@@ -2,6 +2,7 @@ package matcher.gui;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -270,7 +271,7 @@ public class Gui extends Application {
 				return null;
 			}
 		};
-		job.addCompletionListener((result, error) -> Platform.runLater(() -> {
+		job.addFinishListener((result, error) -> Platform.runLater(() -> {
 			if (newConfig.getMappingsPathA() != null) {
 				Path mappingsPath = newConfig.getMappingsPathA();
 
@@ -281,7 +282,7 @@ public class Gui extends Application {
 							MappingField.PLAIN, MappingField.MAPPED,
 							env.getEnvA(), true);
 				} catch (IOException e) {
-					e.printStackTrace();
+					throw new UncheckedIOException(e);
 				}
 			}
 
@@ -295,7 +296,7 @@ public class Gui extends Application {
 							MappingField.PLAIN, MappingField.MAPPED,
 							env.getEnvB(), true);
 				} catch (IOException e) {
-					e.printStackTrace();
+					throw new UncheckedIOException(e);
 				}
 			}
 
@@ -499,7 +500,7 @@ public class Gui extends Application {
 		ProgressBar progressBar = bottomPane.getProgressBar();
 		Label jobLabel = bottomPane.getJobLabel();
 
-		if (activeJobs.size() == 0) {
+		if (activeJobs.isEmpty()) {
 			jobLabel.setText("");
 			progressBar.setVisible(false);
 			progressBar.setProgress(0);
@@ -525,7 +526,7 @@ public class Gui extends Application {
 				StringBuilder tooltipText = new StringBuilder();
 
 				for (Job<?> job : activeJobs) {
-					tooltipText.append(job.getId() + "\n");
+					tooltipText.append(job.getId()).append("\n");
 				}
 
 				jobLabel.setTooltip(new Tooltip(tooltipText.toString()));
@@ -540,7 +541,7 @@ public class Gui extends Application {
 	}
 
 	private void onProgressChange(double progress) {
-		if (activeJobs.size() == 0) return;
+		if (activeJobs.isEmpty()) return;
 
 		ProgressBar progressBar = bottomPane.getProgressBar();
 		// bottomPane.getJobLabel().setText(bottomPane.getJobLabel().getText());
@@ -659,7 +660,7 @@ public class Gui extends Application {
 	private MatchPaneDst dstPane;
 	private BottomPane bottomPane;
 
-	private List<Job<?>> activeJobs = new ArrayList<>();
+	private final List<Job<?>> activeJobs = new ArrayList<>();
 
 	private SortKey sortKey = SortKey.Name;
 	private boolean sortMatchesAlphabetically;

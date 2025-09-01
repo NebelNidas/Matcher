@@ -5,6 +5,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.function.DoubleConsumer;
 
+import job4j.BuiltinJobCancellationReasons;
 import job4j.Job;
 import job4j.JobSettings.MutableJobSettings;
 import job4j.JobState;
@@ -56,7 +57,7 @@ public class AutoMatchAllJob extends MatcherJob<Set<MatchType>> {
 
 		// Automatch classes, pass 1
 		job = new AutoMatchClassesJob(matcher, ClassifierLevel.Initial);
-		job.addCompletionListener(this::onMatchedClasses);
+		job.addFinishListener(this::onMatchedClasses);
 		addSubJob(job, true);
 
 		// Automatch classes, pass 2
@@ -72,7 +73,7 @@ public class AutoMatchAllJob extends MatcherJob<Set<MatchType>> {
 				return super.execute(progressReceiver);
 			}
 		};
-		job.addCompletionListener(this::onMatchedClasses);
+		job.addFinishListener(this::onMatchedClasses);
 		addSubJob(job, false);
 
 		// Automatch all: intermediate
@@ -132,7 +133,7 @@ public class AutoMatchAllJob extends MatcherJob<Set<MatchType>> {
 					settings.makeInvisible();
 				}
 			};
-			methodJob.addCompletionListener(this::onMatchedMembers);
+			methodJob.addFinishListener(this::onMatchedMembers);
 			parentJob.addSubJob(methodJob, false);
 
 			// Register field matching subjob
@@ -143,7 +144,7 @@ public class AutoMatchAllJob extends MatcherJob<Set<MatchType>> {
 					settings.makeInvisible();
 				}
 			};
-			fieldJob.addCompletionListener(this::onMatchedMembers);
+			fieldJob.addFinishListener(this::onMatchedMembers);
 			parentJob.addSubJob(fieldJob, false);
 
 			// Register class matching subjob
@@ -154,7 +155,7 @@ public class AutoMatchAllJob extends MatcherJob<Set<MatchType>> {
 					settings.makeInvisible();
 				}
 			};
-			classesJob.addCompletionListener(this::onMatchedClasses);
+			classesJob.addFinishListener(this::onMatchedClasses);
 			parentJob.addSubJob(classesJob, false);
 
 			// Run subjobs
@@ -168,9 +169,13 @@ public class AutoMatchAllJob extends MatcherJob<Set<MatchType>> {
 			matchedAny |= fieldJob.runAndAwait().getResult().orElse(false);
 			matchedAnyOverall |= matchedAny;
 
-			if (parentJob.getState() == JobState.CANCELING
-					|| (!matchedAny && !matchedAnyClassesBefore)) {
-				classesJob.cancel();
+			if (parentJob.getState() == JobState.CANCELING) {
+				classesJob.cancel(BuiltinJobCancellationReasons.PARENT_CANCELLATION);
+				break;
+			}
+
+			if (!matchedAny && !matchedAnyClassesBefore) {
+				classesJob.cancel(BuiltinJobCancellationReasons.UNSPECIFIED);
 				break;
 			}
 
@@ -199,7 +204,7 @@ public class AutoMatchAllJob extends MatcherJob<Set<MatchType>> {
 					settings.makeInvisible();
 				}
 			};
-			argJob.addCompletionListener(this::onMatchedLocals);
+			argJob.addFinishListener(this::onMatchedLocals);
 			parentJob.addSubJob(argJob, false);
 
 			// Register var matching subjob
@@ -210,7 +215,7 @@ public class AutoMatchAllJob extends MatcherJob<Set<MatchType>> {
 					settings.makeInvisible();
 				}
 			};
-			varJob.addCompletionListener(this::onMatchedLocals);
+			varJob.addFinishListener(this::onMatchedLocals);
 			parentJob.addSubJob(varJob, false);
 
 			// Run subjobs

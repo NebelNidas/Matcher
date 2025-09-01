@@ -711,7 +711,7 @@ public class MatchPaneDst extends SplitPane implements IFwdGuiComponent, ISelect
 					settings.cancelPreviousJobsWithSameId();
 				}
 			};
-			job.addCompletionListener((results, error) -> Platform.runLater(() -> {
+			job.addFinishListener((results, error) -> Platform.runLater(() -> {
 				if (jobId == cJobId) {
 					assert rankResults.isEmpty();
 

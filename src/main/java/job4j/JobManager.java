@@ -2,32 +2,39 @@ package job4j;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.function.BiConsumer;
 
-import matcher.Util;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class JobManager {
 	private static final JobManager INSTANCE = new JobManager();
-	private static final ThreadPoolExecutor threadPool = (ThreadPoolExecutor) Executors.newFixedThreadPool(Math.max(2, Runtime.getRuntime().availableProcessors() / 2));
+	private static final Logger LOGGER = LoggerFactory.getLogger(JobManager.class);
+	private static final ThreadPoolExecutor JOB_EXECUTING_THREAD_POOL;
+	private static final ThreadPoolExecutor JOB_AWAIT_THREAD_POOL;
 
 	static {
-		threadPool.setKeepAliveTime(60L, TimeUnit.SECONDS);
-		threadPool.allowCoreThreadTimeOut(true);
+		int nThreads = Math.max(2, Runtime.getRuntime().availableProcessors() / 2);
+		JOB_EXECUTING_THREAD_POOL = new ThreadPoolExecutor(nThreads, nThreads, 0L, TimeUnit.MILLISECONDS, new LinkedBlockingQueue<>(1));
+		JOB_EXECUTING_THREAD_POOL.setKeepAliveTime(60L, TimeUnit.SECONDS);
+		JOB_EXECUTING_THREAD_POOL.allowCoreThreadTimeOut(true);
 	}
 
-	public static synchronized JobManager get() {
+	public static JobManager get() {
 		return INSTANCE;
 	}
 
-	private volatile List<BiConsumer<Job<?>, JobManagerEvent>> eventListeners = Collections.synchronizedList(new ArrayList<>());
-	private volatile List<Job<?>> queuedJobs = Collections.synchronizedList(new LinkedList<>());
-	private volatile List<Job<?>> runningJobs = Collections.synchronizedList(new LinkedList<>());
+	private final List<BiConsumer<Job<?>, JobManagerEvent>> eventListeners = Collections.synchronizedList(new ArrayList<>());
+	private final List<Job<?>> queuedJobs = Collections.synchronizedList(new LinkedList<>());
+	private final List<Job<?>> runningJobs = Collections.synchronizedList(new LinkedList<>());
 	private volatile boolean shuttingDown;
 
 	public void registerEventListener(BiConsumer<Job<?>, JobManagerEvent> listener) {
@@ -43,102 +50,143 @@ public class JobManager {
 	/**
 	 * Queues the job for execution.
 	 */
-	void queue(Job<?> job) {
-		boolean threadAlreadyExecutingJob = false;
+	void queue(Job<?> job, boolean awaitTermination) {
+		fixHierarchyIfNecessary(job);
 
-		synchronized (this.runningJobs) {
-			for (Job<?> runningJob : this.runningJobs) {
-				if (runningJob.getThread() == Thread.currentThread()) {
-					// An already running job indirectly started another job.
-					// Neither one declared the correct hierarchy (they don't know each other),
-					// nevertheless one job indirectly parents the other one.
-					// Now we're declaring the correct hierarchy ourselves.
-					threadAlreadyExecutingJob = true;
-					runningJob.addSubJob(job, false);
-				}
-			}
-		}
-
-		if (threadAlreadyExecutingJob) {
-			job.run();
+		if (job.parent != null) {
+			assert job.getParent().getThread() == Thread.currentThread();
+			job.state = JobState.QUEUED;
+			job.runOnCurrentThread();
 			return;
 		}
 
 		if (job.getSettings().isCancelPreviousJobsWithSameId()) {
 			synchronized (queuedJobs) {
-				for (Job<?> queuedJob : this.queuedJobs) {
-					if (queuedJob.getCategory() == job.getCategory()
-							&& queuedJob.getId().equals(job.getId())) {
-						queuedJob.cancel();
+				for (Job<?> queuedJob : queuedJobs) {
+					if (queuedJob.getCategory() == job.getCategory() && queuedJob.getId().equals(job.getId())) {
+						queuedJob.cancel(BuiltinJobCancellationReasons.NEWER_JOB_WITH_SAME_ID);
+						queuedJobs.remove(queuedJob);
 					}
 				}
 			}
 
 			synchronized (runningJobs) {
-				for (Job<?> runningJob : this.runningJobs) {
-					if (runningJob.getCategory() == job.getCategory()
-							&& runningJob.getId().equals(job.getId())) {
-						runningJob.cancel();
+				for (Job<?> runningJob : runningJobs) {
+					if (runningJob.getCategory() == job.getCategory() && runningJob.getId().equals(job.getId())) {
+						runningJob.cancel(BuiltinJobCancellationReasons.NEWER_JOB_WITH_SAME_ID);
 					}
 				}
 			}
 		}
 
-		this.queuedJobs.add(job);
+		synchronized (queuedJobs) {
+			queuedJobs.add(job);
+		}
 
-		job.addCompletionListener((result, error) -> onJobFinished(job));
+		job.addFinishListener((result, error) -> onJobFinished(job));
+
+		if (awaitTermination) {
+			Thread thread = Thread.currentThread();
+			job.addFinishListener((result, error) -> thread.notifyAll());
+		}
+
+		job.state = JobState.QUEUED;
 		notifyEventListeners(job, JobManagerEvent.JOB_QUEUED);
 		tryLaunchNext();
+
+		if (awaitTermination) {
+			while (!job.getState().isFinished()) {
+				try {
+					wait();
+				} catch (InterruptedException e) {
+					job.cancel(BuiltinJobCancellationReasons.INTERRUPTED);
+				}
+			}
+		}
+	}
+
+	/**
+	 * If the job has no parent, tries to find a running job in the current thread
+	 * and adds the new job as a subjob to it.
+	 */
+	private void fixHierarchyIfNecessary(Job<?> job) {
+		if (job.getParent() != null) {
+			return;
+		}
+
+		synchronized (runningJobs) {
+			for (Job<?> runningJob : runningJobs) {
+				if (runningJob.getThread() == Thread.currentThread()) {
+					// An already running job indirectly started another job.
+					// Neither one declared the correct hierarchy (they don't know each other),
+					// nevertheless one job indirectly parents the other one.
+					// Now we're declaring the correct hierarchy ourselves.
+					runningJob.addSubJob(job, false);
+					return;
+				}
+			}
+		}
 	}
 
 	private void onJobFinished(Job<?> job) {
 		notifyEventListeners(job, JobManagerEvent.JOB_FINISHED);
-		this.runningJobs.remove(job);
+
+		synchronized (runningJobs) {
+			runningJobs.remove(job);
+		}
+
 		tryLaunchNext();
 	}
 
-	private synchronized void tryLaunchNext() {
-		for (Job<?> queuedJob : this.queuedJobs) {
-			boolean blocked = false;
+	private void tryLaunchNext() {
+		if (queuedJobs.isEmpty() || !JOB_EXECUTING_THREAD_POOL.getQueue().isEmpty()) {
+			return;
+		}
 
-			synchronized (this.runningJobs) {
-				List<Job<?>> jobsToCheckAgainst = new ArrayList<>();
+		synchronized (queuedJobs) {
+			Iterator<Job<?>> queuedJobsIterator = queuedJobs.iterator();
 
-				for (Job<?> runningJob : this.runningJobs) {
-					jobsToCheckAgainst.add(runningJob);
+			queuedJobsLoop:
+			while (queuedJobsIterator.hasNext()) {
+				Job<?> queuedJob = queuedJobsIterator.next();
 
-					for (Job<?> runningSubJob : runningJob.getSubJobs(true)) {
-						jobsToCheckAgainst.add(runningSubJob);
+				synchronized (runningJobs) {
+					List<Job<?>> jobsToCheckAgainst = new ArrayList<>();
+
+					for (Job<?> runningJob : runningJobs) {
+						jobsToCheckAgainst.add(runningJob);
+						jobsToCheckAgainst.addAll(runningJob.getSubJobs(true));
+					}
+
+					for (Job<?> jobToCheckAgainst : jobsToCheckAgainst) {
+						if (queuedJob.isBlockedBy(jobToCheckAgainst.getCategory())) {
+							continue queuedJobsLoop;
+						}
 					}
 				}
 
-				for (Job<?> jobToCheckAgainst : jobsToCheckAgainst) {
-					if (queuedJob.isBlockedBy(jobToCheckAgainst.getCategory())) {
-						blocked = true;
-						break;
-					}
-				}
-			}
-
-			if (!blocked) {
-				this.queuedJobs.remove(queuedJob);
-				this.runningJobs.add(queuedJob);
+				queuedJobsIterator.remove();
+				runningJobs.add(queuedJob);
 				notifyEventListeners(queuedJob, JobManagerEvent.JOB_STARTED);
+				Future<?> future = JOB_EXECUTING_THREAD_POOL.submit(queuedJob::runOnCurrentThread);
 
 				Thread wrapper = new Thread(() -> {
 					try {
-						threadPool.submit(() -> queuedJob.runNow()).get(queuedJob.getSettings().getTimeout(), TimeUnit.SECONDS);
-					} catch (Throwable e) {
+						future.get(queuedJob.getSettings().getTimeout(), TimeUnit.SECONDS);
+					} catch (Exception e) {
 						if (e instanceof TimeoutException) {
-							queuedJob.cancel();
+							queuedJob.cancel(BuiltinJobCancellationReasons.TIMEOUT);
 						} else if (!shuttingDown) {
-							throw new RuntimeException(String.format("An exception has been encountered in job '%s':\n%s",
-									queuedJob.getId(), Util.getStacktrace(e)));
+							throw new RuntimeException(String.format("An exception has been encountered in wrapper thread for job '%s'", queuedJob.getId()), e);
 						}
 					}
 				});
 				wrapper.setName(queuedJob.getId() + " wrapper thread");
 				wrapper.start();
+
+				if (!JOB_EXECUTING_THREAD_POOL.getQueue().isEmpty()) {
+					return;
+				}
 			}
 		}
 	}
@@ -159,40 +207,29 @@ public class JobManager {
 
 	/**
 	 * @param id the job in question's ID
-	 * @param recursive whether or not all running jobs' subjobs should be checked too
+	 * @param recursive whether all running jobs' subjobs should be checked too
 	 */
 	public boolean isJobRunning(String id, boolean recursive) {
 		List<Job<?>> jobs = List.copyOf(this.runningJobs);
 
-		boolean running = jobs.stream()
-				.filter((job -> job.getId().equals(id)))
-				.findAny()
-				.isPresent();
-
-		if (!recursive) return running;
-
-		running = jobs.stream()
-				.filter((job -> job.hasSubJob(id, recursive)))
-				.findAny()
-				.isPresent();
-
-		return running;
+		return recursive
+				? jobs.stream().anyMatch((job -> job.getId().equals(id) || job.hasSubJob(id, true)))
+				: jobs.stream().anyMatch((job -> job.getId().equals(id)));
 	}
 
 	public int getMaxJobExecutorThreads() {
-		return threadPool.getMaximumPoolSize();
+		return JOB_EXECUTING_THREAD_POOL.getMaximumPoolSize();
 	}
 
-	public void setMaxJobExecutorThreads(int maxThreads) {
-		int oldSize = threadPool.getMaximumPoolSize();
-		int newSize = maxThreads;
+	public void setMaxJobExecutorThreads(int newSize) {
+		int oldSize = JOB_EXECUTING_THREAD_POOL.getMaximumPoolSize();
 
 		if (newSize < oldSize) {
-			JobManager.threadPool.setCorePoolSize(newSize);
-			JobManager.threadPool.setMaximumPoolSize(newSize);
+			JobManager.JOB_EXECUTING_THREAD_POOL.setCorePoolSize(newSize);
+			JobManager.JOB_EXECUTING_THREAD_POOL.setMaximumPoolSize(newSize);
 		} else if (newSize > oldSize) {
-			JobManager.threadPool.setMaximumPoolSize(newSize);
-			JobManager.threadPool.setCorePoolSize(newSize);
+			JobManager.JOB_EXECUTING_THREAD_POOL.setMaximumPoolSize(newSize);
+			JobManager.JOB_EXECUTING_THREAD_POOL.setCorePoolSize(newSize);
 		}
 	}
 
@@ -203,10 +240,10 @@ public class JobManager {
 		this.queuedJobs.clear();
 
 		synchronized (this.runningJobs) {
-			this.runningJobs.forEach(job -> job.cancel());
+			this.runningJobs.forEach(job -> job.cancel(BuiltinJobCancellationReasons.SHUTDOWN));
 		}
 
-		threadPool.shutdownNow();
+		JOB_EXECUTING_THREAD_POOL.shutdownNow();
 	}
 
 	public boolean isShuttingDown() {
