@@ -8,6 +8,7 @@ import java.util.Set;
 
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
+import javafx.scene.Cursor;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.ProgressBar;
@@ -56,6 +57,7 @@ public class BottomPane extends StackPane implements IGuiComponent {
 
 		progressBar.setVisible(false);
 		progressBar.setPrefWidth(200);
+		progressBar.setCursor(Cursor.HAND);
 
 		JobProgressView jobProgressView = new JobProgressView(gui);
 
@@ -65,7 +67,11 @@ public class BottomPane extends StackPane implements IGuiComponent {
 		jobPopOver.setArrowLocation(ArrowLocation.BOTTOM_LEFT);
 
 		progressBar.setOnMouseClicked((e) -> {
-			jobPopOver.show(progressBar);
+			if (jobPopOver.isShowing()) {
+				jobPopOver.hide();
+			} else {
+				jobPopOver.show(progressBar);
+			}
 		});
 
 		left.getChildren().add(progressBar);

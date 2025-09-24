@@ -671,6 +671,25 @@ public class Matcher {
 				totalFieldCount, matchedFieldCount);
 	}
 
+	public static int getMatchingThreadPoolSize() {
+		return matchingThreadPool.getParallelism();
+	}
+
+	/**
+	 * Update the size of the thread pool used for matching.
+	 * If this is changed during a matching operation, the new size will only apply
+	 * once the current matching subtask is finished.
+	 *
+	 * @param newThreadPoolSize The new size of the thread pool.
+	 */
+	public static void setMatchingThreadPoolSize(int newThreadPoolSize) {
+		int oldThreadPoolSize = Matcher.matchingThreadPool.getParallelism();
+
+		if (newThreadPoolSize != oldThreadPoolSize) {
+			matchingThreadPool = (ForkJoinPool) Executors.newWorkStealingPool(newThreadPoolSize);
+		}
+	}
+
 	public static class MatchingStatus {
 		MatchingStatus(int totalClassCount, int matchedClassCount,
 				int totalMethodCount, int matchedMethodCount,
@@ -702,8 +721,8 @@ public class Matcher {
 	}
 
 	public static final Logger LOGGER = LoggerFactory.getLogger("Matcher");
-	public static volatile ForkJoinPool matchingThreadPool = (ForkJoinPool) Executors.newWorkStealingPool(Math.max(1, Runtime.getRuntime().availableProcessors() - 2));
 	public volatile boolean debugMode;
+	private static volatile ForkJoinPool matchingThreadPool = (ForkJoinPool) Executors.newWorkStealingPool(Math.max(1, Runtime.getRuntime().availableProcessors() - 2));
 
 	private final ClassEnvironment env;
 	public static final ClassifierLevel defaultAutoMatchLevel = ClassifierLevel.Extra;

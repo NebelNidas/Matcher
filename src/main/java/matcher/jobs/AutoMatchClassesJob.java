@@ -1,5 +1,8 @@
 package matcher.jobs;
 
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -10,17 +13,21 @@ import java.util.stream.Collectors;
 import job4j.JobState;
 
 import matcher.Matcher;
+import matcher.Util;
 import matcher.classifier.ClassClassifier;
 import matcher.classifier.ClassifierLevel;
 import matcher.classifier.RankResult;
+import matcher.network.ConnectedLanPeer;
+import matcher.network.NetworkHandler;
 import matcher.type.ClassEnvironment;
 import matcher.type.ClassInstance;
 
 public class AutoMatchClassesJob extends MatcherJob<Boolean> {
-	public AutoMatchClassesJob(Matcher matcher, ClassifierLevel level) {
+	public AutoMatchClassesJob(Matcher matcher, NetworkHandler networkHandler, ClassifierLevel level) {
 		super(JobCategories.AUTOMATCH_CLASSES);
 
 		this.matcher = matcher;
+		this.networkHandler = networkHandler;
 		this.level = level;
 	}
 
@@ -32,29 +39,47 @@ public class AutoMatchClassesJob extends MatcherJob<Boolean> {
 
 		List<ClassInstance> classes = env.getClassesA().stream()
 				.filter(filter)
-				.collect(Collectors.toList());
+				.toList();
 
-		ClassInstance[] cmpClasses = env.getClassesB().stream()
-				.filter(filter)
-				.collect(Collectors.toList()).toArray(new ClassInstance[0]);
-
-		double maxScore = ClassClassifier.getMaxScore(level);
-		double maxMismatch = maxScore - Matcher.getRawScore(Matcher.absClassAutoMatchThreshold * (1 - Matcher.relClassAutoMatchThreshold), maxScore);
 		Map<ClassInstance, ClassInstance> matches = new ConcurrentHashMap<>(classes.size());
+		Collection<ConnectedLanPeer> peers = networkHandler.getConnections().tcpPeersByAddress.values();
+		List<ClassInstance> classesToMatchLocally;
+		List<List<ClassInstance>> classSetsToMatchRemotely;
+		AutoMatchClassesLocalJob localJob;
+		List<AutoMatchClassesRemoteJob> remoteJobs;
 
-		Matcher.runInParallel(classes, cls -> {
-			if (state == JobState.CANCELING) {
-				return;
+		if (classes.size() < 200 || peers.isEmpty()) {
+			classesToMatchLocally = classes;
+			classSetsToMatchRemotely = List.of();
+		} else {
+			List<List<ClassInstance>> classesPartitioned = Util.partition(classes, 1 + peers.size());
+			classesToMatchLocally = classesPartitioned.get(0);
+			classSetsToMatchRemotely = classesPartitioned.subList(1, classesPartitioned.size());
+		}
+
+		localJob = new AutoMatchClassesLocalJob(matcher, level, classesToMatchLocally);
+		addSubJob(localJob, true);
+
+		if (!classSetsToMatchRemotely.isEmpty()) {
+			int i = 0;
+			Iterator<ConnectedLanPeer> peerIt = peers.iterator();
+
+			while (peerIt.hasNext()) {
+				ConnectedLanPeer peer = peerIt.next();
+				List<ClassInstance> classSet = classSetsToMatchRemotely.get(i);
+
+				AutoMatchClassesRemoteJob remoteJob = new AutoMatchClassesRemoteJob(matcher, networkHandler, peer, level, classSet);
+				addSubJob(remoteJob, true);
+
+				i++;
+
+				if (i >= classSetsToMatchRemotely.size()) {
+					break;
+				}
 			}
+		}
 
-			List<RankResult<ClassInstance>> ranking = ClassClassifier.rank(cls, cmpClasses, level, env, maxMismatch);
-
-			if (Matcher.checkRank(ranking, Matcher.absClassAutoMatchThreshold, Matcher.relClassAutoMatchThreshold, maxScore)) {
-				ClassInstance match = ranking.get(0).getSubject();
-
-				matches.put(cls, match);
-			}
-		}, progressReceiver);
+		matches.putAll(localJob.runAndAwait().getResult().orElseThrow());
 
 		Matcher.sanitizeMatches(matches);
 
@@ -68,5 +93,6 @@ public class AutoMatchClassesJob extends MatcherJob<Boolean> {
 	}
 
 	private final Matcher matcher;
+	private final NetworkHandler networkHandler;
 	private final ClassifierLevel level;
 }

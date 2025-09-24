@@ -45,7 +45,7 @@ public class MappingMenu extends Menu {
 
 	private void fixRecordMemberNames() {
 		Dialog<NamespaceSettings> dialog = new Dialog<>();
-		//dialog.initModality(Modality.APPLICATION_MODAL);
+		dialog.initOwner(gui.getScene().getWindow());
 		dialog.setResizable(true);
 		dialog.setTitle("Mapping Namespace Settings");
 		dialog.getDialogPane().getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);

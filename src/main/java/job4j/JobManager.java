@@ -5,6 +5,7 @@ import java.util.Collections;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Timer;
 import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -19,7 +20,7 @@ public class JobManager {
 	private static final JobManager INSTANCE = new JobManager();
 	private static final Logger LOGGER = LoggerFactory.getLogger(JobManager.class);
 	private static final ThreadPoolExecutor JOB_EXECUTING_THREAD_POOL;
-	private static final ThreadPoolExecutor JOB_AWAIT_THREAD_POOL;
+	private static final Timer JOB_TIMER = new Timer(true);
 
 	static {
 		int nThreads = Math.max(2, Runtime.getRuntime().availableProcessors() / 2);
@@ -222,14 +223,16 @@ public class JobManager {
 	}
 
 	public void setMaxJobExecutorThreads(int newSize) {
-		int oldSize = JOB_EXECUTING_THREAD_POOL.getMaximumPoolSize();
+		synchronized (JOB_EXECUTING_THREAD_POOL) {
+			int oldSize = JOB_EXECUTING_THREAD_POOL.getMaximumPoolSize();
 
-		if (newSize < oldSize) {
-			JobManager.JOB_EXECUTING_THREAD_POOL.setCorePoolSize(newSize);
-			JobManager.JOB_EXECUTING_THREAD_POOL.setMaximumPoolSize(newSize);
-		} else if (newSize > oldSize) {
-			JobManager.JOB_EXECUTING_THREAD_POOL.setMaximumPoolSize(newSize);
-			JobManager.JOB_EXECUTING_THREAD_POOL.setCorePoolSize(newSize);
+			if (newSize < oldSize) {
+				JobManager.JOB_EXECUTING_THREAD_POOL.setCorePoolSize(newSize);
+				JobManager.JOB_EXECUTING_THREAD_POOL.setMaximumPoolSize(newSize);
+			} else if (newSize > oldSize) {
+				JobManager.JOB_EXECUTING_THREAD_POOL.setMaximumPoolSize(newSize);
+				JobManager.JOB_EXECUTING_THREAD_POOL.setCorePoolSize(newSize);
+			}
 		}
 	}
 

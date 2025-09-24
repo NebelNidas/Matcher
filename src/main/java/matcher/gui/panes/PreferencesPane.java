@@ -1,11 +1,9 @@
 package matcher.gui.panes;
 
-import java.util.concurrent.Executors;
-import java.util.concurrent.ForkJoinPool;
-
 import javafx.geometry.Insets;
 import javafx.scene.Node;
 import javafx.scene.control.Button;
+import javafx.scene.control.Label;
 import javafx.scene.control.Slider;
 import javafx.scene.layout.VBox;
 import javafx.scene.text.Text;
@@ -26,38 +24,24 @@ public class PreferencesPane extends VBox {
 	private void init() {
 		int minSliderValue = 1;
 		int sliderLabelStep = 2;
-		int originalMaxSliderValue = Runtime.getRuntime().availableProcessors();
-		int alignedMaxSliderValue = ((int) Math.floor((float) originalMaxSliderValue / sliderLabelStep)) * sliderLabelStep;
-		int normalizedShift = minSliderValue - ((int) Math.floor((float) minSliderValue / sliderLabelStep) * sliderLabelStep);
-		int distanceRight = normalizedShift;
-		int distanceLeft = sliderLabelStep - distanceRight;
+		int targetedMaxSliderValue = Math.max(Runtime.getRuntime().availableProcessors(), Matcher.getMatchingThreadPoolSize());
+		int alignedMaxSliderValue = getAlignedMaxSliderValue(targetedMaxSliderValue, sliderLabelStep, minSliderValue);
 
-		if (distanceLeft >= distanceRight) {
-			alignedMaxSliderValue += distanceRight;
-		} else {
-			alignedMaxSliderValue -= distanceLeft;
-		}
+		Label label = newLabel("Amount of threads used for matching (applies once the current matching subtask is finished):");
+		getChildren().add(label);
 
-		alignedMaxSliderValue = Math.max(sliderLabelStep, alignedMaxSliderValue);
+		matchingThreadsSlider = newSlider(minSliderValue, alignedMaxSliderValue, sliderLabelStep, Matcher.getMatchingThreadPoolSize());
+		matchingThreadsSlider.valueProperty().addListener((newValue) -> showWarningIfNecessary());
+		getChildren().add(matchingThreadsSlider);
 
-		Text text = new Text("Amount of threads used for matching (applies once the current matching subtask is finished):");
-		text.setWrappingWidth(getWidth());
-		getChildren().add(text);
+		label = newLabel("Amount of threads used for job execution:");
+		getChildren().add(label);
 
-		mainWorkersSlider = newSlider(minSliderValue, alignedMaxSliderValue, sliderLabelStep, Matcher.matchingThreadPool.getParallelism());
-		mainWorkersSlider.valueProperty().addListener((newValue) -> showWarningIfNecessary());
-		getChildren().add(mainWorkersSlider);
-
-		text = new Text("Amount of threads used for job execution:");
-		text.setWrappingWidth(getWidth());
-		getChildren().add(text);
-
-		alignedMaxSliderValue = Math.max(2, alignedMaxSliderValue);
 		jobExecutorsSlider = newSlider(minSliderValue, alignedMaxSliderValue, sliderLabelStep, JobManager.get().getMaxJobExecutorThreads());
 		jobExecutorsSlider.valueProperty().addListener((newValue) -> showWarningIfNecessary());
 		getChildren().add(jobExecutorsSlider);
 
-		warningText = new Text();
+		warningText = newLabel(null);
 		warningText.setStyle("-fx-fill: firebrick;");
 		VBox.setMargin(warningText, new Insets(GuiConstants.padding, 0, GuiConstants.padding, 0));
 		getChildren().add(warningText);
@@ -72,6 +56,29 @@ public class PreferencesPane extends VBox {
 		});
 		okButton.setOnAction(event -> save());
 		setWidth(600);
+	}
+
+	@SuppressWarnings("UnnecessaryLocalVariable")
+	private static int getAlignedMaxSliderValue(int targetedMaxSliderValue, int sliderLabelStep, int minSliderValue) {
+		int alignedMaxSliderValue = ((int) Math.floor((float) targetedMaxSliderValue / sliderLabelStep)) * sliderLabelStep;
+		int normalizedShift = minSliderValue - ((int) Math.floor((float) minSliderValue / sliderLabelStep) * sliderLabelStep);
+		int distanceRight = normalizedShift;
+		int distanceLeft = sliderLabelStep - distanceRight;
+
+		if (distanceLeft >= distanceRight) {
+			alignedMaxSliderValue += distanceRight;
+		} else {
+			alignedMaxSliderValue -= distanceLeft;
+		}
+
+		alignedMaxSliderValue = Math.max(sliderLabelStep, alignedMaxSliderValue);
+		return alignedMaxSliderValue;
+	}
+
+	private Label newLabel(String text) {
+		Label label = new Label(text);
+		label.setWrapText(true);
+		return label;
 	}
 
 	private Slider newSlider(int min, int max, int labelDistance, int value) {
@@ -89,7 +96,7 @@ public class PreferencesPane extends VBox {
 		StringBuilder warning = new StringBuilder();
 
 		int allocatedMegabytes = (int) (Runtime.getRuntime().maxMemory() / 1024 / 1024);
-		int workerThreadCount = (int) mainWorkersSlider.getValue();
+		int workerThreadCount = (int) matchingThreadsSlider.getValue();
 		int minBaseMegabytes = 5200;
 		int minMegabytesPerThread = 70;
 		int minTotalRequiredMegabytes = minBaseMegabytes + workerThreadCount * minMegabytesPerThread;
@@ -123,18 +130,12 @@ public class PreferencesPane extends VBox {
 	}
 
 	private void save() {
-		int oldThreadPoolSize = Matcher.matchingThreadPool.getParallelism();
-		int newThreadPoolSize = (int) mainWorkersSlider.getValue();
-
-		if (newThreadPoolSize != oldThreadPoolSize) {
-			Matcher.matchingThreadPool = (ForkJoinPool) Executors.newWorkStealingPool(newThreadPoolSize);
-		}
-
+		Matcher.setMatchingThreadPoolSize((int) matchingThreadsSlider.getValue());
 		JobManager.get().setMaxJobExecutorThreads((int) jobExecutorsSlider.getValue());
 	}
 
 	private final Button okButton;
-	private Slider mainWorkersSlider;
+	private Slider matchingThreadsSlider;
 	private Slider jobExecutorsSlider;
-	private Text warningText;
+	private Label warningText;
 }

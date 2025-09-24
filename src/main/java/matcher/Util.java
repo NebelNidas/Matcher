@@ -5,8 +5,10 @@ import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.io.UncheckedIOException;
+import java.net.InetAddress;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.net.UnknownHostException;
 import java.nio.file.FileSystem;
 import java.nio.file.FileSystemNotFoundException;
 import java.nio.file.FileSystems;
@@ -16,25 +18,53 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.IdentityHashMap;
+import java.util.Iterator;
+import java.util.List;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
 import java.util.stream.Stream;
 
+import org.jetbrains.annotations.Nullable;
 import org.objectweb.asm.Handle;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.tree.MethodInsnNode;
 
 public class Util {
+	public static @Nullable String getComputerName() {
+		try {
+			return InetAddress.getLocalHost().getHostName();
+		} catch (UnknownHostException e) {
+			return null;
+		}
+	}
+
 	public static String getStacktrace(Throwable throwable) {
 		StringWriter stringWriter = new StringWriter();
 		throwable.printStackTrace(new PrintWriter(stringWriter));
 		return stringWriter.toString();
+	}
+
+	public static  <T> List<List<T>> partition(Iterable<T> iterable, int size) {
+		List<List<T>> result = new ArrayList<>(size);
+
+		for (int i = 0; i < size; i++) {
+			result.add(new ArrayList<>());
+		}
+
+		Iterator<T> iterator = iterable.iterator();
+
+		for (int i = 0; iterator.hasNext(); i++) {
+			result.get(i % size).add(iterator.next());
+		}
+
+		return result;
 	}
 
 	public static <T> Set<T> newIdentityHashSet() {

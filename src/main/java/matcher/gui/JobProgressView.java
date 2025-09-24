@@ -117,14 +117,13 @@ public class JobProgressView extends Control {
 		}
 
 		class TaskCell extends ListCell<Job<?>> {
-			private ProgressBar progressBar;
-			private Label titleLabel;
-			private Label progressLabel;
-			private Button cancelButton;
-
+			private final ProgressBar progressBar;
+			private final Label titleLabel;
+			private final Label progressLabel;
+			private final Button cancelButton;
+			private final BorderPane borderPane;
+			private final VBox vbox;
 			private Job<?> job;
-			private BorderPane borderPane;
-			private VBox vbox;
 
 			TaskCell() {
 				titleLabel = new Label();
@@ -173,7 +172,6 @@ public class JobProgressView extends Control {
 				cancelButton.setDisable(false);
 			}
 
-			@SuppressWarnings("incomplete-switch")
 			private void update(Job<?> originatingJob) {
 				if (originatingJob != this.job) {
 					return;
@@ -226,7 +224,7 @@ public class JobProgressView extends Control {
 					resetProperties();
 					getStyleClass().setAll("task-list-cell-empty");
 					setGraphic(null);
-				} else if (job != null) {
+				} else {
 					job.addCancelListener(() -> Platform.runLater(() -> update(job)));
 					job.addProgressListener((progress) -> Platform.runLater(() -> update(job)));
 					job.addFinishListener((result, error) -> Platform.runLater(() -> update(job)));

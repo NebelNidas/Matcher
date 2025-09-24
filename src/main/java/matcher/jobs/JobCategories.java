@@ -26,6 +26,9 @@ public class JobCategories {
 	public static final JobCategory AUTOMATCH_ALL_LOCALS = new JobCategory("automatch-all:locals", AUTOMATCH_ALL);
 
 	public static final JobCategory AUTOMATCH_CLASSES = new JobCategory("automatch-classes", AUTOMATCH);
+	public static final JobCategory AUTOMATCH_CLASSES_LOCAL = new JobCategory("automatch-classes-local", AUTOMATCH_CLASSES);
+	public static final JobCategory AUTOMATCH_CLASSES_NETWORK = new JobCategory("automatch-classes-network", AUTOMATCH_CLASSES);
+	
 	public static final JobCategory AUTOMATCH_FIELDS = new JobCategory("automatch-fields", AUTOMATCH);
 	public static final JobCategory AUTOMATCH_METHODS = new JobCategory("automatch-methods", AUTOMATCH);
 	public static final JobCategory AUTOMATCH_LOCALS = new JobCategory("automatch-locals", AUTOMATCH);

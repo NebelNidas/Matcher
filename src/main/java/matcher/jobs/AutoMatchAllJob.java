@@ -12,13 +12,15 @@ import job4j.JobState;
 
 import matcher.Matcher;
 import matcher.classifier.ClassifierLevel;
+import matcher.network.NetworkHandler;
 import matcher.type.MatchType;
 
 public class AutoMatchAllJob extends MatcherJob<Set<MatchType>> {
-	public AutoMatchAllJob(Matcher matcher) {
+	public AutoMatchAllJob(Matcher matcher, NetworkHandler networkHandler) {
 		super(JobCategories.AUTOMATCH_ALL);
 
 		this.matcher = matcher;
+		this.networkHandler = networkHandler;
 	}
 
 	@Override
@@ -56,12 +58,12 @@ public class AutoMatchAllJob extends MatcherJob<Set<MatchType>> {
 		Job<Boolean> job;
 
 		// Automatch classes, pass 1
-		job = new AutoMatchClassesJob(matcher, ClassifierLevel.Initial);
+		job = new AutoMatchClassesJob(matcher, networkHandler, ClassifierLevel.Initial);
 		job.addFinishListener(this::onMatchedClasses);
 		addSubJob(job, true);
 
 		// Automatch classes, pass 2
-		job = new AutoMatchClassesJob(matcher, ClassifierLevel.Initial) {
+		job = new AutoMatchClassesJob(matcher, networkHandler, ClassifierLevel.Initial) {
 			@Override
 			protected Boolean execute(DoubleConsumer progressReceiver) {
 				if (!matchedAnyClasses) {
@@ -148,7 +150,7 @@ public class AutoMatchAllJob extends MatcherJob<Set<MatchType>> {
 			parentJob.addSubJob(fieldJob, false);
 
 			// Register class matching subjob
-			var classesJob = new AutoMatchClassesJob(matcher, level) {
+			var classesJob = new AutoMatchClassesJob(matcher, networkHandler, level) {
 				@Override
 				protected void changeDefaultSettings(MutableJobSettings settings) {
 					super.changeDefaultSettings(settings);
@@ -246,6 +248,7 @@ public class AutoMatchAllJob extends MatcherJob<Set<MatchType>> {
 	}
 
 	private final Matcher matcher;
+	private final NetworkHandler networkHandler;
 	private boolean matchedAnyClasses;
 	private boolean matchedAnyMembers;
 	private boolean matchedAnyLocals;

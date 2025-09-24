@@ -31,6 +31,7 @@ import javafx.scene.layout.RowConstraints;
 import javafx.stage.DirectoryChooser;
 import javafx.stage.FileChooser;
 import javafx.stage.FileChooser.ExtensionFilter;
+import javafx.stage.Modality;
 import javafx.stage.Stage;
 import javafx.stage.Window;
 import job4j.Job;
@@ -52,6 +53,7 @@ import matcher.gui.panes.NewProjectPane;
 import matcher.jobs.MatcherJob;
 import matcher.mapping.MappingField;
 import matcher.mapping.Mappings;
+import matcher.network.NetworkHandler;
 import matcher.srcprocess.BuiltinDecompiler;
 import matcher.type.ClassEnvironment;
 import matcher.type.MatchType;
@@ -63,6 +65,7 @@ public class Gui extends Application {
 
 		env = new ClassEnvironment();
 		matcher = new Matcher(env);
+		networkHandler = new NetworkHandler(matcher);
 
 		JobManager.get().registerEventListener((job, event) -> Platform.runLater(() -> onJobManagerEvent(job, event)));
 
@@ -133,8 +136,21 @@ public class Gui extends Application {
 
 		for (int i = 0; i < args.size(); i++) {
 			switch (args.get(i)) {
-			// ProjectConfig args
+			// General args
+			case "--matching-threads":
+				int threads = Integer.parseInt(args.get(++i));
+				Matcher.setMatchingThreadPoolSize(threads);
+				break;
+			case "--job-threads":
+				int jobThreads = Integer.parseInt(args.get(++i));
+				JobManager.get().setMaxJobExecutorThreads(jobThreads);
+				break;
+			case "--open-to-lan":
+				networkHandler.startPeerScanning();
+				networkHandler.openToLan();
+				break;
 
+			// ProjectConfig args
 			case "--inputs-a":
 				while (i+1 < args.size() && !args.get(i+1).startsWith("--")) {
 					inputsA.add(Path.of(args.get(++i)));
@@ -204,7 +220,6 @@ public class Gui extends Application {
 				break;
 
 			// GUI args
-
 			case "--hide-unmapped-a":
 				hideUnmappedA = true;
 				break;
@@ -235,7 +250,8 @@ public class Gui extends Application {
 
 		if (showConfigDialog) {
 			Dialog<ProjectConfig> dialog = new Dialog<>();
-			//dialog.initModality(Modality.APPLICATION_MODAL);
+			dialog.initOwner(scene.getWindow());
+			dialog.initModality(Modality.NONE);
 			dialog.setResizable(true);
 			dialog.setTitle("Project configuration");
 			dialog.getDialogPane().getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
@@ -312,6 +328,10 @@ public class Gui extends Application {
 
 	public Matcher getMatcher() {
 		return matcher;
+	}
+
+	public NetworkHandler getNetworkHandler() {
+		return networkHandler;
 	}
 
 	public Scene getScene() {
@@ -556,6 +576,8 @@ public class Gui extends Application {
 	public void showAlert(AlertType type, String title, String headerText, String text) {
 		Alert alert = new Alert(type, text);
 
+		alert.initOwner(getScene().getWindow());
+		alert.initModality(Modality.NONE);
 		alert.setTitle(title);
 		alert.setHeaderText(headerText);
 
@@ -567,6 +589,7 @@ public class Gui extends Application {
 	public boolean requestConfirmation(String title, String headerText, String text) {
 		Alert alert = new Alert(AlertType.CONFIRMATION, text);
 
+		alert.initOwner(getScene().getWindow());
 		alert.setTitle(title);
 		alert.setHeaderText(headerText);
 
@@ -651,6 +674,7 @@ public class Gui extends Application {
 
 	private ClassEnvironment env;
 	private Matcher matcher;
+	private NetworkHandler networkHandler;
 
 	private Scene scene;
 	private final Collection<IGuiComponent> components = new ArrayList<>();

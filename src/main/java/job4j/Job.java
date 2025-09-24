@@ -14,12 +14,10 @@ import java.util.function.Consumer;
 import java.util.function.DoubleConsumer;
 
 import job4j.JobSettings.MutableJobSettings;
-
-import matcher.Matcher;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import matcher.Matcher;
 import matcher.Util;
 
 public abstract class Job<T> implements Runnable {

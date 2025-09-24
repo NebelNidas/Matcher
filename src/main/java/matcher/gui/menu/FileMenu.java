@@ -24,6 +24,7 @@ import javafx.scene.control.MenuItem;
 import javafx.scene.control.SeparatorMenuItem;
 import javafx.stage.FileChooser;
 import javafx.stage.FileChooser.ExtensionFilter;
+import javafx.stage.Modality;
 import javafx.stage.Window;
 
 import net.fabricmc.mappingio.MappingReader;
@@ -130,13 +131,13 @@ public class FileMenu extends Menu {
 				return null;
 			}
 		};
-		job.addFinishListener((result, error) -> Platform.runLater(() -> gui.onProjectChange()));
+		job.addFinishListener((result, error) -> Platform.runLater(gui::onProjectChange));
 		job.run();
 	}
 
 	public ProjectLoadSettings requestProjectLoadSettings() {
 		Dialog<ProjectLoadSettings> dialog = new Dialog<>();
-		//dialog.initModality(Modality.APPLICATION_MODAL);
+		dialog.initOwner(gui.getScene().getWindow());
 		dialog.setResizable(true);
 		dialog.setTitle("Project paths");
 		dialog.getDialogPane().getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
@@ -178,7 +179,7 @@ public class FileMenu extends Menu {
 			List<String> namespaces = MappingReader.getNamespaces(file, format);
 
 			Dialog<MappingsLoadSettings> dialog = new Dialog<>();
-			//dialog.initModality(Modality.APPLICATION_MODAL);
+			dialog.initOwner(gui.getScene().getWindow());
 			dialog.setResizable(true);
 			dialog.setTitle("Import Settings");
 			dialog.getDialogPane().getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
@@ -286,7 +287,7 @@ public class FileMenu extends Menu {
 		}
 
 		Dialog<MappingsSaveSettings> dialog = new Dialog<>();
-		//dialog.initModality(Modality.APPLICATION_MODAL);
+		dialog.initOwner(gui.getScene().getWindow());
 		dialog.setResizable(true);
 		dialog.setTitle("Mappings export settings");
 		dialog.getDialogPane().getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
@@ -391,7 +392,8 @@ public class FileMenu extends Menu {
 
 	private void openPreferences() {
 		Dialog<?> dialog = new Dialog<>();
-		//dialog.initModality(Modality.APPLICATION_MODAL);
+		dialog.initOwner(gui.getScene().getWindow());
+		dialog.initModality(Modality.NONE);
 		dialog.setResizable(true);
 		dialog.setTitle("Preferences");
 		dialog.getDialogPane().getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);

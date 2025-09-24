@@ -1,3 +1,6 @@
+import com.diffplug.spotless.LineEnding
+import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar
+
 plugins {
 	id 'java-library'
 	id 'application'
@@ -14,8 +17,12 @@ plugins {
 repositories {
 	mavenCentral()
 	maven {
-		name = "Fabric"
+		name = 'Fabric'
 		url = 'https://maven.fabricmc.net/'
+	}
+	maven {
+		name = 'JitPack'
+		url 'https://jitpack.io'
 	}
 }
 
@@ -37,7 +44,7 @@ tasks.withType(Checkstyle) {
 }
 
 spotless {
-	lineEndings = com.diffplug.spotless.LineEnding.UNIX
+	lineEndings = LineEnding.UNIX
 
 	java {
 		removeUnusedImports()
@@ -103,6 +110,10 @@ dependencies {
 	api "net.fabricmc:mapping-io:${mappingio_version}"
 	implementation "org.ow2.asm:asm-commons:${asm_version}"
 	implementation "org.ow2.asm:asm-util:${asm_version}"
+	implementation "com.fasterxml.jackson.core:jackson-core:${jackson_version}"
+	implementation "com.fasterxml.jackson.core:jackson-databind:${jackson_version}"
+	implementation "com.fasterxml.jackson.core:jackson-annotations:${jackson_version}"
+	implementation "com.github.NebelNidas:fabric-semver:${fabric_semver_version}"
 	implementation "com.github.javaparser:javaparser-core:${javaparser_version}"
 	implementation "net.fabricmc:cfr:${fabric_cfr_version}"
 	implementation "org.vineflower:vineflower:${vineflower_version}"
@@ -116,6 +127,7 @@ dependencies {
 		exclude group: 'io.github.skylot', module: 'raung-disasm'
 	}
 	implementation "org.controlsfx:controlsfx:${controlsfx_version}"
+	compileOnly "org.jetbrains:annotations:${jetbrains_annotations_version}"
 	runtimeOnly "org.tinylog:tinylog-impl:${tinylog_version}"
 	runtimeOnly "org.tinylog:slf4j-tinylog:${tinylog_version}"
 
@@ -130,6 +142,9 @@ dependencies {
 
 extraJavaModuleInfo {
 	failOnMissingModuleInfo.set(false) // because of transitive dependencies
+
+	// Fabric SemVer
+	automaticModule("com.github.NebelNidas:fabric-semver", "net.fabricmc.semver")
 
 	// CFR
 	automaticModule("net.fabricmc:cfr", "cfr")
@@ -159,7 +174,6 @@ shadowJar {
 	enabled = false
 }
 
-import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar
 
 platforms.forEach { platform ->
 	def platformJar = tasks.register(platform + "Jar", ShadowJar) {

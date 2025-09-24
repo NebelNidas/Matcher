@@ -11,6 +11,7 @@ import javafx.scene.control.Dialog;
 import javafx.scene.control.Menu;
 import javafx.scene.control.MenuItem;
 import javafx.scene.control.SeparatorMenuItem;
+import javafx.stage.Modality;
 
 import matcher.Matcher;
 import matcher.config.Config;
@@ -68,7 +69,8 @@ public class UidMenu extends Menu {
 
 	private void setup() {
 		Dialog<UidConfig> dialog = new Dialog<>();
-		//dialog.initModality(Modality.APPLICATION_MODAL);
+		dialog.initOwner(gui.getScene().getWindow());
+		dialog.initModality(Modality.NONE);
 		dialog.setResizable(true);
 		dialog.setTitle("UID Setup");
 		dialog.getDialogPane().getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);

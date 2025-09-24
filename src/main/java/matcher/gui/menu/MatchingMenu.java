@@ -72,7 +72,7 @@ public class MatchingMenu extends Menu {
 	}
 
 	public void autoMatchClasses() {
-		var job = new AutoMatchClassesJob(gui.getMatcher(), Matcher.defaultAutoMatchLevel);
+		var job = new AutoMatchClassesJob(gui.getMatcher(), gui.getNetworkHandler(), Matcher.defaultAutoMatchLevel);
 		job.addFinishListener((matchedAny, error) -> {
 			if (matchedAny.orElse(false)) {
 				Platform.runLater(() -> gui.onMatchChange(EnumSet.allOf(MatchType.class)));

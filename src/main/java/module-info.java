@@ -11,6 +11,11 @@ module matcher {
 	exports matcher.bcremap;
 	exports matcher.serdes;
 	exports job4j;
+	exports matcher.network;
+	exports matcher.network.packet;
+	exports matcher.network.packet.broadcast;
+	exports matcher.network.packet.c2s;
+	exports matcher.network.packet.s2c;
 
 	requires transitive org.slf4j;
 	requires cfr;
@@ -30,7 +35,13 @@ module matcher {
 	requires procyon.compilertools;
 	requires jadx.core;
 	requires jadx.plugins.java_input;
-	requires transitive net.fabricmc.mappingio;
+	requires net.fabricmc.mappingio;
+	requires net.fabricmc.semver;
+	requires com.fasterxml.jackson.core;
+	requires com.fasterxml.jackson.databind;
+	requires com.fasterxml.jackson.annotation;
+	requires static org.jetbrains.annotations;
+	requires matcher;
 
 	uses matcher.Plugin;
 }
