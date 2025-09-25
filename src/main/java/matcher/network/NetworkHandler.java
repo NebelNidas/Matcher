@@ -4,13 +4,16 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.UncheckedIOException;
+import java.net.InetAddress;
+import java.net.NetworkInterface;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketAddress;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingDeque;
@@ -33,7 +36,9 @@ public class NetworkHandler {
 	private final PacketMapper mapper;
 	private final ConnectionStore connections;
 	private final SimpleStringProperty hostname;
-	private final Set<String> hostAddresses;
+	private final Map<NetworkInterface, List<InetAddress>> hostAddresses;
+	private final Map<NetworkInterface, LanPeerDetector> peerDetectorsByNetworkItf;
+	private final Map<NetworkInterface, LanPresenceAnnouncer> announcersByNetworkItf;
 	private final BlockingQueue<Runnable> tasks;
 	private final Thread taskExecutorThread;
 	private final AtomicBoolean shuttingDown;
@@ -41,9 +46,7 @@ public class NetworkHandler {
 	private final PingHandler pingHandler;
 	private final MatchClassesS2CHandler matchClassesS2CHandler;
 	private final MatchedClassesC2SHandler matchedClassesC2SHandler;
-	private @Nullable LanPresenceAnnouncer announcer;
 	private @Nullable ServerSocket serverSocket;
-	private @Nullable LanPeerDetector peerDetector;
 	private @Nullable Thread connectionListenerThread;
 	private int localPort;
 
@@ -53,7 +56,9 @@ public class NetworkHandler {
 
 		connections = new ConnectionStore();
 		hostname = new SimpleStringProperty(Util.getComputerName());
-		hostAddresses = NetworkUtil.getHostAddresses();
+		hostAddresses = NetworkUtil.getAllLocalAddresses();
+		peerDetectorsByNetworkItf = new ConcurrentHashMap<>();
+		announcersByNetworkItf = new ConcurrentHashMap<>();
 		tasks = new LinkedBlockingDeque<>();
 		taskExecutorThread = new Thread(() -> {
 			while (true) {
@@ -91,22 +96,23 @@ public class NetworkHandler {
 
 	public void startPeerScanning() {
 		try {
-			if (peerDetector == null) {
-				peerDetector = new LanPeerDetector(this, address -> announcer != null
-						&& address.getPort() == announcer.getPort()
-						&& hostAddresses.contains(address.getAddress().getHostAddress()));
+			for (Map.Entry<NetworkInterface, List<InetAddress>> entry : hostAddresses.entrySet()) {
+				LanPeerDetector detector = new LanPeerDetector(this, entry.getKey(), entry.getValue(), (netItf, address) -> {
+					LanPresenceAnnouncer announcer = announcersByNetworkItf.get(netItf);
+					return announcer != null && address.getPort() == announcer.getPort();
+				});
+				peerDetectorsByNetworkItf.put(entry.getKey(), detector);
+				detector.start();
 			}
-
-			peerDetector.start();
 		} catch (IOException e) {
 			throw new UncheckedIOException(e);
 		}
 	}
 
 	public void stopPeerScanning() {
-		if (peerDetector != null) {
-			peerDetector.interrupt();
-			peerDetector = null;
+		for (Map.Entry<NetworkInterface, LanPeerDetector> entry : peerDetectorsByNetworkItf.entrySet()) {
+			entry.getValue().interrupt();
+			peerDetectorsByNetworkItf.remove(entry.getKey());
 		}
 	}
 
@@ -114,8 +120,12 @@ public class NetworkHandler {
 		try {
 			serverSocket = new ServerSocket(0);
 			localPort = serverSocket.getLocalPort();
-			announcer = new LanPresenceAnnouncer(this, localPort, hostname);
-			announcer.start();
+
+			for (Map.Entry<NetworkInterface, List<InetAddress>> entry : hostAddresses.entrySet()) {
+				LanPresenceAnnouncer announcer = new LanPresenceAnnouncer(this, entry.getKey(), entry.getValue(), localPort, hostname);
+				announcersByNetworkItf.put(entry.getKey(), announcer);
+				announcer.start();
+			}
 
 			connectionListenerThread = new Thread(() -> {
 				try {
@@ -206,10 +216,11 @@ public class NetworkHandler {
 		runOnThread0(() -> {
 			stopPeerScanning();
 
-			if (announcer != null) {
+			for (LanPresenceAnnouncer announcer : announcersByNetworkItf.values()) {
 				announcer.interrupt();
-				announcer = null;
 			}
+
+			announcersByNetworkItf.clear();
 
 			if (connectionListenerThread != null) {
 				connectionListenerThread.interrupt();
@@ -255,6 +266,14 @@ public class NetworkHandler {
 
 	public void setHostname(@Nullable String hostname) {
 		this.hostname.set(hostname);
+	}
+
+	public Map<NetworkInterface, LanPeerDetector> getPeerDetectorsByNetworkItf() {
+		return peerDetectorsByNetworkItf;
+	}
+
+	public Map<NetworkInterface, LanPresenceAnnouncer> getAnnouncersByNetworkItf() {
+		return announcersByNetworkItf;
 	}
 
 	public boolean isShuttingDown() {

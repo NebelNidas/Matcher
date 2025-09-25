@@ -5,9 +5,11 @@ import java.net.InetSocketAddress;
 import java.net.NetworkInterface;
 import java.net.Socket;
 import java.net.SocketException;
+import java.util.ArrayList;
 import java.util.Enumeration;
-import java.util.HashSet;
-import java.util.Set;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 import matcher.Matcher;
 import matcher.network.packet.Packet;
@@ -17,24 +19,28 @@ public final class NetworkUtil {
 	private NetworkUtil() {
 	}
 
-	public static Set<String> getHostAddresses() {
-		Set<String> addresses = new HashSet<>();
+	public static Map<NetworkInterface, List<InetAddress>> getAllLocalAddresses() {
+		Enumeration<NetworkInterface> interfaces;
 
 		try {
-			Enumeration<NetworkInterface> interfaces = NetworkInterface.getNetworkInterfaces();
-
-			while (interfaces.hasMoreElements()) {
-				Enumeration<InetAddress> inetAddresses = interfaces.nextElement().getInetAddresses();
-
-				while (inetAddresses.hasMoreElements()) {
-					addresses.add(inetAddresses.nextElement().getHostAddress());
-				}
-			}
+			interfaces = NetworkInterface.getNetworkInterfaces();
 		} catch (SocketException e) {
-			return Set.of();
+			return Map.of();
 		}
 
-		return addresses;
+		Map<NetworkInterface, List<InetAddress>> ret = new HashMap<>();
+
+		while (interfaces.hasMoreElements()) {
+			NetworkInterface networkInterface = interfaces.nextElement();
+			Enumeration<InetAddress> inetAddresses = networkInterface.getInetAddresses();
+
+			while (inetAddresses.hasMoreElements()) {
+				InetAddress address = inetAddresses.nextElement();
+				ret.computeIfAbsent(networkInterface, k -> new ArrayList<>()).add(address);
+			}
+		}
+
+		return ret;
 	}
 
 	public static String hostnamePlusPort(InetSocketAddress address) {

@@ -5,35 +5,46 @@ import java.net.DatagramPacket;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.MulticastSocket;
+import java.net.NetworkInterface;
 import java.net.SocketTimeoutException;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.function.Predicate;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.function.BiPredicate;
 
 import matcher.Matcher;
 
 public class LanPeerDetector extends Thread {
-	private static final AtomicInteger THREAD_ID = new AtomicInteger();
 	private final NetworkHandler networkHandler;
-	private final Predicate<InetSocketAddress> isOwnSendingSocket;
+	private final NetworkInterface networkInterface;
+	private final List<InetAddress> addressesToTry;
+	private final BiPredicate<NetworkInterface, InetSocketAddress> isOwnSendingSocket;
 	private final InetAddress multicastAddress;
-	private final MulticastSocket socket;
+	private MulticastSocket socket;
 	private boolean running;
 
-	public LanPeerDetector(NetworkHandler networkHandler, Predicate<InetSocketAddress> isOwnSendingSocket) throws IOException {
-		super("PeerDetector #" + THREAD_ID.incrementAndGet());
-		this.setDaemon(true);
+	public LanPeerDetector(
+			NetworkHandler networkHandler,
+			NetworkInterface networkInterface,
+			List<InetAddress> addressesToTry,
+			BiPredicate<NetworkInterface, InetSocketAddress> isOwnSendingSocket) throws IOException {
+		super("PeerDetector on network interface \"" + networkInterface.getDisplayName() + "\"");
 		this.networkHandler = networkHandler;
+		this.networkInterface = networkInterface;
+		this.addressesToTry = new ArrayList<>(addressesToTry);
 		this.isOwnSendingSocket = isOwnSendingSocket;
-		this.socket = new MulticastSocket(NetworkConstants.MULTICAST_PORT);
 		this.multicastAddress = InetAddress.getByName(NetworkConstants.MULTICAST_ADDRESS);
-		this.socket.setSoTimeout(NetworkConstants.MULTICAST_INTERVAL_MS * 2);
-		this.socket.joinGroup(multicastAddress);
+
+		setDaemon(true);
 	}
 
 	@Override
 	public void run() {
 		running = true;
 		byte[] buffer = new byte[1024];
+
+		if (!tryNextBind()) {
+			return;
+		}
 
 		while (!isInterrupted()) {
 			DatagramPacket packet = new DatagramPacket(buffer, buffer.length);
@@ -43,14 +54,14 @@ public class LanPeerDetector extends Thread {
 			} catch (SocketTimeoutException ignored) {
 				continue;
 			} catch (IOException e) {
-				running = false;
-				Matcher.LOGGER.error("Error while searching for peers on the network", e);
-				break;
+				if (!tryNextBind()) {
+					return;
+				}
 			}
 
 			InetSocketAddress address = (InetSocketAddress) packet.getSocketAddress();
 
-			if (isOwnSendingSocket.test(address)) {
+			if (isOwnSendingSocket.test(networkInterface, address)) {
 				continue;
 			}
 
@@ -84,6 +95,35 @@ public class LanPeerDetector extends Thread {
 		}
 
 		socket.close();
+	}
+
+	private boolean tryNextBind() {
+		if (addressesToTry.isEmpty()) {
+			Matcher.LOGGER.warn("Unable to search fo peers on the network: None of the current network interface's addresses could be bound to a socket.");
+			networkHandler.getAnnouncersByNetworkItf().remove(networkInterface);
+			running = false;
+			return false;
+		} else {
+			if (socket != null) {
+				socket.close();
+			}
+
+			InetAddress nextAddress = addressesToTry.remove(0);
+
+			if (nextAddress.isLoopbackAddress()) {
+				return tryNextBind();
+			}
+
+			try {
+				socket = new MulticastSocket(new InetSocketAddress(nextAddress, NetworkConstants.MULTICAST_PORT));
+				socket.setSoTimeout(NetworkConstants.MULTICAST_INTERVAL_MS * 2);
+				socket.joinGroup(multicastAddress);
+			} catch (IOException e) {
+				tryNextBind();
+			}
+		}
+
+		return true;
 	}
 
 	@Override

@@ -1,10 +1,14 @@
 package matcher.network;
 
 import java.io.IOException;
+import java.net.BindException;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.net.NetworkInterface;
+import java.net.SocketException;
+import java.util.ArrayList;
+import java.util.List;
 
 import javafx.beans.value.ObservableStringValue;
 
@@ -16,21 +20,29 @@ import matcher.network.packet.p2p.PresenceAnnouncement;
  * local network of this instance's presence and how to connect to it.
  */
 public class LanPresenceAnnouncer extends Thread {
-	private static final AtomicInteger THREAD_ID = new AtomicInteger();
 	private final NetworkHandler networkHandler;
+	private final NetworkInterface networkInterface;
+	private final List<InetAddress> addressesToTry;
 	private final int tcpPortToAnnounce;
 	private final ObservableStringValue name;
-	private final DatagramSocket socket;
 	private final InetAddress multicastAddress;
+	private DatagramSocket socket;
 	private boolean running;
 	private DatagramPacket packet;
+	private int port;
 
-	public LanPresenceAnnouncer(NetworkHandler networkHandler, int tcpPortToAnnounce, ObservableStringValue name) throws IOException {
-		super("PresenceAnnouncer #" + THREAD_ID.incrementAndGet());
+	public LanPresenceAnnouncer(
+			NetworkHandler networkHandler,
+			NetworkInterface networkInterface,
+			List<InetAddress> addressesToTry,
+			int tcpPortToAnnounce,
+			ObservableStringValue name) throws IOException {
+		super("PresenceAnnouncer on network interface \"" + networkInterface.getDisplayName() + "\"");
 		this.networkHandler = networkHandler;
+		this.networkInterface = networkInterface;
+		this.addressesToTry = new ArrayList<>(addressesToTry);
 		this.tcpPortToAnnounce = tcpPortToAnnounce;
 		this.name = name;
-		this.socket = new DatagramSocket();
 		this.multicastAddress = InetAddress.getByName(NetworkConstants.MULTICAST_ADDRESS);
 
 		setDaemon(true);
@@ -54,8 +66,13 @@ public class LanPresenceAnnouncer extends Thread {
 	@Override
 	public void run() {
 		running = true;
+
+		if (!tryNextBind()) {
+			return;
+		}
+
 		regeneratePacket();
-		Matcher.LOGGER.info("Announcing presence on the network (name: {}, multicast port: {}; interval: {} ms)",
+		Matcher.LOGGER.info("Announcing presence on the network (username: {}, multicast port: {}; interval: {} ms)",
 				name.get(),
 				socket.getLocalPort(),
 				NetworkConstants.MULTICAST_INTERVAL_MS);
@@ -63,6 +80,10 @@ public class LanPresenceAnnouncer extends Thread {
 		while (!isInterrupted()) {
 			try {
 				socket.send(packet);
+			} catch (BindException e) {
+				if (!tryNextBind()) {
+					break;
+				}
 			} catch (IOException e) {
 				Matcher.LOGGER.warn("Error while announcing presence on the network", e);
 				break;
@@ -76,6 +97,33 @@ public class LanPresenceAnnouncer extends Thread {
 		}
 	}
 
+	private boolean tryNextBind() {
+		if (addressesToTry.isEmpty()) {
+			Matcher.LOGGER.warn("Failed to announce presence on the network: None of the current network interface's addresses could be bound to a socket.");
+			networkHandler.getPeerDetectorsByNetworkItf().remove(networkInterface);
+			return false;
+		} else {
+			if (socket != null) {
+				socket.close();
+			}
+
+			InetAddress nextAddress = addressesToTry.remove(0);
+
+			if (nextAddress.isLoopbackAddress()) {
+				return tryNextBind();
+			}
+
+			try {
+				socket = new DatagramSocket(port, nextAddress);
+				port = socket.getLocalPort();
+			} catch (SocketException e) {
+				tryNextBind();
+			}
+		}
+
+		return true;
+	}
+
 	@Override
 	public void interrupt() {
 		super.interrupt();
@@ -83,7 +131,7 @@ public class LanPresenceAnnouncer extends Thread {
 	}
 
 	int getPort() {
-		return socket.getLocalPort();
+		return port;
 	}
 
 	public boolean isRunning() {
