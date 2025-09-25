@@ -6,22 +6,26 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.locks.LockSupport;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.DoubleConsumer;
 
 import job4j.JobSettings.MutableJobSettings;
+import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import matcher.Matcher;
 import matcher.Util;
 
 public abstract class Job<T> implements Runnable {
-	private static final Logger logger = LoggerFactory.getLogger(Job.class);
+	private static final Logger LOGGER = LoggerFactory.getLogger(Job.class);
+	static final ExecutorService TIMEOUT_THREAD_POOL = Executors.newCachedThreadPool();
 	private final String id;
 	private final JobCategory category;
 	private final MutableJobSettings settings = new MutableJobSettings();
@@ -88,7 +92,11 @@ public abstract class Job<T> implements Runnable {
 	 * newly added job instance.
 	 */
 	public void addSubJobAddedListener(Consumer<Job<?>> listener) {
-		this.subJobAddedListeners.add(listener);
+		if (state.isFinished()) {
+			throw new RuntimeException("Can't add subjobAddedListener to a job which has already finished!");
+		}
+
+		subJobAddedListeners.add(listener);
 	}
 
 	/**
@@ -96,7 +104,11 @@ public abstract class Job<T> implements Runnable {
 	 * Progress is a value between -INF and 1, where negative values indicate an uncertain runtime.
 	 */
 	public void addProgressListener(DoubleConsumer listener) {
-		this.progressListeners.add(listener);
+		progressListeners.add(listener);
+
+		if (state.isFinished()) {
+			listener.accept(overallProgress);
+		}
 	}
 
 	/**
@@ -105,7 +117,11 @@ public abstract class Job<T> implements Runnable {
 	 * react to the event.
 	 */
 	public void addCancelListener(Runnable listener) {
-		this.cancelListeners.add(listener);
+		if (state.isFinished()) {
+			throw new RuntimeException("Can't add cancelListener to a job which has already finished!");
+		}
+
+		cancelListeners.add(listener);
 	}
 
 	/**
@@ -116,7 +132,11 @@ public abstract class Job<T> implements Runnable {
 	 * so it doesn't have to be done manually each time.
 	 */
 	public void addFinishListener(BiConsumer<Optional<T>, Optional<Throwable>> listener) {
-		this.finishListeners.add(listener);
+		finishListeners.add(listener);
+
+		if (state.isFinished()) {
+			listener.accept(Optional.ofNullable(result), Optional.ofNullable(error));
+		}
 	}
 
 
@@ -137,8 +157,8 @@ public abstract class Job<T> implements Runnable {
 	//======================================================================================
 
 	/**
-	 * Dynamically add subjobs. Please consider overriding {@link #registerSubJobs}
-	 * to register any subjobs known ahead of time!
+	 * Dynamically add subjobs. Override {@link #registerSubJobs}
+	 * to register any subjobs known ahead of time.
 	 */
 	public void addSubJob(Job<?> subJob, boolean cancelsParentWhenCanceledOrErrored) {
 		if (hasParentJobInHierarchy(subJob)) {
@@ -147,16 +167,16 @@ public abstract class Job<T> implements Runnable {
 
 		subJob.setParent(this);
 		subJob.addProgressListener(this::onSubJobProgressChange);
-		this.subJobs.add(subJob);
+		subJobs.add(subJob);
 
 		if (cancelsParentWhenCanceledOrErrored) {
-			subJob.addCancelListener(() -> this.cancel(BuiltinJobCancellationReasons.PARENT_CANCELLATION));
+			subJob.addCancelListener(() -> cancel(BuiltinJobCancellationReasons.PARENT_CANCELLATION));
 			subJob.addFinishListener((subJobResult, subJobError) -> {
 				subJobError.ifPresent(this::onError);
 			});
 		}
 
-		List.copyOf(this.subJobAddedListeners).forEach((listener) -> listener.accept(subJob));
+		List.copyOf(subJobAddedListeners).forEach((listener) -> listener.accept(subJob));
 	}
 
 	/**
@@ -170,7 +190,7 @@ public abstract class Job<T> implements Runnable {
 			throw new IllegalArgumentException("Can't set an already added subjob as parent job!");
 		}
 
-		if (this.state.compareTo(JobState.RUNNING) >= 0) {
+		if (state.compareTo(JobState.RUNNING) >= 0) {
 			throw new UnsupportedOperationException("Can't change job's parent after already having been started");
 		}
 
@@ -183,57 +203,142 @@ public abstract class Job<T> implements Runnable {
 	//======================================================================================
 
 	/**
-	 * Queues the job for execution.
-	 * If called on a subjob, executes it directly.
+	 * Queues the job for execution, and, if it is a subjob, runs it on the current thread.
 	 */
 	public void run() {
-		if (this.state.compareTo(JobState.CREATED) > 0
-				&& this.state != JobState.CANCELING
-				&& this.state != JobState.CANCELED) {
+		if (state.compareTo(JobState.CREATED) > 0
+				&& state != JobState.CANCELING
+				&& state != JobState.CANCELED) {
 			throw new RuntimeException("Can't run a job which is already " + state + "!");
 		}
 
-		JobManager.get().queue(this, this.parent != null);
+		JobManager.get().queue(this);
+	}
+
+	public void runAsync() {
+		if (state.compareTo(JobState.CREATED) > 0
+				&& state != JobState.CANCELING
+				&& state != JobState.CANCELED) {
+			throw new RuntimeException("Can't run a job which is already " + state + "!");
+		}
+
+		new Thread(this, "AsyncJobRunner-" + id).start();
 	}
 
 	/**
 	 * Queues the job for execution, waits for it to get scheduled,
 	 * executes the job and then returns the result and/or error.
-	 * This is basically the synchronous version of registering a
-	 * finishListener.
 	 */
 	public JobResult<T> runAndAwait() {
-		if (this.state.compareTo(JobState.CREATED) > 0
-				&& this.state != JobState.CANCELING
-				&& this.state != JobState.CANCELED) {
+		return runAndAwait(0, null, false);
+	}
+
+	/**
+	 * Queues the job for execution, waits for it to get scheduled,
+	 * executes the job and then returns the result and/or error.
+	 *
+	 * <p>If a timeout is specified, it overwrites the job settings' timeout.
+	 *
+	 * @param timeout The maximum time to wait for the job to finish. Use 0 for infinite.
+	 * @param unit The time unit of the timeout argument. May be null if timeout is 0.
+	 * @param cancelOnTimeout Whether to cancel the job when the timeout is reached.
+	 * @return The job result if it finished in time, null if the timeout was reached and cancelOnTimeout is false.
+	 */
+	public @Nullable JobResult<T> runAndAwait(long timeout, TimeUnit unit, boolean cancelOnTimeout) {
+		if (state.compareTo(JobState.CREATED) > 0
+				&& state != JobState.CANCELING
+				&& state != JobState.CANCELED) {
 			throw new RuntimeException("Can't run a job which is already " + state + "!");
 		}
 
-		JobManager.get().queue(this, true);
+		if (timeout >= 0 && cancelOnTimeout) {
+			settings.setTimeoutNanos(timeout == 0 ? 0 : unit.toNanos(timeout));
+		}
+
+		if (state == JobState.CREATED) {
+			JobManager.get().queue(this);
+		}
+
+		if (!state.isFinished() && timeout > 0 && !cancelOnTimeout) {
+			long timeoutNanos = unit.toNanos(timeout);
+			long startTime = System.nanoTime();
+			long remainingTime = timeoutNanos;
+
+			do {
+				LockSupport.parkNanos(this, remainingTime);
+				long elapsed = System.nanoTime() - startTime;
+				remainingTime = timeoutNanos - elapsed;
+			} while (remainingTime > 0 && state == JobState.RUNNING);
+
+			return null;
+		}
+
+		return await();
+	}
+
+	public JobResult<T> await() {
+		Object monitor = new Object();
+
+		if (!state.isFinished()) {
+			Thread thread = Thread.currentThread();
+			addFinishListener((result, error) -> {
+				synchronized (monitor) {
+					monitor.notifyAll();
+				}
+			});
+		}
+
+		while (!state.isFinished()) {
+			try {
+				synchronized (monitor) {
+					monitor.wait();
+				}
+			} catch (InterruptedException e) {
+				cancel(BuiltinJobCancellationReasons.INTERRUPTED);
+			}
+		}
 
 		return new JobResult<>(result, error);
 	}
 
 	void runOnCurrentThread() {
-		if (this.state.compareTo(JobState.QUEUED) > 0
-				&& this.state != JobState.CANCELING
-				&& this.state != JobState.CANCELED) {
+		if (state.compareTo(JobState.QUEUED) > 0
+				&& state != JobState.CANCELING
+				&& state != JobState.CANCELED) {
 			throw new RuntimeException("Can't run a job which is already " + state + "!");
 		}
 
-		assert this.state == JobState.QUEUED;
+		assert state == JobState.QUEUED;
 
-		this.thread = Thread.currentThread();
-		this.state = JobState.RUNNING;
+		thread = Thread.currentThread();
+		state = JobState.RUNNING;
 		registerSubJobs();
 
+		if (settings.getTimeoutNanos() > 0) {
+			TIMEOUT_THREAD_POOL.submit(() -> {
+				long timeoutNanos = settings.getTimeoutNanos();
+				long startTime = System.nanoTime();
+				long remainingTime = timeoutNanos;
+
+				do {
+					LockSupport.parkNanos(this, remainingTime);
+					long elapsed = System.nanoTime() - startTime;
+					remainingTime = timeoutNanos - elapsed;
+				} while (remainingTime > 0 && state == JobState.RUNNING);
+
+				if (state == JobState.RUNNING) {
+					cancel(BuiltinJobCancellationReasons.TIMEOUT);
+				}
+			});
+		}
+
 		try {
-			this.result = execute(this::onOwnProgressChange);
+			result = execute(this::onOwnProgressChange);
 		} catch (Exception e) {
 			onError(e);
 		}
 
-		switch (this.state) {
+		switch (state) {
 			case RUNNING:
 				onSuccess();
 				break;
@@ -256,8 +361,7 @@ public abstract class Job<T> implements Runnable {
 			return;
 		}
 
-		Matcher.LOGGER.info("Job '{}' progress changed to {}", id, progress);
-		this.ownProgress = progress;
+		ownProgress = progress;
 		onProgressChange();
 	}
 
@@ -268,7 +372,7 @@ public abstract class Job<T> implements Runnable {
 
 	protected void validateProgress(double progress) {
 		if (progress > 1f + Util.floatError) {
-			throw new IllegalArgumentException("Progress has to be a value between -INF and 1!");
+			throw new IllegalArgumentException("Progress has to be a value between -INF and 1, but was %s!".formatted(progress));
 		}
 	}
 
@@ -286,7 +390,7 @@ public abstract class Job<T> implements Runnable {
 			// empty shell for hosting subjobs.
 			progresses = new ArrayList<>(subJobs.size());
 
-			for (Job<?> job : List.copyOf(this.subJobs)) {
+			for (Job<?> job : List.copyOf(subJobs)) {
 				progresses.add(job.getProgress());
 			}
 		}
@@ -296,20 +400,17 @@ public abstract class Job<T> implements Runnable {
 				progress = -1;
 				break;
 			} else {
-				if (value > 1f + Util.floatError) {
-					throw new IllegalArgumentException("Progress has to be a value between -INF and 1!");
-				}
-
+				validateProgress(value);
 				progress += value / progresses.size();
 			}
 		}
 
 		this.overallProgress = Math.min(1.0, progress);
-		List.copyOf(this.progressListeners).forEach(listener -> listener.accept(this.overallProgress));
+		List.copyOf(progressListeners).forEach(listener -> listener.accept(this.overallProgress));
 	}
 
 	public boolean cancel(String reason) {
-		if (this.state != JobState.CANCELING && !this.state.isFinished()) {
+		if (state != JobState.CANCELING && !state.isFinished()) {
 			onCancel();
 			return true;
 		}
@@ -318,11 +419,11 @@ public abstract class Job<T> implements Runnable {
 	}
 
 	protected void onCancel() {
-		JobState previousState = this.state;
-		this.state = JobState.CANCELING;
+		JobState previousState = state;
+		state = JobState.CANCELING;
 
-		List.copyOf(this.cancelListeners).forEach(Runnable::run);
-		List.copyOf(this.subJobs).forEach((subJob) -> subJob.cancel(BuiltinJobCancellationReasons.PARENT_CANCELLATION));
+		List.copyOf(cancelListeners).forEach(Runnable::run);
+		List.copyOf(subJobs).forEach((subJob) -> subJob.cancel(BuiltinJobCancellationReasons.PARENT_CANCELLATION));
 
 		if (previousState.compareTo(JobState.RUNNING) < 0) {
 			onCanceled();
@@ -330,7 +431,7 @@ public abstract class Job<T> implements Runnable {
 	}
 
 	protected void onCanceled() {
-		this.state = JobState.CANCELED;
+		state = JobState.CANCELED;
 		onFinish();
 	}
 
@@ -338,25 +439,24 @@ public abstract class Job<T> implements Runnable {
 		this.state = JobState.ERRORED;
 		this.error = error;
 
-		if (this.settings.isPrintStackTraceOnError() && !JobManager.get().isShuttingDown()) {
-			logger.error("An exception has been encountered in job '{}':\n{}",
-					id, Util.getStacktrace(error));
+		if (settings.isPrintStackTraceOnError() && !JobManager.get().isShuttingDown()) {
+			LOGGER.error("An exception has been encountered in job '{}'", id, error);
 		}
 
-		List.copyOf(this.subJobs).forEach((subJob) -> subJob.cancel(BuiltinJobCancellationReasons.PARENT_ERROR));
+		List.copyOf(subJobs).forEach((subJob) -> subJob.cancel(BuiltinJobCancellationReasons.PARENT_ERROR));
 
 		onFinish();
 	}
 
 	protected void onSuccess() {
-		this.state = JobState.SUCCEEDED;
+		state = JobState.SUCCEEDED;
 		onFinish();
 	}
 
 	protected void onFinish() {
 		onOwnProgressChange(1);
 
-		List.copyOf(this.finishListeners).forEach(listener -> listener.accept(Optional.ofNullable(result), Optional.ofNullable(error)));
+		List.copyOf(finishListeners).forEach(listener -> listener.accept(Optional.ofNullable(result), Optional.ofNullable(error)));
 	}
 
 
@@ -369,7 +469,7 @@ public abstract class Job<T> implements Runnable {
 	}
 
 	public String getId() {
-		return this.id;
+		return id;
 	}
 
 	public JobCategory getCategory() {
@@ -377,15 +477,15 @@ public abstract class Job<T> implements Runnable {
 	}
 
 	public Job<?> getParent() {
-		return this.parent;
+		return parent;
 	}
 
 	public double getProgress() {
-		return this.overallProgress;
+		return overallProgress;
 	}
 
 	public JobState getState() {
-		return this.state;
+		return state;
 	}
 
 	public JobSettings getSettings() {
@@ -397,10 +497,10 @@ public abstract class Job<T> implements Runnable {
 	 */
 	public List<Job<?>> getSubJobs(boolean recursive) {
 		if (!recursive) {
-			return Collections.unmodifiableList(this.subJobs);
+			return Collections.unmodifiableList(subJobs);
 		}
 
-		List<Job<?>> subjobs = List.copyOf(this.subJobs);
+		List<Job<?>> subjobs = List.copyOf(subJobs);
 		List<Job<?>> subjobsRecursive = new ArrayList<>(subjobs);
 
 		for (Job<?> subjob : subjobs) {
@@ -411,7 +511,7 @@ public abstract class Job<T> implements Runnable {
 	}
 
 	public boolean hasSubJob(String id, boolean recursive) {
-		List<Job<?>> subjobs = List.copyOf(this.subJobs);
+		List<Job<?>> subjobs = List.copyOf(subJobs);
 		boolean hasSubJob = false;
 
 		for (Job<?> subjob : subjobs) {
@@ -438,25 +538,25 @@ public abstract class Job<T> implements Runnable {
 	 * blocked by the passed job category.
 	 */
 	public boolean isBlockedBy(JobCategory category) {
-		boolean blocked = this.blockingJobCategories.contains(category);
+		boolean blocked = blockingJobCategories.contains(category);
 
 		if (blocked) return true;
 
-		blocked = List.copyOf(this.blockingJobCategories).stream()
+		blocked = List.copyOf(blockingJobCategories).stream()
 				.anyMatch(category::hasParent);
 
 		if (blocked) return true;
 
-		return List.copyOf(this.subJobs).stream()
+		return List.copyOf(subJobs).stream()
 				.anyMatch(job -> job.isBlockedBy(category));
 	}
 
 	public boolean containsSubJob(Job<?> subJob, boolean recursive) {
-		boolean contains = this.subJobs.contains(subJob);
+		boolean contains = subJobs.contains(subJob);
 
 		if (contains || !recursive) return contains;
 
-		return List.copyOf(this.subJobs).stream()
+		return List.copyOf(subJobs).stream()
 				.anyMatch(nestedSubJob -> nestedSubJob.containsSubJob(subJob, true));
 	}
 
@@ -516,7 +616,7 @@ public abstract class Job<T> implements Runnable {
 
 			@Override
 			public T get(long timeout, TimeUnit unit) throws InterruptedException, ExecutionException, TimeoutException {
-				job.settings.setTimeout(unit.toSeconds(timeout));
+				job.settings.setTimeoutNanos(unit.toSeconds(timeout));
 				job.runAndAwait();
 
 				if (job.error == null) {

@@ -9,8 +9,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import javafx.beans.value.ObservableStringValue;
 
 import matcher.Matcher;
-import matcher.network.packet.PacketMapper;
-import matcher.network.packet.broadcast.PresenceAnnouncement;
+import matcher.network.packet.p2p.PresenceAnnouncement;
 
 /**
  * Sends UDP multicasts to notify other Matcher instances in the same
@@ -18,6 +17,7 @@ import matcher.network.packet.broadcast.PresenceAnnouncement;
  */
 public class LanPresenceAnnouncer extends Thread {
 	private static final AtomicInteger THREAD_ID = new AtomicInteger();
+	private final NetworkHandler networkHandler;
 	private final int tcpPortToAnnounce;
 	private final ObservableStringValue name;
 	private final DatagramSocket socket;
@@ -25,8 +25,9 @@ public class LanPresenceAnnouncer extends Thread {
 	private boolean running;
 	private DatagramPacket packet;
 
-	public LanPresenceAnnouncer(int tcpPortToAnnounce, ObservableStringValue name) throws IOException {
+	public LanPresenceAnnouncer(NetworkHandler networkHandler, int tcpPortToAnnounce, ObservableStringValue name) throws IOException {
 		super("PresenceAnnouncer #" + THREAD_ID.incrementAndGet());
+		this.networkHandler = networkHandler;
 		this.tcpPortToAnnounce = tcpPortToAnnounce;
 		this.name = name;
 		this.socket = new DatagramSocket();
@@ -46,7 +47,7 @@ public class LanPresenceAnnouncer extends Thread {
 				name.get(),
 				tcpPortToAnnounce,
 				true));
-		byte[] packetBytes = PacketMapper.getInstance().toBytes(packet);
+		byte[] packetBytes = networkHandler.getPacketMapper().toBytes(packet);
 		this.packet = new DatagramPacket(packetBytes, packetBytes.length, multicastAddress, NetworkConstants.MULTICAST_PORT);
 	}
 
@@ -70,6 +71,7 @@ public class LanPresenceAnnouncer extends Thread {
 			try {
 				Thread.sleep(NetworkConstants.MULTICAST_INTERVAL_MS);
 			} catch (InterruptedException ignored) {
+				// ignore
 			}
 		}
 	}

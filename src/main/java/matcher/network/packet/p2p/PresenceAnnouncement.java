@@ -1,10 +1,10 @@
-package matcher.network.packet.broadcast;
+package matcher.network.packet.p2p;
 
 import net.fabricmc.loader.api.SemanticVersion;
 
 import matcher.network.packet.Packet;
 import matcher.network.packet.PacketType;
-import matcher.network.packet.broadcast.PresenceAnnouncement.Data;
+import matcher.network.packet.p2p.PresenceAnnouncement.Data;
 
 public record PresenceAnnouncement(PacketType type, Data data) implements Packet<Data> {
 	public PresenceAnnouncement(Data data) {

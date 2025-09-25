@@ -1,21 +1,20 @@
 package matcher.network;
 
-import java.io.DataOutputStream;
 import java.io.IOException;
+import java.io.PrintWriter;
 import java.net.DatagramPacket;
 import java.net.Socket;
 
+import org.jetbrains.annotations.Nullable;
+
 import matcher.Matcher;
 import matcher.network.packet.Packet;
-import matcher.network.packet.PacketMapper;
 import matcher.network.packet.PacketType;
 import matcher.network.packet.s2c.KickS2C;
 
-import org.jetbrains.annotations.Nullable;
-
 public class ConnectedLanPeer extends LanPeer {
 	ConnectedLanPeer(NetworkHandler networkHandler, Socket socket, long lastSeen, DatagramPacket udpPacket) {
-		super(socket.getInetAddress(), lastSeen, udpPacket);
+		super(networkHandler, socket.getInetAddress(), lastSeen, udpPacket);
 
 		this.networkHandler = networkHandler;
 		this.socket = socket;
@@ -27,7 +26,7 @@ public class ConnectedLanPeer extends LanPeer {
 		}
 
 		try {
-			new DataOutputStream(socket.getOutputStream()).writeUTF(mapper.toString(packet));
+			new PrintWriter(socket.getOutputStream(), true).println(networkHandler.getPacketMapper().toString(packet));
 		} catch (IOException e) {
 			if (packet.type() != PacketType.KICK_S2C) {
 				kick("Server error: " + e.getMessage());
@@ -36,9 +35,9 @@ public class ConnectedLanPeer extends LanPeer {
 		}
 	}
 
-	void kick(@Nullable String reason) {
+	public void kick(@Nullable String reason) {
 		KickS2C packet = new KickS2C(new KickS2C.Data("Admin", reason));
-		send(socket, packet);
+		send(packet);
 
 		try {
 			networkHandler.getConnections().tcpPeersByAddress.remove(socket.getRemoteSocketAddress());
@@ -49,7 +48,10 @@ public class ConnectedLanPeer extends LanPeer {
 		}
 	}
 
-	private static final PacketMapper mapper = PacketMapper.getInstance();
+	public Socket getSocket() {
+		return socket;
+	}
+
 	private final NetworkHandler networkHandler;
-	private Socket socket;
+	private final Socket socket;
 }

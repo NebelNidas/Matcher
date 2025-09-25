@@ -1,16 +1,14 @@
 package matcher.network.packet.serdes;
 
-import com.fasterxml.jackson.core.JacksonException;
+import java.io.IOException;
+
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.databind.DeserializationContext;
 import com.fasterxml.jackson.databind.deser.std.StdDeserializer;
-
 import com.fasterxml.jackson.databind.module.SimpleModule;
 
 import net.fabricmc.loader.api.SemanticVersion;
 import net.fabricmc.loader.api.VersionParsingException;
-
-import java.io.IOException;
 
 public class SemverDeserializer extends StdDeserializer<SemanticVersion> {
 	public SemverDeserializer() {

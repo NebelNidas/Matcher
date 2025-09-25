@@ -11,6 +11,7 @@ import java.util.Set;
 
 import matcher.Matcher;
 import matcher.network.packet.Packet;
+import matcher.network.packet.PacketType;
 
 public final class NetworkUtil {
 	private NetworkUtil() {
@@ -43,11 +44,16 @@ public final class NetworkUtil {
 	public static String remoteAddressPlusPort(Socket connection) {
 		return connection.getInetAddress() + ":" + connection.getPort();
 	}
+
 	public static String localAddressPlusPort(Socket connection) {
 		return connection.getLocalAddress() + ":" + connection.getLocalPort();
 	}
 
-	public static void failedToSerialize(Packet<?> packet, Exception exception) {
+	public static void logFailedToSerialize(Packet<?> packet, Exception exception) {
 		Matcher.LOGGER.error("Failed to serialize {} packet \"{}\"", packet.type().name(), packet, exception);
+	}
+
+	public static void logFailedToParse(String json, PacketType packetType, ConnectedLanPeer client, Exception exception) {
+		Matcher.LOGGER.error("Failed to parse {} packet from {} \"{}\"", packetType.name(), remoteAddressPlusPort(client.getSocket()), json, exception);
 	}
 }

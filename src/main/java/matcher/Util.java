@@ -51,20 +51,30 @@ public class Util {
 		return stringWriter.toString();
 	}
 
-	public static  <T> List<List<T>> partition(Iterable<T> iterable, int size) {
-		List<List<T>> result = new ArrayList<>(size);
+	public static <T> List<List<T>> partitionIntoNLists(Iterable<T> iterable, int chunks) {
+		List<List<T>> ret = new ArrayList<>(chunks);
 
-		for (int i = 0; i < size; i++) {
-			result.add(new ArrayList<>());
+		for (int i = 0; i < chunks; i++) {
+			ret.add(new ArrayList<>());
 		}
 
 		Iterator<T> iterator = iterable.iterator();
 
 		for (int i = 0; iterator.hasNext(); i++) {
-			result.get(i % size).add(iterator.next());
+			ret.get(i % chunks).add(iterator.next());
 		}
 
-		return result;
+		return ret;
+	}
+
+	public static <T> List<List<T>> partitionIntoListsOfNSize(List<T> list, int maxSizePerChunk) {
+		List<List<T>> ret = new ArrayList<>();
+
+		for (int i = 0; i < list.size(); i += maxSizePerChunk) {
+			ret.add(list.subList(i, Math.min(i + maxSizePerChunk, list.size())));
+		}
+
+		return ret;
 	}
 
 	public static <T> Set<T> newIdentityHashSet() {

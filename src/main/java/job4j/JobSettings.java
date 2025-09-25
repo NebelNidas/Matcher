@@ -7,7 +7,7 @@ public class JobSettings {
 				this.visualPassthrough = original.visualPassthrough;
 				this.printStackTraceOnError = original.printStackTraceOnError;
 				this.cancelPreviousJobsWithSameId = original.cancelPreviousJobsWithSameId;
-				this.timeoutSeconds = original.timeoutSeconds;
+				this.timeoutNanos = original.timeoutNanos;
 			}};
 	}
 
@@ -15,10 +15,10 @@ public class JobSettings {
 	protected boolean visualPassthrough;
 	protected boolean printStackTraceOnError = true;
 	protected boolean cancelPreviousJobsWithSameId;
-	protected long timeoutSeconds = Long.MAX_VALUE;
+	protected long timeoutNanos = Long.MAX_VALUE;
 
 	/**
-	 * Whether or not this job and its subjobs should be
+	 * Whether this job and its subjobs should be
 	 * visible to the user. Has no effects on job execution.
 	 */
 	public boolean isInvisible() {
@@ -26,7 +26,7 @@ public class JobSettings {
 	}
 
 	/**
-	 * Whether or not this job should be visible to the user.
+	 * Whether this job should be visible to the user.
 	 * In contrast to {@link #isInvisible()}, the subjobs
 	 * aren't made invisible too, but instead they appear as
 	 * subjobs of this job's parent (or at the job root, if
@@ -41,7 +41,7 @@ public class JobSettings {
 	}
 
 	/**
-	 * Whether or not already running jobs with the
+	 * Whether already running jobs with the
 	 * same ID should get canceled when this job
 	 * gets submitted.
 	 */
@@ -51,10 +51,12 @@ public class JobSettings {
 
 	/**
 	 * Gets the job's timeout (maximum allowed execution time
-	 * before getting canceled). Defaults to {@link java.lang.Long#MAX_VALUE}.
+	 * before getting canceled), in nanoseconds.
+	 *
+	 * <p>A value of {@code 0} or less means no timeout.
 	 */
-	public long getTimeout() {
-		return this.timeoutSeconds;
+	public long getTimeoutNanos() {
+		return this.timeoutNanos;
 	}
 
 	public static class MutableJobSettings extends JobSettings {
@@ -84,8 +86,8 @@ public class JobSettings {
 			onSettingChange();
 		}
 
-		public void setTimeout(long seconds) {
-			this.timeoutSeconds = seconds;
+		public void setTimeoutNanos(long nanoseconds) {
+			this.timeoutNanos = nanoseconds;
 			onSettingChange();
 		}
 

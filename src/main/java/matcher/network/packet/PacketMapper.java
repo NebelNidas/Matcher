@@ -11,18 +11,23 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.json.JsonMapper;
 
+import matcher.Matcher;
+import matcher.network.NetworkHandler;
 import matcher.network.packet.serdes.SemverDeserializer;
 import matcher.network.packet.serdes.SemverSerializer;
 
 public class PacketMapper {
-	private static final PacketMapper INSTANCE = new PacketMapper();
-	private final ObjectMapper mapper = JsonMapper.builder()
+	private final Matcher matcher;
+	private final NetworkHandler networkHandler;
+	private final ObjectMapper mapper;
+
+	public PacketMapper(Matcher matcher, NetworkHandler networkHandler) {
+		this.matcher = matcher;
+		this.networkHandler = networkHandler;
+		this.mapper = JsonMapper.builder()
 			.addModule(new SemverSerializer.Module())
 			.addModule(new SemverDeserializer.Module())
 			.build();
-
-	public static PacketMapper getInstance() {
-		return INSTANCE;
 	}
 
 	public String toString(Packet<?> packet) {

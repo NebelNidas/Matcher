@@ -13,7 +13,7 @@ module matcher {
 	exports job4j;
 	exports matcher.network;
 	exports matcher.network.packet;
-	exports matcher.network.packet.broadcast;
+	exports matcher.network.packet.p2p;
 	exports matcher.network.packet.c2s;
 	exports matcher.network.packet.s2c;
 
@@ -41,7 +41,6 @@ module matcher {
 	requires com.fasterxml.jackson.databind;
 	requires com.fasterxml.jackson.annotation;
 	requires static org.jetbrains.annotations;
-	requires matcher;
 
 	uses matcher.Plugin;
 }

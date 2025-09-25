@@ -62,7 +62,7 @@ public class MatchingMenu extends Menu {
 	}
 
 	public void autoMatchAll() {
-		var job = new AutoMatchAllJob(gui.getMatcher());
+		var job = new AutoMatchAllJob(gui.getMatcher(), gui.getNetworkHandler());
 		job.addFinishListener((result, error) -> {
 			if (result.isPresent()) {
 				Platform.runLater(() -> gui.onMatchChange(result.get()));

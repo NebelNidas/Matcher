@@ -3,16 +3,17 @@ package matcher.network;
 import java.net.DatagramPacket;
 import java.net.InetAddress;
 
-import matcher.network.packet.PacketMapper;
-import matcher.network.packet.broadcast.PresenceAnnouncement;
+import matcher.network.packet.p2p.PresenceAnnouncement;
 
 public class LanPeer {
+	private final NetworkHandler networkHandler;
 	private final InetAddress address;
 	private long lastSeen;
 	private DatagramPacket udpPacket;
 	private PresenceAnnouncement pojoPacket;
 
-	LanPeer(InetAddress address, long lastSeen, DatagramPacket udpPacket) {
+	LanPeer(NetworkHandler networkHandler, InetAddress address, long lastSeen, DatagramPacket udpPacket) {
+		this.networkHandler = networkHandler;
 		this.address = address;
 		this.lastSeen = lastSeen;
 		this.udpPacket = udpPacket;
@@ -32,7 +33,7 @@ public class LanPeer {
 
 	public PresenceAnnouncement getAnnouncement() {
 		if (pojoPacket == null) {
-			pojoPacket = PacketMapper.getInstance().fromUdpPacket(udpPacket, PresenceAnnouncement.class);
+			pojoPacket = networkHandler.getPacketMapper().fromUdpPacket(udpPacket, PresenceAnnouncement.class);
 		}
 
 		return pojoPacket;

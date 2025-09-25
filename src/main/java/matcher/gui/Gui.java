@@ -115,6 +115,7 @@ public class Gui extends Application {
 
 	@Override
 	public void stop() throws Exception {
+		networkHandler.shutdown();
 		JobManager.get().shutdown();
 	}
 

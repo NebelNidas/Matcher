@@ -1,13 +1,13 @@
 package matcher.network.packet.serdes;
 
+import java.io.IOException;
+
 import com.fasterxml.jackson.core.JsonGenerator;
 import com.fasterxml.jackson.databind.SerializerProvider;
 import com.fasterxml.jackson.databind.module.SimpleModule;
 import com.fasterxml.jackson.databind.ser.std.StdSerializer;
 
 import net.fabricmc.loader.api.SemanticVersion;
-
-import java.io.IOException;
 
 public class SemverSerializer extends StdSerializer<SemanticVersion> {
 	public SemverSerializer() {

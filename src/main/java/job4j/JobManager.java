@@ -5,24 +5,25 @@ import java.util.Collections;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Timer;
-import java.util.concurrent.Future;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 import java.util.function.BiConsumer;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class JobManager {
-	private static final JobManager INSTANCE = new JobManager();
-	private static final Logger LOGGER = LoggerFactory.getLogger(JobManager.class);
+	private static final Logger LOGGER;
+	private static final JobManager INSTANCE;
 	private static final ThreadPoolExecutor JOB_EXECUTING_THREAD_POOL;
-	private static final Timer JOB_TIMER = new Timer(true);
 
 	static {
+		LOGGER = LoggerFactory.getLogger(JobManager.class);
+		INSTANCE = new JobManager();
+
 		int nThreads = Math.max(2, Runtime.getRuntime().availableProcessors() / 2);
 		JOB_EXECUTING_THREAD_POOL = new ThreadPoolExecutor(nThreads, nThreads, 0L, TimeUnit.MILLISECONDS, new LinkedBlockingQueue<>(1));
 		JOB_EXECUTING_THREAD_POOL.setKeepAliveTime(60L, TimeUnit.SECONDS);
@@ -33,10 +34,41 @@ public class JobManager {
 		return INSTANCE;
 	}
 
-	private final List<BiConsumer<Job<?>, JobManagerEvent>> eventListeners = Collections.synchronizedList(new ArrayList<>());
-	private final List<Job<?>> queuedJobs = Collections.synchronizedList(new LinkedList<>());
-	private final List<Job<?>> runningJobs = Collections.synchronizedList(new LinkedList<>());
+	private final BlockingQueue<Runnable> tasks;
+	private final Thread jobManagerThread;
+	private final List<BiConsumer<Job<?>, JobManagerEvent>> eventListeners;
+	private final List<Job<?>> queuedJobs;
+	private final List<Job<?>> runningJobs;
 	private volatile boolean shuttingDown;
+
+	private JobManager() {
+		this.tasks = new LinkedBlockingDeque<>();
+		this.eventListeners = Collections.synchronizedList(new ArrayList<>());
+		this.queuedJobs = Collections.synchronizedList(new LinkedList<>());
+		this.runningJobs = Collections.synchronizedList(new LinkedList<>());
+
+		jobManagerThread = new Thread(() -> {
+			while (true) {
+				try {
+					tasks.take().run();
+				} catch (InterruptedException e) {
+					if (shuttingDown) {
+						break;
+					}
+
+					LOGGER.error("Job manager thread interrupted, shutting down", e);
+					shutdown();
+					break;
+				}
+			}
+		}, "Job Manager");
+		jobManagerThread.setDaemon(true);
+		jobManagerThread.start();
+	}
+
+	protected void runOnJobManagerThread(Runnable task) {
+		tasks.add(task);
+	}
 
 	public void registerEventListener(BiConsumer<Job<?>, JobManagerEvent> listener) {
 		this.eventListeners.add(listener);
@@ -51,7 +83,7 @@ public class JobManager {
 	/**
 	 * Queues the job for execution.
 	 */
-	void queue(Job<?> job, boolean awaitTermination) {
+	void queue(Job<?> job) {
 		fixHierarchyIfNecessary(job);
 
 		if (job.parent != null) {
@@ -85,25 +117,10 @@ public class JobManager {
 		}
 
 		job.addFinishListener((result, error) -> onJobFinished(job));
-
-		if (awaitTermination) {
-			Thread thread = Thread.currentThread();
-			job.addFinishListener((result, error) -> thread.notifyAll());
-		}
-
 		job.state = JobState.QUEUED;
-		notifyEventListeners(job, JobManagerEvent.JOB_QUEUED);
-		tryLaunchNext();
 
-		if (awaitTermination) {
-			while (!job.getState().isFinished()) {
-				try {
-					wait();
-				} catch (InterruptedException e) {
-					job.cancel(BuiltinJobCancellationReasons.INTERRUPTED);
-				}
-			}
-		}
+		notifyEventListeners(job, JobManagerEvent.JOB_QUEUED);
+		runOnJobManagerThread(this::tryLaunchNext);
 	}
 
 	/**
@@ -136,7 +153,7 @@ public class JobManager {
 			runningJobs.remove(job);
 		}
 
-		tryLaunchNext();
+		runOnJobManagerThread(this::tryLaunchNext);
 	}
 
 	private void tryLaunchNext() {
@@ -169,21 +186,7 @@ public class JobManager {
 				queuedJobsIterator.remove();
 				runningJobs.add(queuedJob);
 				notifyEventListeners(queuedJob, JobManagerEvent.JOB_STARTED);
-				Future<?> future = JOB_EXECUTING_THREAD_POOL.submit(queuedJob::runOnCurrentThread);
-
-				Thread wrapper = new Thread(() -> {
-					try {
-						future.get(queuedJob.getSettings().getTimeout(), TimeUnit.SECONDS);
-					} catch (Exception e) {
-						if (e instanceof TimeoutException) {
-							queuedJob.cancel(BuiltinJobCancellationReasons.TIMEOUT);
-						} else if (!shuttingDown) {
-							throw new RuntimeException(String.format("An exception has been encountered in wrapper thread for job '%s'", queuedJob.getId()), e);
-						}
-					}
-				});
-				wrapper.setName(queuedJob.getId() + " wrapper thread");
-				wrapper.start();
+				JOB_EXECUTING_THREAD_POOL.submit(queuedJob::runOnCurrentThread);
 
 				if (!JOB_EXECUTING_THREAD_POOL.getQueue().isEmpty()) {
 					return;
@@ -247,6 +250,8 @@ public class JobManager {
 		}
 
 		JOB_EXECUTING_THREAD_POOL.shutdownNow();
+		Job.TIMEOUT_THREAD_POOL.shutdownNow();
+
 	}
 
 	public boolean isShuttingDown() {

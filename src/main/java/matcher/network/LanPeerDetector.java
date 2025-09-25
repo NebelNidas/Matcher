@@ -10,7 +10,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Predicate;
 
 import matcher.Matcher;
-import matcher.network.packet.PacketMapper;
 
 public class LanPeerDetector extends Thread {
 	private static final AtomicInteger THREAD_ID = new AtomicInteger();
@@ -59,7 +58,7 @@ public class LanPeerDetector extends Thread {
 			boolean isNewPeer = peer == null;
 
 			if (isNewPeer) {
-				networkHandler.getConnections().udpPeersByAddress.put(address, peer = new LanPeer(address.getAddress(), System.currentTimeMillis(), packet));
+				networkHandler.getConnections().udpPeersByAddress.put(address, peer = new LanPeer(networkHandler, address.getAddress(), System.currentTimeMillis(), packet));
 			}
 
 			peer.setLastSeen(System.currentTimeMillis());
@@ -81,6 +80,7 @@ public class LanPeerDetector extends Thread {
 		try {
 			socket.leaveGroup(multicastAddress);
 		} catch (IOException ignored) {
+			// ignore
 		}
 
 		socket.close();
