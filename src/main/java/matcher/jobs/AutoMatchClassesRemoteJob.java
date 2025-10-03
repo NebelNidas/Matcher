@@ -12,13 +12,14 @@ import job4j.JobState;
 import matcher.Matcher;
 import matcher.Util;
 import matcher.classifier.ClassifierLevel;
-import matcher.network.ConnectedLanPeer;
+import matcher.network.peer.Peer;
+import matcher.network.peer.TcpPeerConnection;
 import matcher.network.NetworkHandler;
 import matcher.network.packet.s2c.MatchClassesS2C;
 import matcher.type.ClassInstance;
 
 public class AutoMatchClassesRemoteJob extends MatcherJob<Map<ClassInstance, ClassInstance>> {
-	public AutoMatchClassesRemoteJob(Matcher matcher, NetworkHandler networkHandler, ConnectedLanPeer peer, ClassifierLevel level, List<ClassInstance> classes) {
+	public AutoMatchClassesRemoteJob(Matcher matcher, NetworkHandler networkHandler, Peer peer, ClassifierLevel level, List<ClassInstance> classes) {
 		super(JobCategories.AUTOMATCH_CLASSES_REMOTE);
 
 		this.matcher = matcher;
@@ -86,7 +87,7 @@ public class AutoMatchClassesRemoteJob extends MatcherJob<Map<ClassInstance, Cla
 
 	private final Matcher matcher;
 	private final NetworkHandler networkHandler;
-	private final ConnectedLanPeer peer;
+	private final Peer peer;
 	private final ClassifierLevel level;
 	private final List<ClassInstance> classes;
 	private final Map<ClassInstance, ClassInstance> matches;

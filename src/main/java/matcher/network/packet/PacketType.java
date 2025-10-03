@@ -8,11 +8,13 @@ import matcher.network.packet.c2s.MatchedClassesC2S;
 import matcher.network.packet.p2p.Ping;
 import matcher.network.packet.p2p.Pong;
 import matcher.network.packet.p2p.PresenceAnnouncement;
+import matcher.network.packet.p2p.Test;
 import matcher.network.packet.s2c.InviteS2C;
 import matcher.network.packet.s2c.KickS2C;
 import matcher.network.packet.s2c.MatchClassesS2C;
 
 public enum PacketType {
+	TEST(Test.class),
 	PRESENCE_ANNOUNCEMENT(PresenceAnnouncement.class),
 	PING(Ping.class),
 	PONG(Pong.class),

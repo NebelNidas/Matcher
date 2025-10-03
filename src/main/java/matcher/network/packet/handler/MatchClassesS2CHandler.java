@@ -6,7 +6,8 @@ import java.util.stream.Collectors;
 
 import matcher.jobs.AutoMatchClassesLocalJob;
 import matcher.jobs.AutoMatchClassesRemoteJob;
-import matcher.network.ConnectedLanPeer;
+import matcher.network.peer.Peer;
+import matcher.network.peer.TcpPeerConnection;
 import matcher.network.NetworkHandler;
 import matcher.network.NetworkUtil;
 import matcher.network.packet.PacketHandler;
@@ -30,14 +31,14 @@ public class MatchClassesS2CHandler implements PacketHandler<MatchClassesS2C> {
 	}
 
 	@Override
-	public void handlePacket(String json, ConnectedLanPeer client) {
+	public void handlePacket(String json, Peer peer, TcpPeerConnection connection) {
 		PacketMapper mapper = networkHandler.getPacketMapper();
 		MatchClassesS2C packet;
 
 		try {
 			packet = mapper.fromString(json, MatchClassesS2C.class);
 		} catch (Exception e) {
-			NetworkUtil.logFailedToParse(json, getPacketType(), client, e);
+			NetworkUtil.logFailedToParse(json, getPacketType(), connection, e);
 			return;
 		}
 
@@ -50,7 +51,7 @@ public class MatchClassesS2CHandler implements PacketHandler<MatchClassesS2C> {
 					.collect(Collectors.toMap(
 							e -> e.getKey().getId(),
 							e -> e.getValue().getId()));
-			client.send(new MatchedClassesC2S(new MatchedClassesC2S.Data(matches)));
+			peer.send(new MatchedClassesC2S(new MatchedClassesC2S.Data(matches)));
 		});
 		job.runAsync();
 	}

@@ -25,10 +25,13 @@ import java.util.HashSet;
 import java.util.IdentityHashMap;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import org.jetbrains.annotations.Nullable;
@@ -49,6 +52,30 @@ public class Util {
 		StringWriter stringWriter = new StringWriter();
 		throwable.printStackTrace(new PrintWriter(stringWriter));
 		return stringWriter.toString();
+	}
+
+	public static boolean equals(Exception a, Exception b) {
+		if (a == b) return true;
+		if (a == null || b == null) return false;
+		if (!a.getClass().equals(b.getClass())) return false;
+		if (!Objects.equals(a.getMessage(), b.getMessage())) return false;
+
+		StackTraceElement[] stackA = a.getStackTrace();
+		StackTraceElement[] stackB = b.getStackTrace();
+
+		if (stackA.length != stackB.length) return false;
+
+		for (int i = 0; i < stackA.length; i++) {
+			if (!stackA[i].equals(stackB[i])) return false;
+		}
+
+		return true;
+	}
+
+	public static String prettyPrint(Map<?, ?> map) {
+		return map.keySet().stream()
+				.map(key -> key + ": " + map.get(key))
+				.collect(Collectors.joining("\n\t", "{\n\t", "\n}"));
 	}
 
 	public static <T> List<List<T>> partitionIntoNLists(Iterable<T> iterable, int chunks) {

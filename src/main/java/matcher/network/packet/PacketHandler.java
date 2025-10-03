@@ -1,8 +1,9 @@
 package matcher.network.packet;
 
-import matcher.network.ConnectedLanPeer;
+import matcher.network.peer.Peer;
+import matcher.network.peer.TcpPeerConnection;
 
 public interface PacketHandler<T extends Packet<?>> {
 	PacketType getPacketType();
-	void handlePacket(String json, ConnectedLanPeer client) throws Exception;
+	void handlePacket(String json, Peer peer, TcpPeerConnection connection) throws Exception;
 }

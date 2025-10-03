@@ -13,6 +13,7 @@ public record PresenceAnnouncement(PacketType type, Data data) implements Packet
 
 	public record Data(
 			SemanticVersion protocolVersion,
+			String instanceIdentifier,
 			String name,
 			int port,
 			boolean acceptsAnyTasks) { }

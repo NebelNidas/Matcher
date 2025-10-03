@@ -10,12 +10,17 @@ module matcher {
 	exports matcher;
 	exports matcher.bcremap;
 	exports matcher.serdes;
+	exports matcher.jobs;
 	exports job4j;
 	exports matcher.network;
 	exports matcher.network.packet;
 	exports matcher.network.packet.p2p;
 	exports matcher.network.packet.c2s;
 	exports matcher.network.packet.s2c;
+	exports matcher.network.packet.handler;
+	exports matcher.network.packet.serdes;
+	exports matcher.network.threads;
+	exports matcher.network.peer;
 
 	requires transitive org.slf4j;
 	requires cfr;

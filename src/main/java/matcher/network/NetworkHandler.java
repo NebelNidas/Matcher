@@ -5,11 +5,9 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.UncheckedIOException;
 import java.net.InetAddress;
+import java.net.InetSocketAddress;
 import java.net.NetworkInterface;
-import java.net.ServerSocket;
 import java.net.Socket;
-import java.net.SocketAddress;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.BlockingQueue;
@@ -20,6 +18,15 @@ import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import javafx.beans.property.SimpleStringProperty;
+
+import matcher.network.packet.p2p.PresenceAnnouncement;
+import matcher.network.peer.Peer;
+import matcher.network.peer.TcpPeerConnection;
+import matcher.network.peer.UdpPeerConnection;
+import matcher.network.threads.PeerAcceptor;
+import matcher.network.threads.PeerDetector;
+import matcher.network.threads.PresenceAnnouncer;
+
 import org.jetbrains.annotations.Nullable;
 
 import matcher.Matcher;
@@ -31,14 +38,16 @@ import matcher.network.packet.handler.MatchedClassesC2SHandler;
 import matcher.network.packet.handler.PingHandler;
 
 public class NetworkHandler {
-	private static final ExecutorService connectionThreadPool = Executors.newCachedThreadPool();
+	public static final ExecutorService CONNECTION_THREAD_POOL = Executors.newCachedThreadPool();
+	public static final String INSTANCE_ID = NetworkUtil.getInstanceIdentifier();
 	private final Matcher matcher;
 	private final PacketMapper mapper;
 	private final ConnectionStore connections;
 	private final SimpleStringProperty hostname;
-	private final Map<NetworkInterface, List<InetAddress>> hostAddresses;
-	private final Map<NetworkInterface, LanPeerDetector> peerDetectorsByNetworkItf;
-	private final Map<NetworkInterface, LanPresenceAnnouncer> announcersByNetworkItf;
+	private final Map<NetworkInterface, List<InetAddress>> hostAddressesByNetworkItf;
+	private final Map<NetworkInterface, Map<InetAddress, PeerDetector>> peerDetectorsByAddressByNetworkItf;
+	private final Map<NetworkInterface, Map<InetAddress, PresenceAnnouncer>> announcersByAddressByNetworkItf;
+	private final Map<NetworkInterface, Map<InetAddress, PeerAcceptor>> acceptorsByAddressByNetworkItf;
 	private final BlockingQueue<Runnable> tasks;
 	private final Thread taskExecutorThread;
 	private final AtomicBoolean shuttingDown;
@@ -46,9 +55,7 @@ public class NetworkHandler {
 	private final PingHandler pingHandler;
 	private final MatchClassesS2CHandler matchClassesS2CHandler;
 	private final MatchedClassesC2SHandler matchedClassesC2SHandler;
-	private @Nullable ServerSocket serverSocket;
 	private @Nullable Thread connectionListenerThread;
-	private int localPort;
 
 	public NetworkHandler(Matcher matcher) {
 		this.matcher = matcher;
@@ -56,9 +63,10 @@ public class NetworkHandler {
 
 		connections = new ConnectionStore();
 		hostname = new SimpleStringProperty(Util.getComputerName());
-		hostAddresses = NetworkUtil.getAllLocalAddresses();
-		peerDetectorsByNetworkItf = new ConcurrentHashMap<>();
-		announcersByNetworkItf = new ConcurrentHashMap<>();
+		hostAddressesByNetworkItf = NetworkUtil.getLocalAddresses(false, false, true, false, false);
+		peerDetectorsByAddressByNetworkItf = new ConcurrentHashMap<>();
+		announcersByAddressByNetworkItf = new ConcurrentHashMap<>();
+		acceptorsByAddressByNetworkItf = new ConcurrentHashMap<>();
 		tasks = new LinkedBlockingDeque<>();
 		taskExecutorThread = new Thread(() -> {
 			while (true) {
@@ -76,8 +84,16 @@ public class NetworkHandler {
 		pingHandler = new PingHandler(this);
 		matchClassesS2CHandler = new MatchClassesS2CHandler(this);
 		matchedClassesC2SHandler = new MatchedClassesC2SHandler(this);
+	}
 
-		localPort = -1;
+	public boolean isOnThread() {
+		return Thread.currentThread() == taskExecutorThread;
+	}
+
+	public void assertOnThread() {
+		if (!isOnThread()) {
+			throw new IllegalStateException("Not on NetworkHandler thread");
+		}
 	}
 
 	public void runOnThread(Runnable task) {
@@ -95,14 +111,21 @@ public class NetworkHandler {
 	}
 
 	public void startPeerScanning() {
+		Matcher.LOGGER.info("Starting peer scanning");
+
 		try {
-			for (Map.Entry<NetworkInterface, List<InetAddress>> entry : hostAddresses.entrySet()) {
-				LanPeerDetector detector = new LanPeerDetector(this, entry.getKey(), entry.getValue(), (netItf, address) -> {
-					LanPresenceAnnouncer announcer = announcersByNetworkItf.get(netItf);
-					return announcer != null && address.getPort() == announcer.getPort();
-				});
-				peerDetectorsByNetworkItf.put(entry.getKey(), detector);
-				detector.start();
+			for (Map.Entry<NetworkInterface, List<InetAddress>> entry : hostAddressesByNetworkItf.entrySet()) {
+				NetworkInterface networkInterface = entry.getKey();
+				List<InetAddress> addresses = entry.getValue();
+
+				for (InetAddress address : addresses) {
+					PeerDetector detector = new PeerDetector(this, networkInterface, address);
+					peerDetectorsByAddressByNetworkItf
+							.computeIfAbsent(networkInterface, k -> new ConcurrentHashMap<>())
+							.put(address, detector);
+					detector.start();
+				}
+
 			}
 		} catch (IOException e) {
 			throw new UncheckedIOException(e);
@@ -110,78 +133,129 @@ public class NetworkHandler {
 	}
 
 	public void stopPeerScanning() {
-		for (Map.Entry<NetworkInterface, LanPeerDetector> entry : peerDetectorsByNetworkItf.entrySet()) {
-			entry.getValue().interrupt();
-			peerDetectorsByNetworkItf.remove(entry.getKey());
+		Matcher.LOGGER.info("Stopping peer scanning");
+
+		for (Map.Entry<NetworkInterface, List<InetAddress>> entry : hostAddressesByNetworkItf.entrySet()) {
+			NetworkInterface networkInterface = entry.getKey();
+			List<InetAddress> addresses = entry.getValue();
+
+			for (InetAddress address : addresses) {
+				PeerDetector detector = peerDetectorsByAddressByNetworkItf
+						.getOrDefault(networkInterface, Map.of())
+						.get(address);
+				if (detector != null) {
+					detector.interrupt();
+					peerDetectorsByAddressByNetworkItf.get(networkInterface).remove(address);
+				}
+			}
 		}
 	}
 
 	public void openToLan() {
-		try {
-			serverSocket = new ServerSocket(0);
-			localPort = serverSocket.getLocalPort();
+		Matcher.LOGGER.info("""
+				Opening to LAN. Detected {} network interfaces with addresses: {}
+				The network constants are as follows:
+				\t- Protocol version: {}
+				\t- Multicast address: {}
+				\t- Multicast port: {}
+				\t- Milliseconds between presence announcements: {}
 
-			for (Map.Entry<NetworkInterface, List<InetAddress>> entry : hostAddresses.entrySet()) {
-				LanPresenceAnnouncer announcer = new LanPresenceAnnouncer(this, entry.getKey(), entry.getValue(), localPort, hostname);
-				announcersByNetworkItf.put(entry.getKey(), announcer);
+				To be announced:
+				\t- Name: {}
+				\t- Instance ID: {}
+				""",
+				hostAddressesByNetworkItf.size(),
+				Util.prettyPrint(hostAddressesByNetworkItf),
+				NetworkConstants.PROTOCOL_VERSION,
+				NetworkConstants.MULTICAST_ADDRESS,
+				NetworkConstants.MULTICAST_PORT,
+				NetworkConstants.MULTICAST_INTERVAL_MS,
+				hostname.get(),
+				INSTANCE_ID);
+		Matcher.LOGGER.info("Starting presence announcers");
+
+		for (Map.Entry<NetworkInterface, List<InetAddress>> entry : hostAddressesByNetworkItf.entrySet()) {
+			NetworkInterface networkInterface = entry.getKey();
+			List<InetAddress> addresses = entry.getValue();
+
+			for (InetAddress address : addresses) {
+				PresenceAnnouncer announcer = new PresenceAnnouncer(this, networkInterface, address, hostname);
+				announcersByAddressByNetworkItf
+						.computeIfAbsent(networkInterface, k -> new ConcurrentHashMap<>())
+						.put(address, announcer);
 				announcer.start();
 			}
+		}
 
-			connectionListenerThread = new Thread(() -> {
-				try {
-					while (!serverSocket.isClosed()) {
-						acceptClient();
-					}
-				} catch (IOException e) {
-					throw new UncheckedIOException(e);
-				}
-			}, "Network Connection Listener");
-			connectionListenerThread.setDaemon(true);
-			connectionListenerThread.start();
+		Matcher.LOGGER.info("Starting peer acceptors");
 
-			Matcher.LOGGER.info("Opened to LAN on port {}", localPort);
-		} catch (IOException e) {
-			localPort = -1;
-			Matcher.LOGGER.error("Failed to open to LAN on port {}", localPort, e);
+		for (Map.Entry<NetworkInterface, List<InetAddress>> entry : hostAddressesByNetworkItf.entrySet()) {
+			NetworkInterface networkInterface = entry.getKey();
+			List<InetAddress> addresses = entry.getValue();
+
+			for (InetAddress address : addresses) {
+				PeerAcceptor acceptor = new PeerAcceptor(this, networkInterface, address);
+				acceptorsByAddressByNetworkItf
+						.computeIfAbsent(networkInterface, k -> new ConcurrentHashMap<>())
+						.put(address, acceptor);
+				acceptor.start();
+			}
 		}
 	}
 
-	private void acceptClient() throws IOException {
-		assert serverSocket != null;
-		Socket client = serverSocket.accept();
-		LanPeer udpPeer = connections.udpPeersByAddress.get(client.getRemoteSocketAddress());
+	public void connectToPeer(UdpPeerConnection udpConnection) throws IOException {
+		assertOnThread();
+		Map<InetSocketAddress, TcpPeerConnection> tcpConnsByRemoteAddr = connections.tcpConnsByRemoteAddrByNetItfAddrByNetItf
+				.computeIfAbsent(udpConnection.getNetworkInterface(), k -> new ConcurrentHashMap<>())
+				.computeIfAbsent(udpConnection.getNetworkInterfaceAddress(), k -> new ConcurrentHashMap<>());
+		InetSocketAddress remoteAddr = udpConnection.getRemoteSocketAddress();
+		PresenceAnnouncement.Data announcementData = udpConnection.getAnnouncementData();
 
-		ConnectedLanPeer connectedPeer = new ConnectedLanPeer(this, client, System.currentTimeMillis(),
-				udpPeer == null ? null : udpPeer.getUdpPacket());
-		connections.tcpPeersByAddress.put(client.getRemoteSocketAddress(), connectedPeer);
-		Matcher.LOGGER.info("Accepted connection from {}", client.getRemoteSocketAddress());
+		if (shuttingDown.get() || shutDown.get()
+				|| tcpConnsByRemoteAddr.containsKey(remoteAddr)
+				|| connections.peersById.containsKey(announcementData.instanceIdentifier())) {
+			return;
+		}
+		Socket socket = new Socket(
+				udpConnection.getRemoteSocketAddress().getAddress(),
+				announcementData.port(),
+				udpConnection.getNetworkInterfaceAddress(),
+				0);
 
-		connectionThreadPool.submit(() -> {
-			try {
-				BufferedReader reader = new BufferedReader(new InputStreamReader(client.getInputStream()));
+		Matcher.LOGGER.info("Connecting to peer {} (id: {}) at address {}:{} via local address {}:{} through network interface {}",
+				announcementData.name(),
+				announcementData.instanceIdentifier(),
+				remoteAddr.getAddress(),
+				announcementData.port(),
+				udpConnection.getNetworkInterfaceAddress(),
+				socket.getLocalPort(),
+				udpConnection.getNetworkInterface().getDisplayName());
 
-				while (!client.isClosed() && !shuttingDown.get() && !shutDown.get()) {
-					String message = reader.readLine();
-					runOnThread(() -> onMessage(connectedPeer, message));
-				}
-			} catch (IOException e) {
-				throw new RuntimeException(e);
-			}
-		});
-	}
+		TcpPeerConnection tcpConnection = new TcpPeerConnection(
+				this,
+				udpConnection.getNetworkInterface(),
+				udpConnection.getNetworkInterfaceAddress(),
+				socket,
+				true,
+				System.currentTimeMillis());
+		tcpConnsByRemoteAddr.put(remoteAddr, tcpConnection);
+		Peer peer = new Peer(this, udpConnection, tcpConnection);
+		connections.peersById.put(announcementData.instanceIdentifier(), peer);
 
-	void connectToPeer(LanPeer peer) throws IOException {
-		Socket socket = new Socket(peer.getAddress(), peer.getAnnouncement().data().port());
-		ConnectedLanPeer tcpPeer = new ConnectedLanPeer(this, socket, System.currentTimeMillis(), peer.getUdpPacket());
-		connections.tcpPeersByAddress.put(socket.getRemoteSocketAddress(), tcpPeer);
-
-		connectionThreadPool.submit(() -> {
+		CONNECTION_THREAD_POOL.submit(() -> {
 			try {
 				BufferedReader reader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
 
 				while (!socket.isClosed() && !shuttingDown.get() && !shutDown.get()) {
 					String message = reader.readLine();
-					runOnThread(() -> onMessage(tcpPeer, message));
+
+					if (message == null) {
+						// connection closed by peer
+						tcpConnection.terminateConnection();
+						break;
+					}
+
+					runOnThread(() -> onMessage(message, peer, tcpConnection));
 				}
 			} catch (IOException e) {
 				throw new RuntimeException(e);
@@ -189,18 +263,18 @@ public class NetworkHandler {
 		});
 	}
 
-	private void onMessage(ConnectedLanPeer peer, String message) {
+	public void onMessage(String message, Peer peer, TcpPeerConnection connection) {
 		PacketType packetType = mapper.getType(message);
 
 		switch (packetType) {
 		case PING:
-			pingHandler.handlePacket(message, peer);
+			pingHandler.handlePacket(message, peer, connection);
 			break;
 		case MATCH_CLASSES_S2C:
-			matchClassesS2CHandler.handlePacket(message, peer);
+			matchClassesS2CHandler.handlePacket(message, peer, connection);
 			break;
 		case MATCHED_CLASSES_C2S:
-			matchedClassesC2SHandler.handlePacket(message, peer);
+			matchedClassesC2SHandler.handlePacket(message, peer, connection);
 			break;
 		default:
 			Matcher.LOGGER.warn("Unhandled packet type: {}", packetType);
@@ -216,31 +290,36 @@ public class NetworkHandler {
 		runOnThread0(() -> {
 			stopPeerScanning();
 
-			for (LanPresenceAnnouncer announcer : announcersByNetworkItf.values()) {
-				announcer.interrupt();
+			for (Map<InetAddress, PresenceAnnouncer> entry : announcersByAddressByNetworkItf.values()) {
+				for (PresenceAnnouncer announcer : entry.values()) {
+					announcer.interrupt();
+				}
 			}
 
-			announcersByNetworkItf.clear();
+			announcersByAddressByNetworkItf.clear();
 
 			if (connectionListenerThread != null) {
 				connectionListenerThread.interrupt();
 				connectionListenerThread = null;
 			}
 
-			for (Map.Entry<SocketAddress, ConnectedLanPeer> entry : new HashMap<>(connections.tcpPeersByAddress).entrySet()) {
-				entry.getValue().kick("Server shutting down");
+			for (Peer peer : connections.peersById.values()) {
+				peer.kick("Server shutting down");
 			}
 
-			if (serverSocket != null) {
-				try {
-					serverSocket.close();
-				} catch (IOException e) {
-					Matcher.LOGGER.error("Failed to close LAN server socket", e);
+			for (Peer peer : connections.pendingPeers) {
+				peer.kick("Server shutting down");
+			}
+
+			CONNECTION_THREAD_POOL.shutdownNow();
+
+			for (Map<InetAddress, PeerAcceptor> acceptorsByAddress : acceptorsByAddressByNetworkItf.values()) {
+				for (PeerAcceptor acceptor : acceptorsByAddress.values()) {
+					acceptor.interrupt();
 				}
-
-				serverSocket = null;
-				localPort = -1;
 			}
+
+			acceptorsByAddressByNetworkItf.clear();
 
 			shutDown.set(true);
 			shuttingDown.set(false);
@@ -268,12 +347,16 @@ public class NetworkHandler {
 		this.hostname.set(hostname);
 	}
 
-	public Map<NetworkInterface, LanPeerDetector> getPeerDetectorsByNetworkItf() {
-		return peerDetectorsByNetworkItf;
+	public Map<NetworkInterface, Map<InetAddress, PeerDetector>> getPeerDetectorsByAddressByNetworkItf() {
+		return peerDetectorsByAddressByNetworkItf;
 	}
 
-	public Map<NetworkInterface, LanPresenceAnnouncer> getAnnouncersByNetworkItf() {
-		return announcersByNetworkItf;
+	public Map<NetworkInterface, Map<InetAddress, PresenceAnnouncer>> getAnnouncersByAddressByNetworkItf() {
+		return announcersByAddressByNetworkItf;
+	}
+
+	public Map<NetworkInterface, Map<InetAddress, PeerAcceptor>> getAcceptorsByAddressByNetworkItf() {
+		return acceptorsByAddressByNetworkItf;
 	}
 
 	public boolean isShuttingDown() {

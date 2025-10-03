@@ -70,6 +70,10 @@ public class PacketMapper {
 		}
 	}
 
+	public PacketType getType(DatagramPacket packet) {
+		return getType(parse(packet));
+	}
+
 	public PacketType getType(String json) {
 		return getType(parse(json));
 	}

@@ -1,6 +1,7 @@
 package matcher.network.packet.handler;
 
-import matcher.network.ConnectedLanPeer;
+import matcher.network.peer.Peer;
+import matcher.network.peer.TcpPeerConnection;
 import matcher.network.NetworkHandler;
 import matcher.network.packet.PacketHandler;
 import matcher.network.packet.PacketType;
@@ -20,7 +21,7 @@ public class PingHandler implements PacketHandler<Ping> {
 	}
 
 	@Override
-	public void handlePacket(String json, ConnectedLanPeer client) {
-		client.send(new Pong());
+	public void handlePacket(String json, Peer peer, TcpPeerConnection connection) {
+		peer.send(new Pong());
 	}
 }

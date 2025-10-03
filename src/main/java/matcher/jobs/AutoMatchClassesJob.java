@@ -12,7 +12,7 @@ import job4j.Job;
 import matcher.Matcher;
 import matcher.Util;
 import matcher.classifier.ClassifierLevel;
-import matcher.network.ConnectedLanPeer;
+import matcher.network.peer.Peer;
 import matcher.network.NetworkHandler;
 import matcher.type.ClassEnvironment;
 import matcher.type.ClassInstance;
@@ -37,7 +37,7 @@ public class AutoMatchClassesJob extends MatcherJob<Boolean> {
 				.toList();
 
 		Map<ClassInstance, ClassInstance> matches = new ConcurrentHashMap<>(classes.size());
-		List<ConnectedLanPeer> peers = networkHandler.getConnections().tcpPeersByAddress.values().stream().toList();
+		List<Peer> peers = new ArrayList<>(networkHandler.getConnections().peersById.values());
 		List<ClassInstance> classesToMatchLocally;
 		List<List<ClassInstance>> classSetsToMatchRemotely;
 		AutoMatchClassesLocalJob localJob;
@@ -59,7 +59,7 @@ public class AutoMatchClassesJob extends MatcherJob<Boolean> {
 
 		if (!classSetsToMatchRemotely.isEmpty()) {
 			for (int i = 0; i < classSetsToMatchRemotely.size(); i++) {
-				ConnectedLanPeer peer = peers.get(i);
+				Peer peer = peers.get(i);
 				List<ClassInstance> classSet = classSetsToMatchRemotely.get(i);
 
 				var remoteJob = new AutoMatchClassesRemoteJob(matcher, networkHandler, peer, level, classSet);

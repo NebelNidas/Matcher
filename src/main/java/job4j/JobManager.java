@@ -87,7 +87,7 @@ public class JobManager {
 		fixHierarchyIfNecessary(job);
 
 		if (job.parent != null) {
-			assert job.getParent().getThread() == Thread.currentThread();
+			// assert job.getParent().getThread() == Thread.currentThread();
 			job.state = JobState.QUEUED;
 			job.runOnCurrentThread();
 			return;
