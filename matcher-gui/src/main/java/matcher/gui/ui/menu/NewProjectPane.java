@@ -6,7 +6,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.PathMatcher;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -30,7 +29,6 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.RowConstraints;
 import javafx.scene.layout.VBox;
-import javafx.stage.FileChooser;
 import javafx.stage.FileChooser.ExtensionFilter;
 import javafx.stage.Window;
 
@@ -128,7 +126,7 @@ public class NewProjectPane extends GridPane {
 	private Node createFilesSelectionPane(String name, ObservableList<Path> entries, Window window, boolean isClassPath, boolean isShared) {
 		VBox ret = new VBox(GuiConstants.padding);
 
-		ret.getChildren().add(new Label(name+":"));
+		ret.getChildren().add(new Label(name + ":"));
 
 		ListView<Path> list = new ListView<>(entries);
 		ret.getChildren().add(list);
@@ -287,7 +285,7 @@ public class NewProjectPane extends GridPane {
 	}
 
 	private static List<ExtensionFilter> getInputLoadExtensionFilters() {
-		return Arrays.asList(new FileChooser.ExtensionFilter("Java archive", "*.jar"));
+		return List.of(new ExtensionFilter("Java archive", "*.jar"));
 	}
 
 	private static PathMatcher getInputLoadExtensionMatcher() {

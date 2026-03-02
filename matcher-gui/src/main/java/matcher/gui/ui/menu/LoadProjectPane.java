@@ -75,9 +75,8 @@ public class LoadProjectPane extends VBox {
 		footer.getChildren().add(downButton);
 		downButton.setOnAction(event -> GuiUtil.moveSelectionDown(list));
 
-		ListChangeListener<Path> itemChangeListener = change -> {
-			okButton.setDisable(paths.isEmpty());
-		};
+		ListChangeListener<Path> itemChangeListener = change ->
+				okButton.setDisable(paths.isEmpty());
 
 		list.getItems().addListener(itemChangeListener);
 
@@ -104,15 +103,7 @@ public class LoadProjectPane extends VBox {
 		return new ProjectLoadSettings(new ArrayList<>(paths), verifyFilesBox.isSelected());
 	}
 
-	public static class ProjectLoadSettings {
-		public ProjectLoadSettings(List<Path> paths, boolean verifyFiles) {
-			this.paths = paths;
-			this.verifyFiles = verifyFiles;
-		}
-
-		public final List<Path> paths;
-		public final boolean verifyFiles;
-	}
+	public record ProjectLoadSettings(List<Path> paths, boolean verifyFiles) { }
 
 	private final ObservableList<Path> paths;
 	private final boolean verifyFiles;

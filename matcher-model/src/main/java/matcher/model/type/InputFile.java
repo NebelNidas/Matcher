@@ -13,7 +13,6 @@ import java.nio.channels.SeekableByteChannel;
 import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.security.MessageDigest;
@@ -116,7 +115,8 @@ public final class InputFile {
 
 		for (Path inputDir : inputDirs) {
 			Files.walkFileTree(inputDir, new SimpleFileVisitor<>() {
-				public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
+				@Override
+				public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) {
 					if (InputFile.this.equals(file)) {
 						res.set(file);
 
@@ -141,11 +141,11 @@ public final class InputFile {
 			try {
 				return downloadToTmp(url);
 			} catch (IOException | InterruptedException e) {
-				throw new IOException("download of "+url+" failed: "+e.toString());
+				throw new IOException("download of " + url + " failed: " + e);
 			}
 		}
 
-		throw new IOException("can't find input "+this);
+		throw new IOException("can't find input " + this);
 	}
 
 	public boolean hasPath() {
@@ -260,7 +260,7 @@ public final class InputFile {
 		Path ret = dlTmp;
 		if (ret != null || !create) return ret;
 
-		Path dir = Paths.get("dlTmp");
+		Path dir = Path.of("dlTmp");
 		int suffix = 0;
 		Path path;
 
@@ -277,36 +277,37 @@ public final class InputFile {
 
 		final Path res = ret;
 
-		Runtime.getRuntime().addShutdownHook(new Thread() {
-			@Override
-			public void run() {
-				try {
-					Files.walkFileTree(res, new SimpleFileVisitor<>() {
-						public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
-							System.out.println("delete file "+file);
+		Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+			logger.info("Deleting dlTmp {}", res);
 
-							if (file.normalize().toAbsolutePath().startsWith(res)) {
-								Files.delete(file);
-							}
+			try {
+				Files.walkFileTree(res, new SimpleFileVisitor<>() {
+					@Override
+					public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
+						logger.debug("Deleting file {}", file);
 
-							return FileVisitResult.CONTINUE;
+						if (file.normalize().toAbsolutePath().startsWith(res)) {
+							Files.delete(file);
 						}
 
-						public FileVisitResult postVisitDirectory(Path dir, IOException exc) throws IOException {
-							System.out.println("delete dir "+dir);
+						return FileVisitResult.CONTINUE;
+					}
 
-							if (dir.normalize().toAbsolutePath().startsWith(res)) {
-								Files.delete(dir);
-							}
+					@Override
+					public FileVisitResult postVisitDirectory(Path dir, IOException exc) throws IOException {
+						logger.debug("Deleting dir {}", dir);
 
-							return FileVisitResult.CONTINUE;
+						if (dir.normalize().toAbsolutePath().startsWith(res)) {
+							Files.delete(dir);
 						}
-					});
-				} catch (IOException e) {
-					e.printStackTrace();
-				}
+
+						return FileVisitResult.CONTINUE;
+					}
+				});
+			} catch (IOException e) {
+				logger.error("Exception while deleting dlTmp", e);
 			}
-		});
+		}));
 
 		dlTmp = ret;
 
@@ -314,9 +315,9 @@ public final class InputFile {
 	}
 
 	private static Path downloadToTmp(String url) throws IOException, InterruptedException {
-		LOGGER.info("downloading {}", url);
+		logger.info("downloading {}", url);
 
-		String name = url.substring(url.lastIndexOf('/') + 1).replaceAll("[^\\w\\.\\- ]", "x");
+		String name = url.substring(url.lastIndexOf('/') + 1).replaceAll("[^\\w.\\- ]", "x");
 		if (name.isEmpty()) name = "dl";
 		int suffix = 0;
 		Path dlTmp = getDlTmp(true);
@@ -327,10 +328,10 @@ public final class InputFile {
 		}
 
 		HttpRequest request = HttpRequest.newBuilder(URI.create(url)).timeout(Duration.ofSeconds(10)).build();
-		HttpResponse<InputStream> response = HTTP_CLIENT.send(request, BodyHandlers.ofInputStream());
+		HttpResponse<InputStream> response = httpClient.send(request, BodyHandlers.ofInputStream());
 
 		if (response.statusCode() != 200) {
-			throw new IOException("bad http status code: "+response.statusCode());
+			throw new IOException("bad http status code: " + response.statusCode());
 		}
 
 		try (InputStream is = response.body()) {
@@ -342,8 +343,8 @@ public final class InputFile {
 
 	public static final long unknownSize = -1;
 
-	private static final Logger LOGGER = LoggerFactory.getLogger(InputFile.class);
-	private static final HttpClient HTTP_CLIENT = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
+	private static final Logger logger = LoggerFactory.getLogger(InputFile.class);
+	private static final HttpClient httpClient = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
 
 	private static Path dlTmp;
 

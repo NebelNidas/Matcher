@@ -362,7 +362,7 @@ public abstract class MemberInstance<T extends MemberInstance<T>> implements Mat
 	final ClassInstance cls;
 	final String id;
 	final String origName;
-	boolean nameObfuscatedLocal;
+	final boolean nameObfuscatedLocal;
 	final int position;
 	final boolean isStatic;
 

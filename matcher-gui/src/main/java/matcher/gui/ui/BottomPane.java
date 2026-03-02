@@ -20,6 +20,7 @@ import matcher.model.classifier.RankResult;
 import matcher.model.type.ClassInstance;
 import matcher.model.type.FieldInstance;
 import matcher.model.type.MatchType;
+import matcher.model.type.MatchableKind;
 import matcher.model.type.MemberInstance;
 import matcher.model.type.MethodInstance;
 import matcher.model.type.MethodVarInstance;
@@ -167,7 +168,7 @@ public class BottomPane extends StackPane implements IGuiComponent {
 		if (memberB == null) memberB = dstPane.getSelectedField();
 
 		if (canMatchMembers(memberA, memberB)) {
-			if (memberA instanceof MethodInstance) {
+			if (memberA.getKind() == MatchableKind.METHOD) {
 				gui.getMatcher().match((MethodInstance) memberA, (MethodInstance) memberB);
 				gui.onMatchChange(EnumSet.of(MatchType.Method));
 			} else {
@@ -345,7 +346,6 @@ public class BottomPane extends StackPane implements IGuiComponent {
 
 			var.setMatchable(!var.isMatchable());
 			gui.onMatchChange(EnumSet.of(MatchType.MethodVar));
-			return;
 		}
 	}
 

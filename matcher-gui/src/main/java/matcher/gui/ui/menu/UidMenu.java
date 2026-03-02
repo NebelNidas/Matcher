@@ -17,6 +17,8 @@ import javafx.scene.control.Dialog;
 import javafx.scene.control.Menu;
 import javafx.scene.control.MenuItem;
 import javafx.scene.control.SeparatorMenuItem;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import matcher.core.Matcher;
 import matcher.gui.MatcherGui;
@@ -73,7 +75,7 @@ public class UidMenu extends Menu {
 
 	private void setup() {
 		Dialog<UidConfig> dialog = new Dialog<>();
-		//dialog.initModality(Modality.APPLICATION_MODAL);
+		// dialog.initModality(Modality.APPLICATION_MODAL);
 		dialog.setResizable(true);
 		dialog.setTitle("UID Setup");
 		dialog.getDialogPane().getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
@@ -100,7 +102,7 @@ public class UidMenu extends Menu {
 			HttpURLConnection conn = (HttpURLConnection) new URL("https",
 					config.getAddress().getHostString(),
 					config.getAddress().getPort(),
-					String.format("/%s/matches/%s/%s", config.getProject(), config.getVersionA(), config.getVersionB())).openConnection();
+					"/%s/matches/%s/%s".formatted(config.getProject(), config.getVersionA(), config.getVersionB())).openConnection();
 			conn.setRequestProperty("X-Token", config.getToken());
 
 			progressConsumer.accept(0.5);
@@ -196,7 +198,7 @@ public class UidMenu extends Menu {
 			HttpURLConnection conn = (HttpURLConnection) new URL("https",
 					config.getAddress().getHostString(),
 					config.getAddress().getPort(),
-					String.format("/%s/link/%s/%s", config.getProject(), config.getVersionA(), config.getVersionB())).openConnection();
+					"/%s/link/%s/%s".formatted(config.getProject(), config.getVersionA(), config.getVersionB())).openConnection();
 			conn.setRequestMethod("POST");
 			conn.setRequestProperty("X-Token", config.getToken());
 			conn.setDoOutput(true);
@@ -230,8 +232,8 @@ public class UidMenu extends Menu {
 
 							requested.add(arg);
 							os.writeByte(TYPE_ARG);
-							os.writeUTF(srcMethodId+arg.getId());
-							os.writeUTF(dstMethodId+arg.getMatch().getId());
+							os.writeUTF(srcMethodId + arg.getId());
+							os.writeUTF(dstMethodId + arg.getMatch().getId());
 						}
 					}
 
@@ -240,8 +242,8 @@ public class UidMenu extends Menu {
 
 						requested.add(field);
 						os.writeByte(TYPE_FIELD);
-						os.writeUTF(cls.getId()+"/"+field.getId());
-						os.writeUTF(cls.getMatch().getId()+"/"+field.getMatch().getId());
+						os.writeUTF(cls.getId() + "/" + field.getId());
+						os.writeUTF(cls.getMatch().getId() + "/" + field.getMatch().getId());
 					}
 				}
 			}
@@ -318,16 +320,22 @@ public class UidMenu extends Menu {
 			}
 		}
 
-		Matcher.LOGGER.info("UIDs assigned: {} class, {} method, {} field",
-				nextClassUid - env.nextClassUid,
-				nextMethodUid - env.nextMethodUid,
-				nextFieldUid - env.nextFieldUid);
+		int finalNextClassUid = nextClassUid;
+		int finalNextMethodUid = nextMethodUid;
+		int finalNextFieldUid = nextFieldUid;
+
+		LOGGER.atInfo()
+				.addArgument(() -> finalNextClassUid - env.nextClassUid)
+				.addArgument(() -> finalNextMethodUid - env.nextMethodUid)
+				.addArgument(() -> finalNextFieldUid - env.nextFieldUid)
+				.log("UIDs assigned: {} class, {} method, {} field");
 
 		env.nextClassUid = nextClassUid;
 		env.nextMethodUid = nextMethodUid;
 		env.nextFieldUid = nextFieldUid;
 	}
 
+	private static final Logger LOGGER = LoggerFactory.getLogger(UidMenu.class);
 	private static final byte TYPE_CLASS = 0;
 	private static final byte TYPE_METHOD = 1;
 	private static final byte TYPE_FIELD = 2;

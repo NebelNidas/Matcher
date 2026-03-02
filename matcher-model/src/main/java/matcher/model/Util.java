@@ -33,16 +33,16 @@ import org.objectweb.asm.tree.MethodInsnNode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class Util {
+public final class Util {
 	public static <T> Set<T> newIdentityHashSet() {
-		return Collections.newSetFromMap(new IdentityHashMap<>()); //new IdentityHashSet<>();
+		return Collections.newSetFromMap(new IdentityHashMap<>()); // new IdentityHashSet<>();
 	}
 
 	public static <T> Set<T> newIdentityHashSet(Collection<? extends T> c) {
 		Set<T> ret = Collections.newSetFromMap(new IdentityHashMap<>(c.size()));
 		ret.addAll(c);
 
-		return ret; //new IdentityHashSet<>(c);
+		return ret; // new IdentityHashSet<>(c);
 	}
 
 	public static <T> Set<T> copySet(Set<T> set) {
@@ -67,7 +67,7 @@ public class Util {
 		FileSystem fs = null;
 
 		try {
-			URI uri = new URI("jar:"+archive.toUri().toString());
+			URI uri = new URI("jar:" + archive.toUri());
 
 			synchronized (Util.class) {
 				try {
@@ -89,9 +89,9 @@ public class Util {
 				}
 			}
 
-			Files.walkFileTree(fs.getPath("/"), new SimpleFileVisitor<Path>() {
+			Files.walkFileTree(fs.getPath("/"), new SimpleFileVisitor<>() {
 				@Override
-				public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
+				public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) {
 					if (file.toString().endsWith(".class")) {
 						handler.accept(file);
 					}
@@ -132,7 +132,7 @@ public class Util {
 
 		AtomicBoolean ret = new AtomicBoolean(true);
 
-		Files.walkFileTree(path, new SimpleFileVisitor<Path>() {
+		Files.walkFileTree(path, new SimpleFileVisitor<>() {
 			@Override
 			public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
 				if (disallowed.test(file)) {
@@ -298,7 +298,7 @@ public class Util {
 		int endA = -1;
 		int endB = -1;
 
-		for (;;) {
+		while (true) {
 			int startA = posA;
 			boolean isNumA = false;
 
@@ -397,7 +397,11 @@ public class Util {
 		}
 	}
 
+	private Util() {
+	}
+
 	private static final Logger logger = LoggerFactory.getLogger(Util.class);
 	private static final Map<FileSystem, AtomicInteger> usedFsMap = new IdentityHashMap<>();
 	public static final Object asmNodeSync = new Object();
+	public static final int ASM_API_VERSION = Opcodes.ASM9;
 }

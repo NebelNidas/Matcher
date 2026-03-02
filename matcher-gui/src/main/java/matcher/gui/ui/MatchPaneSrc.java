@@ -21,14 +21,16 @@ import javafx.css.Stylesheet;
 import javafx.css.converter.ColorConverter;
 import javafx.geometry.Orientation;
 import javafx.scene.Node;
+import javafx.scene.control.Alert.AlertType;
 import javafx.scene.control.Cell;
 import javafx.scene.control.ListView;
 import javafx.scene.control.SplitPane;
 import javafx.scene.control.TreeItem;
 import javafx.scene.control.TreeView;
 import javafx.scene.paint.Color;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-import matcher.core.Matcher;
 import matcher.gui.MatcherGui;
 import matcher.gui.MatcherGui.SortKey;
 import matcher.model.NameType;
@@ -64,7 +66,7 @@ public class MatchPaneSrc extends SplitPane implements IFwdGuiComponent, ISelect
 
 		// member list
 
-		memberList.setCellFactory(ignore -> new SrcListCell<MemberInstance<?>>());
+		memberList.setCellFactory(ignore -> new SrcListCell<>());
 		memberList.getSelectionModel().selectedItemProperty().addListener((observable, oldValue, newValue) -> {
 			if (suppressChangeEvents || oldValue == newValue) return;
 
@@ -93,7 +95,7 @@ public class MatchPaneSrc extends SplitPane implements IFwdGuiComponent, ISelect
 
 		// method var list
 
-		varList.setCellFactory(ignore -> new SrcListCell<MethodVarInstance>());
+		varList.setCellFactory(ignore -> new SrcListCell<>());
 		varList.getSelectionModel().selectedItemProperty().addListener((observable, oldValue, newValue) -> {
 			if (suppressChangeEvents || oldValue == newValue) return;
 
@@ -124,7 +126,8 @@ public class MatchPaneSrc extends SplitPane implements IFwdGuiComponent, ISelect
 		try {
 			css = parser.parse(MatcherGui.getThemeCss(Config.getTheme()));
 		} catch (IOException e) {
-			Matcher.LOGGER.error("CSS parsing failed", e);
+			logger.error("CSS parsing failed", e);
+			gui.showAlert(AlertType.ERROR, "Theme error", "Failed to load theme CSS", e.getMessage());
 			return;
 		}
 
@@ -151,11 +154,12 @@ public class MatchPaneSrc extends SplitPane implements IFwdGuiComponent, ISelect
 					.reduce((first, second) -> second);
 			if (textColorDecl.isEmpty()) continue;
 
+			@SuppressWarnings("unchecked")
 			Color color = ColorConverter.getInstance().convert(textColorDecl.get().getParsedValue(), null);
 
 			if (lowSimilarityStylePresent) lowSimilarityCellTextColor = color;
 			if (highSimilarityStylePresent) highSimilarityCellTextColor = color;
-		};
+		}
 	}
 
 	private Node createClassList() {
@@ -222,10 +226,10 @@ public class MatchPaneSrc extends SplitPane implements IFwdGuiComponent, ISelect
 	private class SrcTreeCell extends StyledTreeCell<Object> {
 		@Override
 		protected String getText(Object item) {
-			if (item instanceof String) {
-				return (String) item;
-			} else if (item instanceof Matchable<?>) {
-				return getCellText((Matchable<?>) item, false);
+			if (item instanceof String string) {
+				return string;
+			} else if (item instanceof Matchable<?> matchable) {
+				return getCellText(matchable, false);
 			} else {
 				return "";
 			}
@@ -266,7 +270,7 @@ public class MatchPaneSrc extends SplitPane implements IFwdGuiComponent, ISelect
 				styleClass = CellStyleClass.HIGH_MATCH_SIMILARITY;
 			}
 		} else {
-			final float epsilon = 1e-5f; // float rounding error
+			final float epsilon = 1e-5F; // float rounding error
 			float similarity = item.getSimilarity();
 
 			if (similarity < epsilon) {
@@ -277,7 +281,7 @@ public class MatchPaneSrc extends SplitPane implements IFwdGuiComponent, ISelect
 				cell.setTextFill(null);
 				if (lowSimilarityCellTextColor == null || highSimilarityCellTextColor == null) return;
 
-				similarity = Math.round((similarity / diffColorStepAlignment)) * diffColorStepAlignment;
+				similarity = Math.round(similarity / diffColorStepAlignment) * diffColorStepAlignment;
 				int similarityAsInt = (int) (similarity * 100);
 				Color textColor;
 
@@ -439,14 +443,14 @@ public class MatchPaneSrc extends SplitPane implements IFwdGuiComponent, ISelect
 	public MethodInstance getSelectedMethod() {
 		MemberInstance<?> member = memberList.getSelectionModel().getSelectedItem();
 
-		return member instanceof MethodInstance ? (MethodInstance) member : null;
+		return member instanceof MethodInstance method ? method : null;
 	}
 
 	@Override
 	public FieldInstance getSelectedField() {
 		MemberInstance<?> member = memberList.getSelectionModel().getSelectedItem();
 
-		return member instanceof FieldInstance ? (FieldInstance) member : null;
+		return member instanceof FieldInstance field ? field : null;
 	}
 
 	@Override
@@ -629,50 +633,32 @@ public class MatchPaneSrc extends SplitPane implements IFwdGuiComponent, ISelect
 
 	@SuppressWarnings("unchecked")
 	private Comparator<ClassInstance> getClassComparator() {
-		switch (gui.getSortKey()) {
-		case Name:
-			return Comparator.comparing(this::getName, clsNameComparator);
-		case MappedName:
-			return Comparator.comparing(this::getMappedName, clsNameComparator);
-		case MatchStatus:
-			return ((Comparator<ClassInstance>) matchStatusComparator).thenComparing(this::getName, clsNameComparator);
-		case Similarity:
-			return ((Comparator<ClassInstance>) similarityComparator).thenComparing(this::getName, clsNameComparator);
-		}
-
-		throw new IllegalStateException("unhandled sort key: "+gui.getSortKey());
+		return switch (gui.getSortKey()) {
+		case Name -> Comparator.comparing(this::getName, clsNameComparator);
+		case MappedName -> Comparator.comparing(this::getMappedName, clsNameComparator);
+		case MatchStatus -> ((Comparator<ClassInstance>) matchStatusComparator).thenComparing(this::getName, clsNameComparator);
+		case Similarity -> ((Comparator<ClassInstance>) similarityComparator).thenComparing(this::getName, clsNameComparator);
+		};
 	}
 
 	@SuppressWarnings("unchecked")
 	private Comparator<MemberInstance<?>> getMemberComparator() {
-		switch (gui.getSortKey()) {
-		case Name:
-			return memberTypeComparator.thenComparing(this::getName, clsNameComparator);
-		case MappedName:
-			return memberTypeComparator.thenComparing(this::getMappedName, clsNameComparator);
-		case MatchStatus:
-			return ((Comparator<MemberInstance<?>>) matchStatusComparator).thenComparing(memberTypeComparator).thenComparing(this::getName, clsNameComparator);
-		case Similarity:
-			return ((Comparator<MemberInstance<?>>) similarityComparator).thenComparing(memberTypeComparator).thenComparing(this::getName, clsNameComparator);
-		}
-
-		throw new IllegalStateException("unhandled sort key: "+gui.getSortKey());
+		return switch (gui.getSortKey()) {
+		case Name -> memberTypeComparator.thenComparing(this::getName, clsNameComparator);
+		case MappedName -> memberTypeComparator.thenComparing(this::getMappedName, clsNameComparator);
+		case MatchStatus -> ((Comparator<MemberInstance<?>>) matchStatusComparator).thenComparing(memberTypeComparator).thenComparing(this::getName, clsNameComparator);
+		case Similarity -> ((Comparator<MemberInstance<?>>) similarityComparator).thenComparing(memberTypeComparator).thenComparing(this::getName, clsNameComparator);
+		};
 	}
 
 	@SuppressWarnings("unchecked")
 	private Comparator<MethodVarInstance> getVarComparator() {
-		switch (gui.getSortKey()) {
-		case Name:
-			return varTypeComparator.thenComparing(this::getName, clsNameComparator);
-		case MappedName:
-			return varTypeComparator.thenComparing(this::getMappedName, clsNameComparator);
-		case MatchStatus:
-			return ((Comparator<MethodVarInstance>) matchStatusComparator).thenComparing(varTypeComparator).thenComparing(this::getName, clsNameComparator);
-		case Similarity:
-			return ((Comparator<MethodVarInstance>) similarityComparator).thenComparing(varTypeComparator).thenComparing(this::getName, clsNameComparator);
-		}
-
-		throw new IllegalStateException("unhandled sort key: "+gui.getSortKey());
+		return switch (gui.getSortKey()) {
+		case Name -> varTypeComparator.thenComparing(this::getName, clsNameComparator);
+		case MappedName -> varTypeComparator.thenComparing(this::getMappedName, clsNameComparator);
+		case MatchStatus -> ((Comparator<MethodVarInstance>) matchStatusComparator).thenComparing(varTypeComparator).thenComparing(this::getName, clsNameComparator);
+		case Similarity -> ((Comparator<MethodVarInstance>) similarityComparator).thenComparing(varTypeComparator).thenComparing(this::getName, clsNameComparator);
+		};
 	}
 
 	private String getName(Matchable<?> m) {
@@ -781,10 +767,8 @@ public class MatchPaneSrc extends SplitPane implements IFwdGuiComponent, ISelect
 		return 0;
 	};
 
-	private static final Comparator<? extends Matchable<?>> similarityComparator = (a, b) -> {
-		return Float.compare(a.getSimilarity(), b.getSimilarity());
-	};
-
+	private static final Logger logger = LoggerFactory.getLogger(MatchPaneSrc.class);
+	private static final Comparator<? extends Matchable<?>> similarityComparator = (a, b) -> Float.compare(a.getSimilarity(), b.getSimilarity());
 	private static final Comparator<String> clsNameComparator = Util::compareNatural;
 	private static final int diffColorSteps = 20;
 	private static final float diffColorStepAlignment = 1f / diffColorSteps;

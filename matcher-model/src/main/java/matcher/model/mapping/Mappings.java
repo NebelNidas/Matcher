@@ -18,11 +18,13 @@ import net.fabricmc.mappingio.MappingVisitor;
 import net.fabricmc.mappingio.MappingWriter;
 import net.fabricmc.mappingio.adapter.MappingSourceNsSwitch;
 import net.fabricmc.mappingio.adapter.RegularAsFlatMappingVisitor;
+import net.fabricmc.mappingio.format.FeatureSet.ElementCommentSupport;
 import net.fabricmc.mappingio.format.MappingFormat;
 
 import matcher.model.NameType;
 import matcher.model.Util;
 import matcher.model.type.ClassEnv;
+import matcher.model.type.ClassEnvironment;
 import matcher.model.type.ClassInstance;
 import matcher.model.type.FieldInstance;
 import matcher.model.type.LocalClassEnv;
@@ -32,7 +34,7 @@ import matcher.model.type.MemberInstance;
 import matcher.model.type.MethodInstance;
 import matcher.model.type.MethodVarInstance;
 
-public class Mappings {
+public final class Mappings {
 	public static void load(Path path, MappingFormat format,
 			String nsSource, String nsTarget,
 			MappingField fieldSource, MappingField fieldTarget,
@@ -47,7 +49,7 @@ public class Mappings {
 				@Override
 				public void visitNamespaces(String srcNamespace, List<String> dstNamespaces) {
 					dstNs = dstNamespaces.indexOf(nsTarget);
-					if (dstNs < 0) throw new RuntimeException("missing target namespace: "+nsTarget);
+					if (dstNs < 0) throw new RuntimeException("missing target namespace: " + nsTarget);
 				}
 
 				@Override
@@ -225,7 +227,7 @@ public class Mappings {
 
 							break;
 						case UID:
-							String prefix = env.getGlobal().classUidPrefix;
+							String prefix = ClassEnvironment.CLASS_UID_PREFIX;
 
 							if (!name.startsWith(prefix)) {
 								logger.warn("Invalid uid class name {}", name);
@@ -283,7 +285,7 @@ public class Mappings {
 
 							break;
 						case UID:
-							String prefix = env.getGlobal().fieldUidPrefix;
+							String prefix = ClassEnvironment.FIELD_UID_PREFIX;
 
 							if (!name.startsWith(prefix)) {
 								logger.warn("Invalid uid field name {}", name);
@@ -327,7 +329,7 @@ public class Mappings {
 
 							break;
 						case UID:
-							String prefix = env.getGlobal().methodUidPrefix;
+							String prefix = ClassEnvironment.METHOD_UID_PREFIX;
 
 							if (!name.startsWith(prefix)) {
 								logger.warn("Invalid uid method name {}", name);
@@ -413,15 +415,16 @@ public class Mappings {
 			throw t;
 		}
 
-		logger.info("Loaded mappings for {} classes, {} methods ({} args, {} vars) and {} fields (comments: {}/{}/{}).",
-				dstNameCounts[MatchableKind.CLASS.ordinal()],
-				dstNameCounts[MatchableKind.METHOD.ordinal()],
-				dstNameCounts[MatchableKind.METHOD_ARG.ordinal()],
-				dstNameCounts[MatchableKind.METHOD_VAR.ordinal()],
-				dstNameCounts[MatchableKind.FIELD.ordinal()],
-				commentCounts[MatchableKind.CLASS.ordinal()],
-				commentCounts[MatchableKind.METHOD.ordinal()],
-				commentCounts[MatchableKind.FIELD.ordinal()]);
+		logger.atInfo()
+				.addArgument(() -> dstNameCounts[MatchableKind.CLASS.ordinal()])
+				.addArgument(() -> dstNameCounts[MatchableKind.METHOD.ordinal()])
+				.addArgument(() -> dstNameCounts[MatchableKind.METHOD_ARG.ordinal()])
+				.addArgument(() -> dstNameCounts[MatchableKind.METHOD_VAR.ordinal()])
+				.addArgument(() -> dstNameCounts[MatchableKind.FIELD.ordinal()])
+				.addArgument(() -> commentCounts[MatchableKind.CLASS.ordinal()])
+				.addArgument(() -> commentCounts[MatchableKind.METHOD.ordinal()])
+				.addArgument(() -> commentCounts[MatchableKind.FIELD.ordinal()])
+				.log("Loaded mappings for {} classes, {} methods ({} args, {} vars) and {} fields (comments: {}/{}/{}).");
 	}
 
 	private static ClassInstance findClass(String name, MappingField type, LocalClassEnv env) {
@@ -465,7 +468,7 @@ public class Mappings {
 	public static boolean save(Path file, MappingFormat format, LocalClassEnv env,
 			List<NameType> nsTypes, List<String> nsNames,
 			MappingsExportVerbosity verbosity, boolean forAnyInput, boolean fieldsFirst) throws IOException {
-		if (nsTypes.size() < 2 || nsTypes.size() > 2 && !format.hasNamespaces) throw new IllegalArgumentException("invalid namespace count");
+		if (nsTypes.size() < 2 || nsTypes.size() > 2 && !format.features().hasNamespaces()) throw new IllegalArgumentException("invalid namespace count");
 		if (nsNames != null && nsNames.size() != nsTypes.size()) throw new IllegalArgumentException("namespace types and names don't have the same number of entries");
 
 		if (nsNames == null) {
@@ -530,7 +533,7 @@ public class Mappings {
 			}
 
 			if (!hasAnyDstName
-					&& (!format.supportsComments || cls.getMappedComment() == null)
+					&& (!supportsElementComments(format) || cls.getMappedComment() == null)
 					&& !shouldExportAny(cls.getMethods(), format, nsTypes, verbosity, forAnyInput, exportedHierarchies)
 					&& !shouldExportAny(cls.getFields(), format, nsTypes)) {
 				continue; // no data for the class, skip
@@ -564,6 +567,10 @@ public class Mappings {
 
 		writer.visitEnd();
 		return true;
+	}
+
+	private static boolean supportsElementComments(MappingFormat format) {
+		return format.features().elementComments() != ElementCommentSupport.NONE;
 	}
 
 	private static void exportMethods(ClassInstance cls, String srcClsName, String[] dstClassNames,
@@ -613,23 +620,23 @@ public class Mappings {
 				continue;
 			}
 
-			if (format.supportsComments) {
+			if (supportsElementComments(format)) {
 				String comment = m.getMappedComment();
 				if (comment != null) writer.visitMethodComment(srcClsName, srcName, desc, dstClassNames, dstMethodNames, dstMemberDescs, comment);
 			}
 
 			// method args, vars
 
-			if (format.supportsArgs || format.supportsLocals) {
+			if (format.features().supportsArgs() || format.features().supportsVars()) {
 				for (int k = 0; k < 2; k++) {
 					boolean isArg = k == 0;
 					MethodVarInstance[] instances;
 
 					if (isArg) { // arg
-						if (!format.supportsArgs) continue;
+						if (!format.features().supportsArgs()) continue;
 						instances = m.getArgs();
 					} else { // var
-						if (!format.supportsLocals) continue;
+						if (!format.features().supportsVars()) continue;
 						instances = m.getVars();
 					}
 
@@ -668,7 +675,7 @@ public class Mappings {
 							}
 						}
 
-						if (format.supportsComments) {
+						if (supportsElementComments(format)) {
 							String comment = var.getMappedComment();
 
 							if (comment != null) {
@@ -730,7 +737,7 @@ public class Mappings {
 				continue;
 			}
 
-			if (format.supportsComments) {
+			if (supportsElementComments(format)) {
 				String comment = f.getMappedComment();
 				if (comment != null) writer.visitFieldComment(srcClsName, srcName, desc, dstClassNames, dstMemberNames, dstMemberDescs, comment);
 			}
@@ -770,23 +777,23 @@ public class Mappings {
 		String srcName = method.getName(nsTypes.get(0));
 		if (srcName == null) return false;
 
-		return format.supportsComments && method.getMappedComment() != null
-				|| format.supportsArgs && shouldExportAny(method.getArgs(), format, nsTypes)
-				|| format.supportsLocals && shouldExportAny(method.getVars(), format, nsTypes)
+		return supportsElementComments(format) && method.getMappedComment() != null
+				|| format.features().supportsArgs() && shouldExportAny(method.getArgs(), format, nsTypes)
+				|| format.features().supportsVars() && shouldExportAny(method.getVars(), format, nsTypes)
 				|| hasAnyNames(method, srcName, nsTypes) && shouldExportName(method, verbosity, forAnyInput, exportedHierarchies);
 	}
 
 	private static boolean shouldExport(MethodVarInstance var, MappingFormat format, List<NameType> nsTypes) {
 		String srcName = var.getName(nsTypes.get(0));
 
-		return format.supportsComments && var.getMappedComment() != null || hasAnyNames(var, srcName, nsTypes);
+		return supportsElementComments(format) && var.getMappedComment() != null || hasAnyNames(var, srcName, nsTypes);
 	}
 
 	private static boolean shouldExport(FieldInstance field, MappingFormat format, List<NameType> nsTypes) {
 		String srcName = field.getName(nsTypes.get(0));
 
 		return srcName != null
-				&& (format.supportsComments && field.getMappedComment() != null || hasAnyNames(field, srcName, nsTypes));
+				&& (supportsElementComments(format) && field.getMappedComment() != null || hasAnyNames(field, srcName, nsTypes));
 	}
 
 	private static boolean hasAnyNames(Matchable<?> m, String srcName, List<NameType> nsTypes) {
@@ -857,6 +864,9 @@ public class Mappings {
 				field.setMappedComment(null);
 			}
 		}
+	}
+
+	private Mappings() {
 	}
 
 	private static final Logger logger = LoggerFactory.getLogger(Mappings.class);

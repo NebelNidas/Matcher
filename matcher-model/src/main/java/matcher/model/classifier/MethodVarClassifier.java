@@ -14,7 +14,7 @@ import org.objectweb.asm.tree.VarInsnNode;
 import matcher.model.type.ClassEnvironment;
 import matcher.model.type.MethodVarInstance;
 
-public class MethodVarClassifier {
+public final class MethodVarClassifier {
 	public static void init() {
 		addClassifier(type, 10);
 		addClassifier(position, 3);
@@ -44,14 +44,14 @@ public class MethodVarClassifier {
 	private static final Map<ClassifierLevel, List<IClassifier<MethodVarInstance>>> classifiers = new EnumMap<>(ClassifierLevel.class);
 	private static final Map<ClassifierLevel, Double> maxScore = new EnumMap<>(ClassifierLevel.class);
 
-	private static AbstractClassifier type = new AbstractClassifier("type") {
+	private static final AbstractClassifier type = new AbstractClassifier("type") {
 		@Override
 		public double getScore(MethodVarInstance argA, MethodVarInstance argB, ClassEnvironment env) {
 			return ClassifierUtil.checkPotentialEquality(argA.getType(), argB.getType()) ? 1 : 0;
 		}
 	};
 
-	private static AbstractClassifier position = new AbstractClassifier("position") {
+	private static final AbstractClassifier position = new AbstractClassifier("position") {
 		@Override
 		public double getScore(MethodVarInstance methodA, MethodVarInstance methodB, ClassEnvironment env) {
 			return ClassifierUtil.classifyPosition(methodA, methodB,
@@ -61,14 +61,14 @@ public class MethodVarClassifier {
 		}
 	};
 
-	private static AbstractClassifier lvIndex = new AbstractClassifier("lv index") {
+	private static final AbstractClassifier lvIndex = new AbstractClassifier("lv index") {
 		@Override
 		public double getScore(MethodVarInstance argA, MethodVarInstance argB, ClassEnvironment env) {
 			return argA.getLvIndex() == argB.getLvIndex() ? 1 : 0;
 		}
 	};
 
-	private static AbstractClassifier usage = new AbstractClassifier("usage") {
+	private static final AbstractClassifier usage = new AbstractClassifier("usage") {
 		@Override
 		public double getScore(MethodVarInstance argA, MethodVarInstance argB, ClassEnvironment env) {
 			int[] map = ClassifierUtil.mapInsns(argA.getMethod(), argB.getMethod());
@@ -115,7 +115,7 @@ public class MethodVarClassifier {
 	};
 
 	public abstract static class AbstractClassifier implements IClassifier<MethodVarInstance> {
-		public AbstractClassifier(String name) {
+		protected AbstractClassifier(String name) {
 			this.name = name;
 		}
 
@@ -131,5 +131,8 @@ public class MethodVarClassifier {
 
 		private final String name;
 		private double weight;
+	}
+
+	private MethodVarClassifier() {
 	}
 }

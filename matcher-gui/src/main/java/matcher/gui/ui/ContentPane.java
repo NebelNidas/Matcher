@@ -91,12 +91,12 @@ public class ContentPane extends TabPane implements IFwdGuiComponent {
 		// add tab selection change listeners
 
 		getSelectionModel().selectedItemProperty().addListener((ov, oldTab, newTab) -> {
-			if (oldTab instanceof IGuiComponent.Selectable) {
-				((IGuiComponent.Selectable) oldTab).onSelectStateChange(false);
+			if (oldTab instanceof IGuiComponent.Selectable selectableOldTab) {
+				selectableOldTab.onSelectStateChange(false);
 			}
 
-			if (newTab instanceof IGuiComponent.Selectable) {
-				((IGuiComponent.Selectable) newTab).onSelectStateChange(true);
+			if (newTab instanceof IGuiComponent.Selectable selectableNewTab) {
+				selectableNewTab.onSelectStateChange(true);
 			}
 		});
 	}

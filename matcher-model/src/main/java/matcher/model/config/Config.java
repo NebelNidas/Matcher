@@ -1,7 +1,6 @@
 package matcher.model.config;
 
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -9,7 +8,7 @@ import java.util.function.Function;
 import java.util.prefs.BackingStoreException;
 import java.util.prefs.Preferences;
 
-public class Config {
+public final class Config {
 	public static void init(String themeId) {
 		Preferences prefs = Preferences.userRoot(); // in ~/.java/.userPrefs
 
@@ -140,7 +139,7 @@ public class Config {
 	}
 
 	static Path deserializePath(String path) {
-		return Paths.get(path);
+		return Path.of(path);
 	}
 
 	private static final String userPrefFolder = "player-obf-matcher";

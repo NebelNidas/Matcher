@@ -8,7 +8,7 @@ import java.util.prefs.Preferences;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
 
-public class ProjectConfig {
+public final class ProjectConfig {
 	public static class Builder {
 		public Builder(List<Path> pathsA, List<Path> pathsB) {
 			this.pathsA = pathsA;
@@ -186,7 +186,7 @@ public class ProjectConfig {
 				&& Collections.disjoint(pathsA, pathsB)
 				&& Collections.disjoint(pathsA, sharedClassPath)
 				&& Collections.disjoint(pathsB, sharedClassPath)
-				//&& Collections.disjoint(classPathA, classPathB)
+				// && Collections.disjoint(classPathA, classPathB)
 				&& Collections.disjoint(classPathA, pathsA)
 				&& Collections.disjoint(classPathB, pathsA)
 				&& Collections.disjoint(classPathA, pathsB)
