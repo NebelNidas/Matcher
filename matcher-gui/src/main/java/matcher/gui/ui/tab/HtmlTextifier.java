@@ -1632,7 +1632,7 @@ final class HtmlTextifier extends Textifier {
 		}
 
 		String name = labelNames.computeIfAbsent(label, k -> "L" + labelNames.size());
-		boolean number = numberPattern.matcher(name).matches();
+		boolean number = NUMBER_PATTERN.matcher(name).matches();
 
 		stringBuilder
 				.append(number ? "<span class=\"number\">" : "<span class=\"variable\">")
@@ -1961,7 +1961,7 @@ final class HtmlTextifier extends Textifier {
 	private static final List<String> FRAME_TYPES =
 			List.of("T", "I", "F", "D", "J", "N", "U");
 
-	private static final Pattern numberPattern = Pattern.compile("-?\\d+(\\.\\d+)?");
+	private static final Pattern NUMBER_PATTERN = Pattern.compile("-?\\d+(\\.\\d+)?");
 
 	/** The access flags of the visited class. */
 	private int access;

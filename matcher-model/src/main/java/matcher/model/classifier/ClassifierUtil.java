@@ -379,10 +379,10 @@ public final class ClassifierUtil {
 							implB.getOwner(), implB.getName(), implB.getDesc(), Util.isCallToInterface(implB),
 							env) ? COMPARED_SIMILAR : COMPARED_DISTINCT;
 				default:
-					logger.warn("Unexpected impl tag: {}", implA.getTag());
+					LOGGER.warn("Unexpected impl tag: {}", implA.getTag());
 				}
 			} else if (!Util.isIrrelevantBsm(a.bsm)) {
-				logger.warn("Unknown invokedynamic bsm: {}/{}{} (tag={} iif={})",
+				LOGGER.warn("Unknown invokedynamic bsm: {}/{}{} (tag={} iif={})",
 						a.bsm.getOwner(), a.bsm.getName(), a.bsm.getDesc(), a.bsm.getTag(), a.bsm.isInterface());
 			}
 
@@ -558,7 +558,7 @@ public final class ClassifierUtil {
 		if (ilA.size() * ilB.size() < 1000) {
 			return mapInsns(ilA, ilB, a, b, a.getEnv().getGlobal());
 		} else {
-			return a.getEnv().getGlobal().getCache().compute(ilMapCacheToken, a, b, (mA, mB) -> mapInsns(mA.getAsmNode().instructions, mB.getAsmNode().instructions, mA, mB, mA.getEnv().getGlobal()));
+			return a.getEnv().getGlobal().getCache().compute(IL_MAP_CACHE_TOKEN, a, b, (mA, mB) -> mapInsns(mA.getAsmNode().instructions, mB.getAsmNode().instructions, mA, mB, mA.getEnv().getGlobal()));
 		}
 	}
 
@@ -623,10 +623,10 @@ public final class ClassifierUtil {
 
 		/*for (int j = 0; j <= sizeB; j++) {
 			for (int i = 0; i <= sizeA; i++) {
-				logger.debug("%2d ", v[i + j * size]);
+				LOGGER.debug("%2d ", v[i + j * size]);
 			}
 
-			logger.debug("");
+			LOGGER.debug("");
 		}*/
 
 		int i = sizeA;
@@ -642,10 +642,10 @@ public final class ClassifierUtil {
 			if (keepCost <= delCost && keepCost <= insCost) {
 				if (c - keepCost >= COMPARED_DISTINCT) {
 					assert c - keepCost == COMPARED_DISTINCT;
-					// logger.debug("{}/{} rep {} -> {}", i-1, j-1, toString(elementRetriever.apply(listA, i - 1)), toString(elementRetriever.apply(listB, j - 1)));
+					// LOGGER.debug("{}/{} rep {} -> {}", i-1, j-1, toString(elementRetriever.apply(listA, i - 1)), toString(elementRetriever.apply(listB, j - 1)));
 					ret[i - 1] = -1;
 				} else {
-					// logger.debug("{}/{} eq {} - {}", i-1, j-1, toString(elementRetriever.apply(listA, i - 1)), toString(elementRetriever.apply(listB, j - 1)));
+					// LOGGER.debug("{}/{} eq {} - {}", i-1, j-1, toString(elementRetriever.apply(listA, i - 1)), toString(elementRetriever.apply(listB, j - 1)));
 					ret[i - 1] = j - 1;
 
 					/*U e = elementRetriever.apply(listA, i - 1);
@@ -659,11 +659,11 @@ public final class ClassifierUtil {
 				i--;
 				j--;
 			} else if (delCost < insCost) {
-				// logger.debug("{}/{} del {}", i-1, j-1, toString(elementRetriever.apply(listA, i - 1)));
+				// LOGGER.debug("{}/{} del {}", i-1, j-1, toString(elementRetriever.apply(listA, i - 1)));
 				ret[i - 1] = -1;
 				i--;
 			} else {
-				// logger.debug("{}/{} ins {}", i-1, j-1, toString(elementRetriever.apply(listB, j - 1)));
+				// LOGGER.debug("{}/{} ins {}", i-1, j-1, toString(elementRetriever.apply(listB, j - 1)));
 				j--;
 			}
 		}
@@ -737,7 +737,7 @@ public final class ClassifierUtil {
 
 		for (IClassifier<T> classifier : classifiers) {
 			double cScore = classifier.getScore(src, dst, env);
-			assert cScore > -epsilon && cScore < 1 + epsilon : "invalid score from "+classifier.getName()+": "+cScore;
+			assert cScore > -EPSILON && cScore < 1 + EPSILON : "invalid score from "+classifier.getName()+": "+cScore;
 
 			double weight = classifier.getWeight();
 			double weightedScore = cScore * weight;
@@ -895,8 +895,7 @@ public final class ClassifierUtil {
 	private ClassifierUtil() {
 	}
 
-	private static final double epsilon = 1e-6;
-
-	private static final Logger logger = LoggerFactory.getLogger(ClassifierUtil.class);
-	private static final CacheToken<int[]> ilMapCacheToken = new CacheToken<>();
+	private static final double EPSILON = 1e-6;
+	private static final Logger LOGGER = LoggerFactory.getLogger(ClassifierUtil.class);
+	private static final CacheToken<int[]> IL_MAP_CACHE_TOKEN = new CacheToken<>();
 }

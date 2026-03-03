@@ -1068,7 +1068,7 @@ public final class ClassInstance implements ParentInstance, Matchable<ClassInsta
 		ClassNode cn = getMergedAsmNode();
 		if (cn == null) throw new IllegalArgumentException("cls without asm node: " + this);
 
-		synchronized (Util.asmNodeSync) {
+		synchronized (Util.ASM_NODE_SYNC) {
 			if (nameType != NameType.PLAIN) {
 				AsmClassRemapper.process(cn, new AsmRemapper(env, nameType), visitor);
 			} else {
@@ -1162,11 +1162,11 @@ public final class ClassInstance implements ParentInstance, Matchable<ClassInsta
 		return name.substring(name.lastIndexOf('/') + 1);
 	}
 
-	public static final Comparator<ClassInstance> nameComparator = Comparator.comparing(ClassInstance::getName);
+	public static final Comparator<ClassInstance> NAME_COMPARATOR = Comparator.comparing(ClassInstance::getName);
 
-	private static final ClassInstance[] noArrays = new ClassInstance[0];
-	private static final MethodInstance[] noMethods = new MethodInstance[0];
-	private static final FieldInstance[] noFields = new FieldInstance[0];
+	private static final ClassInstance[] NO_ARRAYS = new ClassInstance[0];
+	private static final MethodInstance[] NO_METHODS = new MethodInstance[0];
+	private static final FieldInstance[] NO_FIELDS = new FieldInstance[0];
 
 	final String id;
 	private final URI origin;
@@ -1178,12 +1178,12 @@ public final class ClassInstance implements ParentInstance, Matchable<ClassInsta
 	final ClassInstance elementClass; // 0-dim class TODO: improve handling of array classes (references etc.)
 	private ClassSignature signature;
 
-	MethodInstance[] methods = noMethods;
-	FieldInstance[] fields = noFields;
+	MethodInstance[] methods = NO_METHODS;
+	FieldInstance[] fields = NO_FIELDS;
 	final Map<String, MethodInstance> methodIdx = new HashMap<>();
 	final Map<String, FieldInstance> fieldIdx = new HashMap<>();
 
-	private ClassInstance[] arrays = noArrays;
+	private ClassInstance[] arrays = NO_ARRAYS;
 
 	ClassInstance outerClass;
 	final Set<ClassInstance> innerClasses = Util.newIdentityHashSet();

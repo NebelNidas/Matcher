@@ -357,7 +357,7 @@ public abstract class MemberInstance<T extends MemberInstance<T>> implements Mat
 		return getDisplayName(NameType.PLAIN, true);
 	}
 
-	public static final Comparator<MemberInstance<?>> nameComparator = Comparator.<MemberInstance<?>, String>comparing(MemberInstance::getName).thenComparing(m -> m.getDesc());
+	public static final Comparator<MemberInstance<?>> NAME_COMPARATOR = Comparator.<MemberInstance<?>, String>comparing(MemberInstance::getName).thenComparing(m -> m.getDesc());
 
 	final ClassInstance cls;
 	final String id;

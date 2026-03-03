@@ -28,7 +28,7 @@ import matcher.model.type.ClassEnvironment;
  * Provides the default {@code automatch} command.
  */
 public class AutomatchCliCommandProvider implements CliCommandProvider {
-	@Parameters(commandNames = {commandName})
+	@Parameters(commandNames = {COMMAND_NAME})
 	static class AutomatchCommand {
 		@Parameter(names = {BuiltinCliParameters.INPUTS_A}, required = true)
 		List<Path> inputsA = Collections.emptyList();
@@ -78,7 +78,7 @@ public class AutomatchCliCommandProvider implements CliCommandProvider {
 
 	@Override
 	public String getCommandName() {
-		return commandName;
+		return COMMAND_NAME;
 	}
 
 	@Override
@@ -147,10 +147,10 @@ public class AutomatchCliCommandProvider implements CliCommandProvider {
 			throw new RuntimeException(e);
 		}
 
-		logger.info("Auto-matching done!");
+		LOGGER.info("Auto-matching done!");
 	}
 
-	private static final Logger logger = LoggerFactory.getLogger(AutomatchCliCommandProvider.class);
-	private static final String commandName = "automatch";
+	private static final Logger LOGGER = LoggerFactory.getLogger(AutomatchCliCommandProvider.class);
+	private static final String COMMAND_NAME = "automatch";
 	private final AutomatchCommand command = new AutomatchCommand();
 }

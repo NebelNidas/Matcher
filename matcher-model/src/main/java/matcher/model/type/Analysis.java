@@ -978,8 +978,8 @@ final class Analysis {
 				if (!localsUsed.isEmpty()) { // not all used (xor -> 1 = not used)
 					changed = true;
 					int newLocalsSize = localsUsed.previousClearBit(state.locals.length - 1) + 1;
-					ClassInstance[] newLocals = newLocalsSize == 0 ? ExecState.empty : Arrays.copyOf(state.locals, newLocalsSize);
-					int[] newLocalVarIds = newLocalsSize == 0 ? ExecState.emptyIds : Arrays.copyOf(state.localVarIds, newLocalsSize);
+					ClassInstance[] newLocals = newLocalsSize == 0 ? ExecState.EMPTY : Arrays.copyOf(state.locals, newLocalsSize);
+					int[] newLocalVarIds = newLocalsSize == 0 ? ExecState.EMPTY_IDS : Arrays.copyOf(state.localVarIds, newLocalsSize);
 					int idx = -1;
 
 					while ((idx = localsUsed.nextSetBit(idx + 1)) != -1 && idx < newLocalsSize) {
@@ -1030,8 +1030,8 @@ final class Analysis {
 							changed = true;
 
 							int newLocalsSize = localsSupplied.previousSetBit(state.locals.length - 1) + 1;
-							ClassInstance[] newLocals = newLocalsSize == 0 ? ExecState.empty : Arrays.copyOf(state.locals, newLocalsSize);
-							int[] newLocalVarIds = newLocalsSize == 0 ? ExecState.emptyIds : Arrays.copyOf(state.localVarIds, newLocalsSize);
+							ClassInstance[] newLocals = newLocalsSize == 0 ? ExecState.EMPTY : Arrays.copyOf(state.locals, newLocalsSize);
+							int[] newLocalVarIds = newLocalsSize == 0 ? ExecState.EMPTY_IDS : Arrays.copyOf(state.localVarIds, newLocalsSize);
 
 							for (int i = 0; i < newLocals.length - 1; i++) {
 								if (!localsSupplied.get(i)) {
@@ -1948,10 +1948,10 @@ final class Analysis {
 
 	private static class ExecState {
 		ExecState(ClassInstance[] locals, int[] localVarIds, int localsSize, ClassInstance[] stack, int[] stackVarIds, int stackSize) {
-			this(localsSize != 0 ? Arrays.copyOf(locals, localsSize) : empty,
-					localsSize != 0 ? Arrays.copyOf(localVarIds, localsSize) : emptyIds,
-					stackSize != 0 ? Arrays.copyOf(stack, stackSize) : empty,
-					stackSize != 0 ? Arrays.copyOf(stackVarIds, stackSize) : emptyIds);
+			this(localsSize != 0 ? Arrays.copyOf(locals, localsSize) : EMPTY,
+					localsSize != 0 ? Arrays.copyOf(localVarIds, localsSize) : EMPTY_IDS,
+					stackSize != 0 ? Arrays.copyOf(stack, stackSize) : EMPTY,
+					stackSize != 0 ? Arrays.copyOf(stackVarIds, stackSize) : EMPTY_IDS);
 		}
 
 		ExecState(ClassInstance[] locals, int[] localVarIds, ClassInstance[] stack, int[] stackVarIds) {
@@ -1981,8 +1981,8 @@ final class Analysis {
 			return Arrays.hashCode(locals) ^ Arrays.hashCode(stack);
 		}
 
-		private static final ClassInstance[] empty = new ClassInstance[0];
-		private static final int[] emptyIds = new int[0];
+		private static final ClassInstance[] EMPTY = new ClassInstance[0];
+		private static final int[] EMPTY_IDS = new int[0];
 
 		final ClassInstance[] locals;
 		final int[] localVarIds;

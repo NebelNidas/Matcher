@@ -21,8 +21,8 @@ public class UidSetupPane extends GridPane {
 	}
 
 	private void init(UidConfig config) {
-		setHgap(GuiConstants.padding);
-		setVgap(GuiConstants.padding);
+		setHgap(GuiConstants.PADDING);
+		setVgap(GuiConstants.PADDING);
 
 		InetSocketAddress address = config.getAddress();
 

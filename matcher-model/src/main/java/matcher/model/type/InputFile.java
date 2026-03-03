@@ -55,19 +55,19 @@ public final class InputFile {
 	}
 
 	public InputFile(String fileName, String url) {
-		this(fileName, unknownSize, null, null, url);
+		this(fileName, UNKNOWN_SIZE, null, null, url);
 	}
 
 	public InputFile(String fileName, Path pathHint, String url) {
-		this(fileName, unknownSize, null, null, pathHint, url);
+		this(fileName, UNKNOWN_SIZE, null, null, pathHint, url);
 	}
 
 	public InputFile(String fileName, byte[] hash, HashType hashType, String url) {
-		this(fileName, unknownSize, hash, hashType, url);
+		this(fileName, UNKNOWN_SIZE, hash, hashType, url);
 	}
 
 	public InputFile(String fileName, byte[] hash, HashType hashType, Path pathHint, String url) {
-		this(fileName, unknownSize, hash, hashType, pathHint, url);
+		this(fileName, UNKNOWN_SIZE, hash, hashType, pathHint, url);
 	}
 
 	public InputFile(String fileName, long size, byte[] hash, HashType hashType, String url) {
@@ -221,7 +221,7 @@ public final class InputFile {
 		}
 
 		public byte[] hash(Path path) throws IOException {
-			TlData tlData = tlDatas.get();
+			TlData tlData = TL_DATAS.get();
 
 			MessageDigest digest = tlData.digests.get(this);
 			ByteBuffer buffer = tlData.buffer;
@@ -251,7 +251,7 @@ public final class InputFile {
 			final ByteBuffer buffer;
 		}
 
-		private static final ThreadLocal<TlData> tlDatas = ThreadLocal.withInitial(TlData::new);
+		private static final ThreadLocal<TlData> TL_DATAS = ThreadLocal.withInitial(TlData::new);
 
 		public final String algorithm;
 	}
@@ -278,13 +278,13 @@ public final class InputFile {
 		final Path res = ret;
 
 		Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-			logger.info("Deleting dlTmp {}", res);
+			LOGGER.info("Deleting dlTmp {}", res);
 
 			try {
 				Files.walkFileTree(res, new SimpleFileVisitor<>() {
 					@Override
 					public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
-						logger.debug("Deleting file {}", file);
+						LOGGER.debug("Deleting file {}", file);
 
 						if (file.normalize().toAbsolutePath().startsWith(res)) {
 							Files.delete(file);
@@ -295,7 +295,7 @@ public final class InputFile {
 
 					@Override
 					public FileVisitResult postVisitDirectory(Path dir, IOException exc) throws IOException {
-						logger.debug("Deleting dir {}", dir);
+						LOGGER.debug("Deleting dir {}", dir);
 
 						if (dir.normalize().toAbsolutePath().startsWith(res)) {
 							Files.delete(dir);
@@ -305,7 +305,7 @@ public final class InputFile {
 					}
 				});
 			} catch (IOException e) {
-				logger.error("Exception while deleting dlTmp", e);
+				LOGGER.error("Exception while deleting dlTmp", e);
 			}
 		}));
 
@@ -315,7 +315,7 @@ public final class InputFile {
 	}
 
 	private static Path downloadToTmp(String url) throws IOException, InterruptedException {
-		logger.info("downloading {}", url);
+		LOGGER.info("downloading {}", url);
 
 		String name = url.substring(url.lastIndexOf('/') + 1).replaceAll("[^\\w.\\- ]", "x");
 		if (name.isEmpty()) name = "dl";
@@ -328,7 +328,7 @@ public final class InputFile {
 		}
 
 		HttpRequest request = HttpRequest.newBuilder(URI.create(url)).timeout(Duration.ofSeconds(10)).build();
-		HttpResponse<InputStream> response = httpClient.send(request, BodyHandlers.ofInputStream());
+		HttpResponse<InputStream> response = HTTP_CLIENT.send(request, BodyHandlers.ofInputStream());
 
 		if (response.statusCode() != 200) {
 			throw new IOException("bad http status code: " + response.statusCode());
@@ -341,10 +341,10 @@ public final class InputFile {
 		return out;
 	}
 
-	public static final long unknownSize = -1;
+	public static final long UNKNOWN_SIZE = -1;
 
-	private static final Logger logger = LoggerFactory.getLogger(InputFile.class);
-	private static final HttpClient httpClient = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
+	private static final Logger LOGGER = LoggerFactory.getLogger(InputFile.class);
+	private static final HttpClient HTTP_CLIENT = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
 
 	private static Path dlTmp;
 

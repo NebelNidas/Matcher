@@ -106,7 +106,7 @@ public class MatcherGui extends Application {
 		scene = new Scene(border, 1400, 800);
 		Shortcuts.init(this);
 
-		for (Consumer<MatcherGui> l : loadListeners) {
+		for (Consumer<MatcherGui> l : LOAD_LISTENERS) {
 			l.accept(this);
 		}
 
@@ -122,7 +122,7 @@ public class MatcherGui extends Application {
 
 	@Override
 	public void stop() {
-		threadPool.shutdown();
+		THREAD_POOL.shutdown();
 	}
 
 	private void handleStartupArgs(List<String> args) {
@@ -307,7 +307,7 @@ public class MatcherGui extends Application {
 					onProjectChange();
 				},
 				exc -> {
-					logger.error("Failed to initialize project", exc);
+					LOGGER.error("Failed to initialize project", exc);
 					showAlert(AlertType.ERROR, "Project initialization error", "An error occurred while initializing the project", exc.getMessage());
 					ret.completeExceptionally(exc);
 				});
@@ -505,7 +505,7 @@ public class MatcherGui extends Application {
 		jfxTask.setOnFailed(event -> ret.completeExceptionally(jfxTask.getException()));
 		jfxTask.setOnCancelled(event -> ret.cancel(false));
 
-		threadPool.execute(jfxTask);
+		THREAD_POOL.execute(jfxTask);
 
 		return ret;
 	}
@@ -517,7 +517,7 @@ public class MatcherGui extends Application {
 	public void runProgressTask(String labelText, Consumer<DoubleConsumer> task, Runnable onSuccess, Consumer<Throwable> onError) {
 		Stage stage = new Stage(StageStyle.UTILITY);
 		stage.initOwner(this.scene.getWindow());
-		VBox pane = new VBox(GuiConstants.padding);
+		VBox pane = new VBox(GuiConstants.PADDING);
 
 		stage.setScene(new Scene(pane));
 		stage.initModality(Modality.APPLICATION_MODAL);
@@ -525,7 +525,7 @@ public class MatcherGui extends Application {
 		stage.setResizable(false);
 		stage.setTitle("Operation progress");
 
-		pane.setPadding(new Insets(GuiConstants.padding));
+		pane.setPadding(new Insets(GuiConstants.PADDING));
 
 		pane.getChildren().add(new Label(labelText));
 
@@ -554,7 +554,7 @@ public class MatcherGui extends Application {
 			if (onError != null) onError.accept(jfxTask.getException());
 		});
 
-		threadPool.execute(jfxTask);
+		THREAD_POOL.execute(jfxTask);
 	}
 
 	public void showAlert(AlertType type, String title, String headerText, String text) {
@@ -659,10 +659,10 @@ public class MatcherGui extends Application {
 		Name, MappedName, MatchStatus, Similarity
 	}
 
-	public static final List<Consumer<MatcherGui>> loadListeners = new ArrayList<>();
+	public static final List<Consumer<MatcherGui>> LOAD_LISTENERS = new ArrayList<>();
 
-	private static final Logger logger = LoggerFactory.getLogger(MatcherGui.class);
-	private static final ExecutorService threadPool = Executors.newCachedThreadPool();
+	private static final Logger LOGGER = LoggerFactory.getLogger(MatcherGui.class);
+	private static final ExecutorService THREAD_POOL = Executors.newCachedThreadPool();
 
 	private ClassEnvironment env;
 	private Matcher matcher;

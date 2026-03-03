@@ -98,7 +98,7 @@ public final class SrcDecorator {
 		TypeResolver resolver = new TypeResolver();
 		resolver.setup(cls, nameType, cu);
 
-		cu.accept(remapVisitor, resolver);
+		cu.accept(REMAP_VISITOR, resolver);
 
 		HtmlPrinter printer = new HtmlPrinter(resolver);
 		cu.accept(printer, null);
@@ -270,7 +270,10 @@ public final class SrcDecorator {
 		handleComment(comment, n);
 	}
 
-	private static final VoidVisitorAdapter<TypeResolver> remapVisitor = new VoidVisitorAdapter<>() {
+	private SrcDecorator() {
+	}
+
+	private static final VoidVisitorAdapter<TypeResolver> REMAP_VISITOR = new VoidVisitorAdapter<>() {
 		@Override
 		public void visit(CompilationUnit n, TypeResolver resolver) {
 			n.getTypes().forEach(p -> p.accept(this, resolver));
@@ -360,9 +363,6 @@ public final class SrcDecorator {
 			n.getAnnotations().forEach(p -> p.accept(this, arg));*/
 		}
 	};
-
-	private SrcDecorator() {
-	}
 
 	private static final Logger LOGGER = LoggerFactory.getLogger(SrcDecorator.class);
 }

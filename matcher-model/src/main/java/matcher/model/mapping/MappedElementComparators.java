@@ -85,18 +85,18 @@ public final class MappedElementComparators {
 	}
 
 	public static Comparator<MethodVarInstance> byLvIndex() {
-		return lvIndexComparator;
+		return LV_INDEX_COMPARATOR;
 	}
 
-	private static final Comparator<MethodVarInstance> lvIndexComparator = Comparator
+	private static final Comparator<MethodVarInstance> LV_INDEX_COMPARATOR = Comparator
 			.comparingInt(MethodVarInstance::getLvIndex)
 			.thenComparingInt(MethodVarInstance::getStartOpIdx);
 
 	public static Comparator<MethodVarInstance> byLvtIndex() {
-		return lvtIndexComparator;
+		return LVT_INDEX_COMPARATOR;
 	}
 
-	private static final Comparator<MethodVarInstance> lvtIndexComparator = Comparator.comparingInt(MethodVarInstance::getAsmIndex);
+	private static final Comparator<MethodVarInstance> LVT_INDEX_COMPARATOR = Comparator.comparingInt(MethodVarInstance::getAsmIndex);
 
 	private static int compareNullLast(String a, String b) {
 		if (a == null) {

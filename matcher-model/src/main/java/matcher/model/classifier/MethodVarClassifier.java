@@ -16,10 +16,10 @@ import matcher.model.type.MethodVarInstance;
 
 public final class MethodVarClassifier {
 	public static void init() {
-		addClassifier(type, 10);
-		addClassifier(position, 3);
-		addClassifier(lvIndex, 2);
-		addClassifier(usage, 8);
+		addClassifier(TYPE, 10);
+		addClassifier(POSITION, 3);
+		addClassifier(LV_INDEX, 2);
+		addClassifier(USAGE, 8);
 	}
 
 	public static void addClassifier(AbstractClassifier classifier, double weight, ClassifierLevel... levels) {
@@ -28,30 +28,30 @@ public final class MethodVarClassifier {
 		classifier.weight = weight;
 
 		for (ClassifierLevel level : levels) {
-			classifiers.computeIfAbsent(level, ignore -> new ArrayList<>()).add(classifier);
-			maxScore.put(level, getMaxScore(level) + weight);
+			CLASSIFIERS.computeIfAbsent(level, ignore -> new ArrayList<>()).add(classifier);
+			MAX_SCORE.put(level, getMaxScore(level) + weight);
 		}
 	}
 
 	public static double getMaxScore(ClassifierLevel level) {
-		return maxScore.getOrDefault(level, 0.);
+		return MAX_SCORE.getOrDefault(level, 0.);
 	}
 
 	public static List<RankResult<MethodVarInstance>> rank(MethodVarInstance src, MethodVarInstance[] dsts, ClassifierLevel level, ClassEnvironment env, double maxMismatch) {
-		return ClassifierUtil.rank(src, dsts, classifiers.getOrDefault(level, Collections.emptyList()), ClassifierUtil::checkPotentialEquality, env, maxMismatch);
+		return ClassifierUtil.rank(src, dsts, CLASSIFIERS.getOrDefault(level, Collections.emptyList()), ClassifierUtil::checkPotentialEquality, env, maxMismatch);
 	}
 
-	private static final Map<ClassifierLevel, List<IClassifier<MethodVarInstance>>> classifiers = new EnumMap<>(ClassifierLevel.class);
-	private static final Map<ClassifierLevel, Double> maxScore = new EnumMap<>(ClassifierLevel.class);
+	private static final Map<ClassifierLevel, List<IClassifier<MethodVarInstance>>> CLASSIFIERS = new EnumMap<>(ClassifierLevel.class);
+	private static final Map<ClassifierLevel, Double> MAX_SCORE = new EnumMap<>(ClassifierLevel.class);
 
-	private static final AbstractClassifier type = new AbstractClassifier("type") {
+	private static final AbstractClassifier TYPE = new AbstractClassifier("type") {
 		@Override
 		public double getScore(MethodVarInstance argA, MethodVarInstance argB, ClassEnvironment env) {
 			return ClassifierUtil.checkPotentialEquality(argA.getType(), argB.getType()) ? 1 : 0;
 		}
 	};
 
-	private static final AbstractClassifier position = new AbstractClassifier("position") {
+	private static final AbstractClassifier POSITION = new AbstractClassifier("position") {
 		@Override
 		public double getScore(MethodVarInstance methodA, MethodVarInstance methodB, ClassEnvironment env) {
 			return ClassifierUtil.classifyPosition(methodA, methodB,
@@ -61,14 +61,14 @@ public final class MethodVarClassifier {
 		}
 	};
 
-	private static final AbstractClassifier lvIndex = new AbstractClassifier("lv index") {
+	private static final AbstractClassifier LV_INDEX = new AbstractClassifier("lv index") {
 		@Override
 		public double getScore(MethodVarInstance argA, MethodVarInstance argB, ClassEnvironment env) {
 			return argA.getLvIndex() == argB.getLvIndex() ? 1 : 0;
 		}
 	};
 
-	private static final AbstractClassifier usage = new AbstractClassifier("usage") {
+	private static final AbstractClassifier USAGE = new AbstractClassifier("usage") {
 		@Override
 		public double getScore(MethodVarInstance argA, MethodVarInstance argB, ClassEnvironment env) {
 			int[] map = ClassifierUtil.mapInsns(argA.getMethod(), argB.getMethod());

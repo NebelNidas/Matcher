@@ -57,12 +57,12 @@ public final class PluginLoader {
 		ServiceLoader<Plugin> pluginLoader = ServiceLoader.load(Plugin.class, cl);
 
 		for (Plugin p : pluginLoader) {
-			p.init(apiVersion);
+			p.init(API_VERSION);
 		}
 	}
 
 	private PluginLoader() {
 	}
 
-	private static final int apiVersion = 0;
+	private static final int API_VERSION = 0;
 }

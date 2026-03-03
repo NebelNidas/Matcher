@@ -66,7 +66,7 @@ public class ContentPane extends TabPane implements IFwdGuiComponent {
 
 		// hierarchy tab
 
-		if (showHierarchy) {
+		if (SHOW_HIERARCHY) {
 			HierarchyTab hTab = new HierarchyTab();
 			components.add(hTab);
 			getTabs().add(hTab);
@@ -106,7 +106,7 @@ public class ContentPane extends TabPane implements IFwdGuiComponent {
 		return components;
 	}
 
-	private static final boolean showHierarchy = false;
+	private static final boolean SHOW_HIERARCHY = false;
 
 	private final MatcherGui gui;
 	private final boolean isSource;

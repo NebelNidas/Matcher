@@ -85,7 +85,7 @@ public final class MatchesIo {
 
 						final int indent = 2;
 						int sizeEnd = line.indexOf('\t', indent);
-						long size = InputFile.unknownSize;
+						long size = InputFile.UNKNOWN_SIZE;
 						byte[] hash = null;
 						HashType hashType = null;
 						String url = null; // TODO: save url?

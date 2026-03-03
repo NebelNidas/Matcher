@@ -27,7 +27,7 @@ import matcher.gui.ui.GuiUtil;
 
 public class LoadProjectPane extends VBox {
 	LoadProjectPane(List<Path> paths, boolean verifyFiles, Window window, Node okButton) {
-		super(GuiConstants.padding);
+		super(GuiConstants.PADDING);
 
 		this.paths = FXCollections.observableArrayList(paths);
 		this.verifyFiles = verifyFiles;
@@ -48,7 +48,7 @@ public class LoadProjectPane extends VBox {
 		list.setPrefHeight(200);
 		VBox.setVgrow(list, Priority.ALWAYS);
 
-		HBox footer = new HBox(GuiConstants.padding);
+		HBox footer = new HBox(GuiConstants.PADDING);
 		getChildren().add(footer);
 
 		footer.setAlignment(Pos.CENTER_RIGHT);

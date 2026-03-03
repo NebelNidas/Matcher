@@ -4,5 +4,5 @@ public final class GuiConstants {
 	private GuiConstants() {
 	}
 
-	public static final double padding = 5;
+	public static final double PADDING = 5;
 }

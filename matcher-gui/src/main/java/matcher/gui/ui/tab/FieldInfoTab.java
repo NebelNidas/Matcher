@@ -39,9 +39,9 @@ public class FieldInfoTab extends Tab implements IGuiComponent {
 
 	private void init() {
 		GridPane grid = new GridPane();
-		grid.setPadding(new Insets(GuiConstants.padding));
-		grid.setHgap(GuiConstants.padding);
-		grid.setVgap(GuiConstants.padding);
+		grid.setPadding(new Insets(GuiConstants.PADDING));
+		grid.setHgap(GuiConstants.PADDING);
+		grid.setVgap(GuiConstants.PADDING);
 		int row = 0;
 
 		row = addRow("Owner", ownerLabel, grid, row);

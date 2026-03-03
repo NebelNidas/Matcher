@@ -38,9 +38,9 @@ public class BottomPane extends StackPane implements IGuiComponent {
 
 	private void init() {
 		setId("bottom-pane");
-		setPadding(new Insets(GuiConstants.padding));
+		setPadding(new Insets(GuiConstants.PADDING));
 
-		HBox center = new HBox(GuiConstants.padding);
+		HBox center = new HBox(GuiConstants.PADDING);
 		getChildren().add(center);
 		StackPane.setAlignment(center, Pos.CENTER);
 		center.setAlignment(Pos.CENTER);
@@ -63,7 +63,7 @@ public class BottomPane extends StackPane implements IGuiComponent {
 
 		center.getChildren().add(matchPerfectMembersButton);
 
-		HBox right = new HBox(GuiConstants.padding);
+		HBox right = new HBox(GuiConstants.PADDING);
 		getChildren().add(right);
 		StackPane.setAlignment(right, Pos.CENTER_RIGHT);
 		right.setAlignment(Pos.CENTER_RIGHT);

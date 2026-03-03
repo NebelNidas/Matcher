@@ -58,8 +58,8 @@ public class NewProjectPane extends GridPane {
 	}
 
 	private void init() {
-		setHgap(4 * GuiConstants.padding);
-		setVgap(4 * GuiConstants.padding);
+		setHgap(4 * GuiConstants.PADDING);
+		setVgap(4 * GuiConstants.PADDING);
 
 		ColumnConstraints colConstraint = new ColumnConstraints();
 		colConstraint.setPercentWidth(50);
@@ -78,7 +78,7 @@ public class NewProjectPane extends GridPane {
 		add(createFilesSelectionPane("Class path A", classPathA, window, true, false), 0, 1);
 		add(createFilesSelectionPane("Class path B", classPathB, window, true, false), 1, 1);
 
-		HBox hbox = new HBox(GuiConstants.padding);
+		HBox hbox = new HBox(GuiConstants.PADDING);
 		Button swapButton = new Button("swap A ⇄ B");
 		hbox.getChildren().add(swapButton);
 		swapButton.setOnAction(event -> {
@@ -124,7 +124,7 @@ public class NewProjectPane extends GridPane {
 	}
 
 	private Node createFilesSelectionPane(String name, ObservableList<Path> entries, Window window, boolean isClassPath, boolean isShared) {
-		VBox ret = new VBox(GuiConstants.padding);
+		VBox ret = new VBox(GuiConstants.PADDING);
 
 		ret.getChildren().add(new Label(name + ":"));
 
@@ -136,7 +136,7 @@ public class NewProjectPane extends GridPane {
 		list.setPrefHeight(isShared ? 200 : 100);
 		VBox.setVgrow(list, Priority.ALWAYS);
 
-		HBox footer = new HBox(GuiConstants.padding);
+		HBox footer = new HBox(GuiConstants.PADDING);
 		ret.getChildren().add(footer);
 
 		footer.setAlignment(Pos.CENTER_RIGHT);
@@ -293,7 +293,7 @@ public class NewProjectPane extends GridPane {
 	}
 
 	private Node createMiscPane() {
-		VBox ret = new VBox(GuiConstants.padding);
+		VBox ret = new VBox(GuiConstants.PADDING);
 
 		ret.getChildren().add(new Label("Non-obfuscated class name pattern A (regex):"));
 		ret.getChildren().add(nonObfuscatedClassPatternA);

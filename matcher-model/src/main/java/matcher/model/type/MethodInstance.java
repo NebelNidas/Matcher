@@ -41,7 +41,7 @@ public final class MethodInstance extends MemberInstance<MethodInstance> impleme
 			this.real = asmNode != null;
 			this.access = asmNode != null ? asmNode.access : approximateAccess(isStatic);
 			this.args = gatherArgs(this, desc, asmNode);
-			this.vars = cls.isInput() ? gatherVars(this, asmNode) : emptyVars;
+			this.vars = cls.isInput() ? gatherVars(this, asmNode) : EMPTY_VARS;
 			this.retType = cls.getEnv().getCreateClassInstance(Type.getReturnType(desc).getDescriptor());
 			this.signature = asmNode == null || asmNode.signature == null || !cls.isInput() ? null : MethodSignature.parse(asmNode.signature, cls.getEnv());
 			this.asmNode = cls.getEnv().isShared() ? null : asmNode;
@@ -62,7 +62,7 @@ public final class MethodInstance extends MemberInstance<MethodInstance> impleme
 
 	private static MethodVarInstance[] gatherArgs(MethodInstance method, String desc, MethodNode asmNode) {
 		Type[] argTypes = Type.getArgumentTypes(desc);
-		if (argTypes.length == 0) return emptyVars;
+		if (argTypes.length == 0) return EMPTY_VARS;
 
 		MethodVarInstance[] args = new MethodVarInstance[argTypes.length];
 		List<LocalVariableNode> locals;
@@ -122,9 +122,9 @@ public final class MethodInstance extends MemberInstance<MethodInstance> impleme
 	}
 
 	private static MethodVarInstance[] gatherVars(MethodInstance method, MethodNode asmNode) {
-		if (asmNode == null) return emptyVars;
-		if (asmNode.localVariables == null) return emptyVars; // TODO: generate?
-		if (asmNode.localVariables.isEmpty()) return emptyVars;
+		if (asmNode == null) return EMPTY_VARS;
+		if (asmNode.localVariables == null) return EMPTY_VARS; // TODO: generate?
+		if (asmNode.localVariables.isEmpty()) return EMPTY_VARS;
 
 		InsnList il = asmNode.instructions;
 		AbstractInsnNode firstInsn = il.getFirst();
@@ -146,7 +146,7 @@ public final class MethodInstance extends MemberInstance<MethodInstance> impleme
 			vars.add(var);
 		}
 
-		if (vars.isEmpty()) return emptyVars;
+		if (vars.isEmpty()) return EMPTY_VARS;
 
 		// stable sort by start bci
 		vars.sort(Comparator.comparingInt(var -> il.indexOf(var.start)));
@@ -566,7 +566,7 @@ public final class MethodInstance extends MemberInstance<MethodInstance> impleme
 		return name+desc;
 	}
 
-	private static final MethodVarInstance[] emptyVars = new MethodVarInstance[0];
+	private static final MethodVarInstance[] EMPTY_VARS = new MethodVarInstance[0];
 
 	final boolean real;
 	final int access;

@@ -26,23 +26,23 @@ import matcher.model.type.Signature.MethodSignature;
 
 public final class MethodClassifier {
 	public static void init() {
-		addClassifier(methodTypeCheck, 10);
-		addClassifier(accessFlags, 4);
-		addClassifier(argTypes, 10);
-		addClassifier(retType, 5);
-		addClassifier(signature, 5);
-		addClassifier(classRefs, 3);
-		addClassifier(stringConstants, 5);
-		addClassifier(numericConstants, 5);
-		addClassifier(parentMethods, 10);
-		addClassifier(childMethods, 3);
-		addClassifier(inReferences, 6);
-		addClassifier(outReferences, 6);
-		addClassifier(fieldReads, 5);
-		addClassifier(fieldWrites, 5);
-		addClassifier(position, 3);
-		addClassifier(code, 12, ClassifierLevel.Full, ClassifierLevel.Extra);
-		addClassifier(inRefsBci, 6, ClassifierLevel.Extra);
+		addClassifier(METHOD_TYPE_CHECK, 10);
+		addClassifier(ACCESS_FLAGS, 4);
+		addClassifier(ARG_TYPES, 10);
+		addClassifier(RET_TYPE, 5);
+		addClassifier(SIGNATURE, 5);
+		addClassifier(CLASS_REFS, 3);
+		addClassifier(STRING_CONSTANTS, 5);
+		addClassifier(NUMERIC_CONSTANTS, 5);
+		addClassifier(PARENT_METHODS, 10);
+		addClassifier(CHILD_METHODS, 3);
+		addClassifier(IN_REFERENCES, 6);
+		addClassifier(OUT_REFERENCES, 6);
+		addClassifier(FIELD_READS, 5);
+		addClassifier(FIELD_WRITES, 5);
+		addClassifier(POSITION, 3);
+		addClassifier(CODE, 12, ClassifierLevel.Full, ClassifierLevel.Extra);
+		addClassifier(IN_REFS_BCI, 6, ClassifierLevel.Extra);
 	}
 
 	public static void addClassifier(AbstractClassifier classifier, double weight, ClassifierLevel... levels) {
@@ -51,13 +51,13 @@ public final class MethodClassifier {
 		classifier.weight = weight;
 
 		for (ClassifierLevel level : levels) {
-			classifiers.computeIfAbsent(level, ignore -> new ArrayList<>()).add(classifier);
-			maxScore.put(level, getMaxScore(level) + weight);
+			CLASSIFIERS.computeIfAbsent(level, ignore -> new ArrayList<>()).add(classifier);
+			MAX_SCORE.put(level, getMaxScore(level) + weight);
 		}
 	}
 
 	public static double getMaxScore(ClassifierLevel level) {
-		return maxScore.getOrDefault(level, 0.);
+		return MAX_SCORE.getOrDefault(level, 0.);
 	}
 
 	public static List<RankResult<MethodInstance>> rank(MethodInstance src, MethodInstance[] dsts, ClassifierLevel level, ClassEnvironment env) {
@@ -92,13 +92,13 @@ public final class MethodClassifier {
 			}
 		}
 
-		return ClassifierUtil.rank(src, dsts, classifiers.getOrDefault(level, Collections.emptyList()), ClassifierUtil::checkPotentialEquality, env, maxMismatch);
+		return ClassifierUtil.rank(src, dsts, CLASSIFIERS.getOrDefault(level, Collections.emptyList()), ClassifierUtil::checkPotentialEquality, env, maxMismatch);
 	}
 
-	private static final Map<ClassifierLevel, List<IClassifier<MethodInstance>>> classifiers = new EnumMap<>(ClassifierLevel.class);
-	private static final Map<ClassifierLevel, Double> maxScore = new EnumMap<>(ClassifierLevel.class);
+	private static final Map<ClassifierLevel, List<IClassifier<MethodInstance>>> CLASSIFIERS = new EnumMap<>(ClassifierLevel.class);
+	private static final Map<ClassifierLevel, Double> MAX_SCORE = new EnumMap<>(ClassifierLevel.class);
 
-	private static final AbstractClassifier methodTypeCheck = new AbstractClassifier("method type check") {
+	private static final AbstractClassifier METHOD_TYPE_CHECK = new AbstractClassifier("method type check") {
 		@Override
 		public double getScore(MethodInstance methodA, MethodInstance methodB, ClassEnvironment env) {
 			if (!checkAsmNodes(methodA, methodB)) return compareAsmNodes(methodA, methodB);
@@ -111,7 +111,7 @@ public final class MethodClassifier {
 		}
 	};
 
-	private static final AbstractClassifier accessFlags = new AbstractClassifier("access flags") {
+	private static final AbstractClassifier ACCESS_FLAGS = new AbstractClassifier("access flags") {
 		@Override
 		public double getScore(MethodInstance methodA, MethodInstance methodB, ClassEnvironment env) {
 			if (!checkAsmNodes(methodA, methodB)) return compareAsmNodes(methodA, methodB);
@@ -124,7 +124,7 @@ public final class MethodClassifier {
 		}
 	};
 
-	private static final AbstractClassifier argTypes = new AbstractClassifier("arg types") {
+	private static final AbstractClassifier ARG_TYPES = new AbstractClassifier("arg types") {
 		@Override
 		public double getScore(MethodInstance methodA, MethodInstance methodB, ClassEnvironment env) {
 			return ClassifierUtil.compareClassLists(getArgTypes(methodA), getArgTypes(methodB));
@@ -144,14 +144,14 @@ public final class MethodClassifier {
 		return ret;
 	}
 
-	private static final AbstractClassifier retType = new AbstractClassifier("ret type") {
+	private static final AbstractClassifier RET_TYPE = new AbstractClassifier("ret type") {
 		@Override
 		public double getScore(MethodInstance methodA, MethodInstance methodB, ClassEnvironment env) {
 			return ClassifierUtil.checkPotentialEquality(methodA.getRetType(), methodB.getRetType()) ? 1 : 0;
 		}
 	};
 
-	private static final AbstractClassifier signature = new AbstractClassifier("signature") {
+	private static final AbstractClassifier SIGNATURE = new AbstractClassifier("signature") {
 		@Override
 		public double getScore(MethodInstance methodA, MethodInstance methodB, ClassEnvironment env) {
 			MethodSignature sigA = methodA.getSignature();
@@ -164,14 +164,14 @@ public final class MethodClassifier {
 		}
 	};
 
-	private static final AbstractClassifier classRefs = new AbstractClassifier("class refs") {
+	private static final AbstractClassifier CLASS_REFS = new AbstractClassifier("class refs") {
 		@Override
 		public double getScore(MethodInstance methodA, MethodInstance methodB, ClassEnvironment env) {
 			return ClassifierUtil.compareClassSets(methodA.getClassRefs(), methodB.getClassRefs(), true);
 		}
 	};
 
-	private static final AbstractClassifier stringConstants = new AbstractClassifier("string constants") {
+	private static final AbstractClassifier STRING_CONSTANTS = new AbstractClassifier("string constants") {
 		@Override
 		public double getScore(MethodInstance methodA, MethodInstance methodB, ClassEnvironment env) {
 			if (!checkAsmNodes(methodA, methodB)) return compareAsmNodes(methodA, methodB);
@@ -185,7 +185,7 @@ public final class MethodClassifier {
 		}
 	};
 
-	private static final AbstractClassifier numericConstants = new AbstractClassifier("numeric constants") {
+	private static final AbstractClassifier NUMERIC_CONSTANTS = new AbstractClassifier("numeric constants") {
 		@Override
 		public double getScore(MethodInstance methodA, MethodInstance methodB, ClassEnvironment env) {
 			if (!checkAsmNodes(methodA, methodB)) return compareAsmNodes(methodA, methodB);
@@ -209,56 +209,56 @@ public final class MethodClassifier {
 		}
 	};
 
-	private static final AbstractClassifier parentMethods = new AbstractClassifier("parent methods") {
+	private static final AbstractClassifier PARENT_METHODS = new AbstractClassifier("parent methods") {
 		@Override
 		public double getScore(MethodInstance methodA, MethodInstance methodB, ClassEnvironment env) {
 			return ClassifierUtil.compareMethodSets(methodA.getParents(), methodB.getParents(), true);
 		}
 	};
 
-	private static final AbstractClassifier childMethods = new AbstractClassifier("child methods") {
+	private static final AbstractClassifier CHILD_METHODS = new AbstractClassifier("child methods") {
 		@Override
 		public double getScore(MethodInstance methodA, MethodInstance methodB, ClassEnvironment env) {
 			return ClassifierUtil.compareMethodSets(methodA.getChildren(), methodB.getChildren(), true);
 		}
 	};
 
-	private static final AbstractClassifier outReferences = new AbstractClassifier("out references") {
+	private static final AbstractClassifier OUT_REFERENCES = new AbstractClassifier("out references") {
 		@Override
 		public double getScore(MethodInstance methodA, MethodInstance methodB, ClassEnvironment env) {
 			return ClassifierUtil.compareMethodSets(methodA.getRefsOut(), methodB.getRefsOut(), true);
 		}
 	};
 
-	private static final AbstractClassifier inReferences = new AbstractClassifier("in references") {
+	private static final AbstractClassifier IN_REFERENCES = new AbstractClassifier("in references") {
 		@Override
 		public double getScore(MethodInstance methodA, MethodInstance methodB, ClassEnvironment env) {
 			return ClassifierUtil.compareMethodSets(methodA.getRefsIn(), methodB.getRefsIn(), true);
 		}
 	};
 
-	private static final AbstractClassifier fieldReads = new AbstractClassifier("field reads") {
+	private static final AbstractClassifier FIELD_READS = new AbstractClassifier("field reads") {
 		@Override
 		public double getScore(MethodInstance methodA, MethodInstance methodB, ClassEnvironment env) {
 			return ClassifierUtil.compareFieldSets(methodA.getFieldReadRefs(), methodB.getFieldReadRefs(), true);
 		}
 	};
 
-	private static final AbstractClassifier fieldWrites = new AbstractClassifier("field writes") {
+	private static final AbstractClassifier FIELD_WRITES = new AbstractClassifier("field writes") {
 		@Override
 		public double getScore(MethodInstance methodA, MethodInstance methodB, ClassEnvironment env) {
 			return ClassifierUtil.compareFieldSets(methodA.getFieldWriteRefs(), methodB.getFieldWriteRefs(), true);
 		}
 	};
 
-	private static final AbstractClassifier position = new AbstractClassifier("position") {
+	private static final AbstractClassifier POSITION = new AbstractClassifier("position") {
 		@Override
 		public double getScore(MethodInstance methodA, MethodInstance methodB, ClassEnvironment env) {
 			return ClassifierUtil.classifyPosition(methodA, methodB, MemberInstance::getPosition, (m, idx) -> m.getCls().getMethod(idx), m -> m.getCls().getMethods());
 		}
 	};
 
-	private static final AbstractClassifier code = new AbstractClassifier("code") {
+	private static final AbstractClassifier CODE = new AbstractClassifier("code") {
 		@Override
 		public double getScore(MethodInstance methodA, MethodInstance methodB, ClassEnvironment env) {
 			if (!checkAsmNodes(methodA, methodB)) return compareAsmNodes(methodA, methodB);
@@ -267,7 +267,7 @@ public final class MethodClassifier {
 		}
 	};
 
-	private static final AbstractClassifier inRefsBci = new AbstractClassifier("in refs (bci)") {
+	private static final AbstractClassifier IN_REFS_BCI = new AbstractClassifier("in refs (bci)") {
 		@Override
 		public double getScore(MethodInstance methodA, MethodInstance methodB, ClassEnvironment env) {
 			String ownerA = methodA.getCls().getName();

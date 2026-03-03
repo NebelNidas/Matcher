@@ -270,7 +270,7 @@ public class UidMenu extends Menu {
 		int nextFieldUid = env.nextFieldUid;
 
 		List<ClassInstance> classes = new ArrayList<>(env.getClassesB());
-		classes.sort(ClassInstance.nameComparator);
+		classes.sort(ClassInstance.NAME_COMPARATOR);
 
 		List<MethodInstance> methods = new ArrayList<>();
 		List<FieldInstance> fields = new ArrayList<>();
@@ -289,7 +289,7 @@ public class UidMenu extends Menu {
 			}
 
 			if (!methods.isEmpty()) {
-				methods.sort(MemberInstance.nameComparator);
+				methods.sort(MemberInstance.NAME_COMPARATOR);
 
 				for (MethodInstance method : methods) {
 					int uid = nextMethodUid++;
@@ -309,7 +309,7 @@ public class UidMenu extends Menu {
 			}
 
 			if (!fields.isEmpty()) {
-				fields.sort(MemberInstance.nameComparator);
+				fields.sort(MemberInstance.NAME_COMPARATOR);
 
 				for (FieldInstance field : fields) {
 					field.setUid(nextFieldUid++);

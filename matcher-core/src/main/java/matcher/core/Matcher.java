@@ -127,7 +127,7 @@ public class Matcher {
 		if (a.getArrayDimensions() != b.getArrayDimensions()) throw new IllegalArgumentException("the classes don't have the same amount of array dimensions");
 		if (a.getMatch() == b) return;
 
-		logger.atDebug()
+		LOGGER.atDebug()
 				.addArgument(a)
 				.addArgument(b)
 				.addArgument(() -> (a.hasMappedName() ? " (" + a.getName(NameType.MAPPED_PLAIN) + ")" : ""))
@@ -258,7 +258,7 @@ public class Matcher {
 		if (a.getCls().getMatch() != b.getCls()) throw new IllegalArgumentException("the methods don't belong to the same class");
 		if (a.getMatch() == b) return;
 
-		logger.atDebug()
+		LOGGER.atDebug()
 				.addArgument(a)
 				.addArgument(b)
 				.addArgument(() -> (a.hasMappedName() ? " (" + a.getName(NameType.MAPPED_PLAIN) + ")" : ""))
@@ -331,7 +331,7 @@ public class Matcher {
 		if (a.getCls().getMatch() != b.getCls()) throw new IllegalArgumentException("the methods don't belong to the same class");
 		if (a.getMatch() == b) return;
 
-		logger.atDebug()
+		LOGGER.atDebug()
 				.addArgument(a)
 				.addArgument(b)
 				.addArgument(() -> (a.hasMappedName() ? " (" + a.getName(NameType.MAPPED_PLAIN) + ")" : ""))
@@ -353,7 +353,7 @@ public class Matcher {
 		if (a.isArg() != b.isArg()) throw new IllegalArgumentException("the method vars are not of the same kind");
 		if (a.getMatch() == b) return;
 
-		logger.atDebug()
+		LOGGER.atDebug()
 				.addArgument(a)
 				.addArgument(b)
 				.addArgument(() -> (a.hasMappedName() ? " (" + a.getName(NameType.MAPPED_PLAIN) + ")" : ""))
@@ -372,7 +372,7 @@ public class Matcher {
 		if (cls == null) throw new NullPointerException("null class");
 		if (cls.getMatch() == null) return;
 
-		logger.atDebug()
+		LOGGER.atDebug()
 				.addArgument(cls)
 				.addArgument(cls.getMatch())
 				.addArgument(() -> (cls.hasMappedName() ? " (" + cls.getName(NameType.MAPPED_PLAIN) + ")" : ""))
@@ -398,7 +398,7 @@ public class Matcher {
 		if (m == null) throw new NullPointerException("null member");
 		if (m.getMatch() == null) return;
 
-		logger.atDebug()
+		LOGGER.atDebug()
 				.addArgument(m)
 				.addArgument(m.getMatch())
 				.addArgument(() -> (m.hasMappedName() ? " (" + m.getName(NameType.MAPPED_PLAIN) + ")" : ""))
@@ -430,7 +430,7 @@ public class Matcher {
 		if (a == null) throw new NullPointerException("null method var");
 		if (a.getMatch() == null) return;
 
-		logger.atDebug()
+		LOGGER.atDebug()
 				.addArgument(a)
 				.addArgument(a.getMatch())
 				.addArgument(() -> (a.hasMappedName() ? " (" + a.getName(NameType.MAPPED_PLAIN) + ")" : ""))
@@ -513,7 +513,7 @@ public class Matcher {
 			match(entry.getKey(), entry.getValue());
 		}
 
-		logger.atInfo()
+		LOGGER.atInfo()
 				.addArgument(matches::size)
 				.addArgument(() -> (classes.size() - matches.size()))
 				.addArgument(() -> env.getClassesA().size())
@@ -529,7 +529,7 @@ public class Matcher {
 		int updateRate = Math.max(1, workSet.size() / 200);
 
 		try {
-			List<Future<Void>> futures = threadPool.invokeAll(workSet.stream().<Callable<Void>>map(workItem -> () -> {
+			List<Future<Void>> futures = THREAD_POOL.invokeAll(workSet.stream().<Callable<Void>>map(workItem -> () -> {
 				worker.accept(workItem);
 
 				int cItemsDone = itemsDone.incrementAndGet();
@@ -563,7 +563,7 @@ public class Matcher {
 			match(entry.getKey(), entry.getValue());
 		}
 
-		logger.atInfo()
+		LOGGER.atInfo()
 				.addArgument(matches::size)
 				.addArgument(totalUnmatched::get)
 				.log("Auto matched {} methods ({} unmatched)");
@@ -587,7 +587,7 @@ public class Matcher {
 			match(entry.getKey(), entry.getValue());
 		}
 
-		logger.atInfo()
+		LOGGER.atInfo()
 				.addArgument(matches::size)
 				.addArgument(totalUnmatched::get)
 				.log("Auto matched {} fields ({} unmatched)");
@@ -705,7 +705,7 @@ public class Matcher {
 			match(entry.getKey(), entry.getValue());
 		}
 
-		logger.atInfo()
+		LOGGER.atInfo()
 				.addArgument(matches::size)
 				.addArgument(() -> (isArg ? "arg" : "var"))
 				.addArgument(totalUnmatched::get)
@@ -813,8 +813,8 @@ public class Matcher {
 		public final int matchedFieldCount;
 	}
 
-	public static final ExecutorService threadPool = Executors.newWorkStealingPool();
-	private static final Logger logger = LoggerFactory.getLogger(Matcher.class);
+	public static final ExecutorService THREAD_POOL = Executors.newWorkStealingPool();
+	private static final Logger LOGGER = LoggerFactory.getLogger(Matcher.class);
 
 	private final ClassEnvironment env;
 	private final ClassifierLevel autoMatchLevel = ClassifierLevel.Extra;

@@ -32,7 +32,7 @@ public class Cfr implements Decompiler {
 				.withOutputSink(sink)
 				.build();
 
-		driver.analyse(List.of(cls.getName(nameType).concat(fileSuffix)));
+		driver.analyse(List.of(cls.getName(nameType).concat(FILE_SUFFIX)));
 
 		return sink.toString();
 	}
@@ -40,12 +40,12 @@ public class Cfr implements Decompiler {
 	private record Source(ClassFeatureExtractor env, NameType nameType) implements ClassFileSource {
 		@Override
 		public void informAnalysisRelativePathDetail(String usePath, String classFilePath) {
-			// logger.debug("informAnalysisRelativePathDetail {} {}", usePath, classFilePath);
+			// LOGGER.debug("informAnalysisRelativePathDetail {} {}", usePath, classFilePath);
 		}
 
 		@Override
 		public Collection<String> addJar(String jarPath) {
-			logger.debug("addJar {}", jarPath);
+			LOGGER.debug("addJar {}", jarPath);
 
 			throw new UnsupportedOperationException();
 		}
@@ -57,21 +57,21 @@ public class Cfr implements Decompiler {
 
 		@Override
 		public Pair<byte[], String> getClassFileContent(String path) throws IOException {
-			if (!path.endsWith(fileSuffix)) {
-				logger.debug("getClassFileContent invalid path: {}", path);
+			if (!path.endsWith(FILE_SUFFIX)) {
+				LOGGER.debug("getClassFileContent invalid path: {}", path);
 				throw new NoSuchFileException(path);
 			}
 
-			String clsName = path.substring(0, path.length() - fileSuffix.length());
+			String clsName = path.substring(0, path.length() - FILE_SUFFIX.length());
 			ClassInstance cls = env.getClsByName(clsName, nameType);
 
 			if (cls == null) {
-				logger.debug("getClassFileContent missing cls: {}", clsName);
+				LOGGER.debug("getClassFileContent missing cls: {}", clsName);
 				throw new NoSuchFileException(path);
 			}
 
 			if (cls.getAsmNodes() == null) {
-				logger.debug("getClassFileContent unknown cls: {}", clsName);
+				LOGGER.debug("getClassFileContent unknown cls: {}", clsName);
 				throw new NoSuchFileException(path);
 			}
 
@@ -91,16 +91,16 @@ public class Cfr implements Decompiler {
 		public <T> OutputSinkFactory.Sink<T> getSink(SinkType sinkType, SinkClass sinkClass) {
 			switch (sinkType) {
 			case EXCEPTION:
-				return str -> logger.error("CFR exception: {}", str);
+				return str -> LOGGER.error("CFR exception: {}", str);
 			case JAVA:
 				return sb::append;
 			case PROGRESS:
-				return str -> logger.debug("CFR progress: {}", str);
+				return str -> LOGGER.debug("CFR progress: {}", str);
 			case SUMMARY:
-				return str -> logger.debug("CFR summary: {}", str);
+				return str -> LOGGER.debug("CFR summary: {}", str);
 			default:
-				logger.debug("Unknown CFR sink type: {}", sinkType);
-				return str -> logger.debug("{}", str);
+				LOGGER.debug("Unknown CFR sink type: {}", sinkType);
+				return str -> LOGGER.debug("{}", str);
 			}
 		}
 
@@ -112,6 +112,6 @@ public class Cfr implements Decompiler {
 		private final StringBuilder sb = new StringBuilder();
 	}
 
-	private static final Logger logger = LoggerFactory.getLogger(Cfr.class);
-	private static final String fileSuffix = ".class";
+	private static final Logger LOGGER = LoggerFactory.getLogger(Cfr.class);
+	private static final String FILE_SUFFIX = ".class";
 }
